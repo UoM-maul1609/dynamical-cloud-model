@@ -123,8 +123,11 @@
 		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 		! Find ids for sending and receiving 6 faces                                     !
 		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+		if(mp1%id >= mp1%dx * mp1%dy * mp1%dz) then
+			return
+		endif
 		call MPI_CART_SHIFT( mp1%ring_comm, 0, 1, &
-							mp1%face%s_west, mp1%face%s_east, error)	
+							mp1%face%s_west, mp1%face%s_east, error)
 		call MPI_CART_SHIFT( mp1%ring_comm, 1, 1, &
 							mp1%face%s_south, mp1%face%s_north, error)
 		call MPI_CART_SHIFT( mp1%ring_comm, 2, 1, &
@@ -137,7 +140,6 @@
 		mp1%face%r_top   = mp1%face%s_bottom
 		mp1%face%r_bottom= mp1%face%s_top
 		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-
 
 
 
