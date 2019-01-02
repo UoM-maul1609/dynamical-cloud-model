@@ -1,3 +1,9 @@
+SFVT_DIR = sfvt
+
+.PHONY: sfvt_code cleanall
+CLEANDIRS = $(SFVT_DIR) ./
+
+
 DEBUG = -fbounds-check -g 
 OPT    =-O3
 
@@ -26,10 +32,12 @@ FFLAGS2 =  $(DEBUG) -O3 -o
 
 main.exe	:  main.$(OBJ) variables.$(OBJ) nrtype.$(OBJ) mpi_module.$(OBJ) \
 			 initialisation.$(OBJ) driver_code.$(OBJ) advection_3d.$(OBJ) \
-			  dynamics.$(OBJ) model_lib.a  
+			  dynamics.$(OBJ) model_lib.a sfvt_code
 	$(FOR2) $(FFLAGSOMP)main.exe main.$(OBJ) variables.$(OBJ) mpi_module.$(OBJ) \
 		 initialisation.$(OBJ) driver_code.$(OBJ) advection_3d.$(OBJ) \
-		  dynamics.$(OBJ) -lm model_lib.a \
+		  dynamics.$(OBJ) \
+		  $(SFVT_DIR)/model_lib.a \
+		  -lm model_lib.a \
 		 ${NETCDFLIB} -I ${NETCDFMOD} ${NETCDF_LIB} $(DEBUG)
 model_lib.a	:   nrtype.$(OBJ) nr.$(OBJ) nrutil.$(OBJ) locate.$(OBJ) polint.$(OBJ) \
 				rkqs.$(OBJ) rkck.$(OBJ) odeint.$(OBJ) zbrent.$(OBJ) \
@@ -63,8 +71,9 @@ variables.$(OBJ) : variables.f90 nrtype.$(OBJ)
 	$(FOR) variables.f90 $(FFLAGS)variables.$(OBJ)
 initialisation.$(OBJ) : initialisation.f90 random.$(OBJ) nr.$(OBJ) nrtype.$(OBJ)
 	$(FOR) initialisation.f90 -I ${NETCDFMOD}  $(FFLAGS)initialisation.$(OBJ)
-driver_code.$(OBJ) : driver_code.f90 nrtype.$(OBJ) advection_3d.$(OBJ) dynamics.$(OBJ)
-	$(FOR) driver_code.f90 -I ${NETCDFMOD}  $(FFLAGS)driver_code.$(OBJ)
+driver_code.$(OBJ) : driver_code.f90 nrtype.$(OBJ) advection_3d.$(OBJ) dynamics.$(OBJ) \
+        sfvt_code
+	$(FOR) driver_code.f90 -I ${NETCDFMOD}  $(FFLAGS)driver_code.$(OBJ) -I$(SFVT_DIR)
 mpi_module.$(OBJ) : mpi_module.f90 
 	$(FOR) mpi_module.f90 $(FFLAGS)mpi_module.$(OBJ)
 advection_3d.$(OBJ) : advection_3d.f90 
@@ -75,7 +84,16 @@ main.$(OBJ)   : main.f90 variables.$(OBJ) mpi_module.$(OBJ) initialisation.$(OBJ
 				 driver_code.$(OBJ) advection_3d.$(OBJ) dynamics.$(OBJ)
 	$(FOR)  main.f90 -I ${NETCDFMOD} $(FFLAGS)main.$(OBJ) 
 
-clean :
+sfvt_code:
+	$(MAKE) -C $(SFVT_DIR)
+
+clean: 
 	rm *.exe  *.o *.mod *~ \
 	model_lib.a
 
+cleanall:
+	for i in $(CLEANDIRS); do \
+		$(MAKE) -C $$i clean; \
+	done
+	
+	

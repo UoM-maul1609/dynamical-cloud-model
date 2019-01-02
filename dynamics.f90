@@ -51,15 +51,15 @@
 		do i=1,ip
 			do j=1,jp
 				do k=1,kp
-					a_e(k,j,i)=1._sp/( dx(i)*dxn(i) )
-					a_w(k,j,i)=1._sp/( dx(i)*dxn(i-1) )
-					a_n(k,j,i)=1._sp/( dy(j)*dyn(j) )
-					a_s(k,j,i)=1._sp/( dy(j)*dyn(j-1) )
-					a_u(k,j,i)=1._sp/( dz(k)*dzn(k) )
-					a_d(k,j,i)=1._sp/( dz(k)*dzn(k-1) )
-					a_p(k,j,i)=-1._sp/( dx(i)*dxn(i) ) -1._sp/( dx(i)*dxn(i-1) ) &
-                            -1._sp/( dy(j)*dyn(j) ) -1._sp/( dy(j)*dyn(j-1) )  &
-                            -1._sp/( dz(k)*dzn(k) ) -1._sp/( dz(k)*dzn(k-1) ) 
+					a_e(k,j,i)=1._sp/( dx(i-1)*dxn(i) )
+					a_w(k,j,i)=1._sp/( dx(i-1)*dxn(i-1) )
+					a_n(k,j,i)=1._sp/( dy(j-1)*dyn(j) )
+					a_s(k,j,i)=1._sp/( dy(j-1)*dyn(j-1) )
+					a_u(k,j,i)=1._sp/( dz(k-1)*dzn(k) )
+					a_d(k,j,i)=1._sp/( dz(k-1)*dzn(k-1) )
+					a_p(k,j,i)=-1._sp/( dx(i-1)*dxn(i) ) -1._sp/( dx(i-1)*dxn(i-1) ) &
+                            -1._sp/( dy(j-1)*dyn(j) ) -1._sp/( dy(j-1)*dyn(j-1) )  &
+                            -1._sp/( dz(k-1)*dzn(k) ) -1._sp/( dz(k-1)*dzn(k-1) ) 
 				enddo
 			enddo
 		enddo
@@ -439,9 +439,9 @@
 		do i=2-l_h,ip
 			do j=1,jp
 				do k=1,kp
-					su(k,j,i)=rhoa(k)* ( ( ( u(k,j,i-1)*(u(k,j,i)+u(k,j,i-1)) - &
+					su(k,j,i)=rhoan(k)* ( ( ( u(k,j,i-1)*(u(k,j,i)+u(k,j,i-1)) - &
 								u(k,j,i+1)*(u(k,j,i)+u(k,j,i+1)) ) / &
-								(2._sp*(dxn(i)+dxn(i-1))) + &
+								(2._sp*(dx(i)+dx(i-1))) + &
 							  ( u(k,j-1,i)*(v(k,j-1,i)+v(k,j-1,i+1)) - &
 								u(k,j+1,i)*(v(k,j,i)+v(k,j,i+1)) ) / &
 								(2._sp*(dyn(j)+dyn(j-1))) + &
@@ -458,12 +458,12 @@
 		do i=1,ip
 			do j=2-l_h,jp
 				do k=1,kp
-					sv(k,j,i)=rhoa(k)* ( ( ( v(k,j,i-1)*(u(k,j,i-1)+u(k,j+1,i-1)) - &
+					sv(k,j,i)=rhoan(k)* ( ( ( v(k,j,i-1)*(u(k,j,i-1)+u(k,j+1,i-1)) - &
 								v(k,j,i+1)*(u(k,j,i)+u(k,j+1,i)) ) / &
 								(2._sp*(dxn(i)+dxn(i-1))) + &
 							  ( v(k,j-1,i)*(v(k,j,i)+v(k,j-1,i)) - &
 								v(k,j+1,i)*(v(k,j,i)+v(k,j+1,i)) ) / &
-								(2._sp*(dyn(j)+dyn(j-1))) + &
+								(2._sp*(dy(j)+dy(j-1))) + &
 							  ( v(k-1,j,i)*(w(k-1,j,i)+w(k-1,j+1,i)) - &
 								v(k+1,j,i)*(w(k,j,i)+w(k,j+1,i)) ) / &
 								(2._sp*(dzn(k)+dzn(k-1))) ) )
@@ -477,7 +477,7 @@
 		do i=1,ip
 			do j=1,jp
 				do k=2-l_h,kp
-					sw(k,j,i)=rhoan(k)* ( ( ( w(k,j,i-1)*(u(k,j,i-1)+u(k+1,j,i-1)) - &
+					sw(k,j,i)=rhoa(k)* ( ( ( w(k,j,i-1)*(u(k,j,i-1)+u(k+1,j,i-1)) - &
 								w(k,j,i+1)*(u(k,j,i)+u(k+1,j,i)) ) / &
 								(2._sp*(dxn(i)+dxn(i-1))) + &
 							  ( w(k,j-1,i)*(v(k,j-1,i)+v(k+1,j-1,i)) - &
@@ -485,9 +485,9 @@
 								(2._sp*(dyn(j)+dyn(j-1))) + &
 							  ( w(k-1,j,i)*(w(k,j,i)+w(k-1,j,i)) - &
 								w(k+1,j,i)*(w(k,j,i)+w(k+1,j,i)) ) / &
-								(2._sp*(dzn(k)+dzn(k-1))) ) + &
+								(2._sp*(dz(k)+dz(k-1))) ) + &
 								grav*(th(k,j,i)+th(k+1,j,i) ) / &
-									(2._sp*thetan(k)) )
+									(2._sp*theta(k)) )
 				enddo
 			enddo
 		enddo		
@@ -716,9 +716,9 @@
 		do i=1,ip
 			do j=1,jp
 				do k=1,kp
-					rhs(k,j,i)=( ( su(k,j,i)-su(k,j,i-1) )/ dxn(i-1) + &
-							 ( sv(k,j,i)-sv(k,j-1,i) )/ dyn(j-1) + &
-							 ( sw(k,j,i)-sw(k-1,j,i) )/ dzn(k-1) )
+					rhs(k,j,i)=( ( su(k,j,i)-su(k,j,i-1) )/ dx(i-1) + &
+							 ( sv(k,j,i)-sv(k,j-1,i) )/ dy(j-1) + &
+							 ( sw(k,j,i)-sw(k-1,j,i) )/ dz(k-1) )
 				enddo
 			enddo
 		enddo
@@ -783,8 +783,8 @@
 		do i=1,ip
 			do j=1,jp
 				do k=1,kp
-					u(k,j,i)=(rhoa(k)*zu(k,j,i)+( su(k,j,i) - &
-						( p(k,j,i+1)-p(k,j,i) ) / (dx(i)) )*dt )/rhoa(k)
+					u(k,j,i)=(rhoan(k)*zu(k,j,i)+( su(k,j,i) - &
+						( p(k,j,i+1)-p(k,j,i) ) / (dxn(i)) )*dt )/rhoan(k)
 				enddo
 			enddo
 		enddo
@@ -795,8 +795,8 @@
 		do i=1,ip
 			do j=1,jp
 				do k=1,kp
-					v(k,j,i)=(rhoa(k)*zv(k,j,i)+( sv(k,j,i) - &
-						( p(k,j+1,i)-p(k,j,i) ) / (dy(j)) )*dt ) /rhoa(k)
+					v(k,j,i)=(rhoan(k)*zv(k,j,i)+( sv(k,j,i) - &
+						( p(k,j+1,i)-p(k,j,i) ) / (dyn(j)) )*dt ) /rhoan(k)
 				enddo
 			enddo
 		enddo
@@ -807,8 +807,8 @@
 		do i=1,ip
 			do j=1,jp
 				do k=1,kp
-					w(k,j,i)=(rhoan(k)*zw(k,j,i)+( sw(k,j,i) - &
-						( p(k+1,j,i)-p(k,j,i) ) / (dz(k)) )*dt) / rhoan(k)
+					w(k,j,i)=(rhoa(k)*zw(k,j,i)+( sw(k,j,i) - &
+						( p(k+1,j,i)-p(k,j,i) ) / (dzn(k)) )*dt) / rhoa(k)
 				enddo
 			enddo
 		enddo

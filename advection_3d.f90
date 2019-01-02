@@ -608,9 +608,9 @@
 				do k=1,kp
 					psi_3d(k,j,i) = psi_3d(k,j,i) &
 								- dt*(0.5_sp/dz(k)*w(k-1,j,i)*&
-								rhoan(k-1)*(psi_ref(k)-psi_ref(k-1)) &
+								rhoa(k-1)*(psi_ref(k)-psi_ref(k-1)) &
 									 + 0.5_sp/dz(k)*w(k,j,i)* &
-								rhoan(k)*(psi_ref(k+1)-psi_ref(k)))/rhoa(k)
+								rhoa(k)*(psi_ref(k+1)-psi_ref(k)))/rhoan(k)
 				enddo
 			enddo
 		enddo

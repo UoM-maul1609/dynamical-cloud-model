@@ -239,14 +239,14 @@
 		dzn(:)=dz_nm
 		! set up horizontal level array
 		x=dx_nm*(/(i,i=-l_h+ipstart,ipp+r_h+ipstart-1)/) - real(ip+1,sp)/2._sp*dx_nm
-		xn=x+0.5_sp*dx_nm
+		xn=x-0.5_sp*dx_nm
 		! set up horizontal level array
 		y=dy_nm*(/(i,i=-l_h+jpstart,jpp+r_h+jpstart-1)/) - real(jp+1,sp)/2._sp*dy_nm
-		yn=y+0.5_sp*dy_nm
+		yn=y-0.5_sp*dy_nm
 
 		! set up vertical level array
 		z=dz_nm*(/(i,i=-l_h+kpstart-1,kpp+r_h+kpstart-2)/)
-		zn=z+0.5_sp*dz_nm
+		zn=z-0.5_sp*dz_nm
 		
 		! set up mixing length array
 		lamsq=1._sp / (1._sp/(cvis*(dx_nm+dy_nm+dz)/3._sp)**2._sp + &
@@ -340,8 +340,8 @@
 		do i=1,ipp
 			do j=1,jpp
 				do k=1,kpp
-					u(k,j,i)=-5._sp*(y(j))/sqrt(xn(i)*xn(i)+y(j)*y(j))
-					v(k,j,i)=5._sp*(x(i))/sqrt(x(i)*x(i)+yn(j)*yn(j))
+					u(k,j,i)=-5._sp*(yn(j))/sqrt(x(i)*x(i)+yn(j)*yn(j))
+					v(k,j,i)=5._sp*(xn(i))/sqrt(xn(i)*xn(i)+y(j)*y(j))
 				enddo
 			enddo
 		enddo
@@ -394,8 +394,8 @@
 				
 					rad = (z(k)-3000._sp)**2._sp
 						
-					if (ip > 1) rad=rad+x(i)**2._sp
-					if (jp > 1) rad=rad+y(j)**2._sp
+					if (ip > 1) rad=rad+xn(i)**2._sp
+					if (jp > 1) rad=rad+yn(j)**2._sp
 					
 					rad=sqrt(rad)
 					if(rad<=1000._sp) then

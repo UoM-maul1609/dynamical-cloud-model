@@ -55,7 +55,9 @@
 				dims,id, world_process, rank, ring_comm)
 		use nrtype
 		use mpi_module, only : exchange_full, exchange_along_dim
-		use advection_3d, only : first_order_upstream_3d, mpdata_3d, adv_ref_state
+		!use advection_3d, only : first_order_upstream_3d, mpdata_3d, adv_ref_state
+        use advection_s_3d, only : first_order_upstream_3d, &
+                    mpdata_3d, mpdata_vec_3d, adv_ref_state
 		use d_solver, only : bicgstab, sources, advance_momentum
 
 		implicit none
@@ -207,10 +209,10 @@
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 			select case (advection_scheme)
 				case (0)
-					call first_order_upstream_3d(dt,dx,dy,dz,rhoa,&
+					call first_order_upstream_3d(dt,dxn,dyn,dzn,rhoa,rhoan, &
 						ipp,jpp,kpp,l_h,r_h,u,v,w,th)
 				case (1)
-					call mpdata_3d(dt,dx,dy,dz,dxn,dyn,dzn,rhoa,&
+					call mpdata_3d(dt,dx,dy,dz,dxn,dyn,dzn,rhoa,rhoan, &
 						ipp,jpp,kpp,l_h,r_h,u,v,w,th,kord,monotone,ring_comm,id, &
 						dims,coords)
 				case default
