@@ -152,7 +152,7 @@
 		integer(i4b) :: i,j,k
 		
 		call exchange_along_dim(comm3d, id, kp, jp, ip, &
-			halo,halo,halo,halo,halo,halo, x,dims,coords)
+			halo,halo,halo,halo,halo,halo, x,0._sp,0._sp,dims,coords)
 
 		ax=0._sp
 !$omp simd		
@@ -675,17 +675,17 @@
 		
 			! 4. wrap taus
 			call exchange_full(comm3d, id, kp, jp, ip, r_h,r_h,r_h,r_h,r_h,r_h, tau11,& 
-								dims,coords)
+								0._sp,0._sp,dims,coords)
 			call exchange_full(comm3d, id, kp, jp, ip, r_h,r_h,r_h,r_h,r_h,r_h, tau12,&
-								dims,coords)
+								0._sp,0._sp,dims,coords)
 			call exchange_full(comm3d, id, kp, jp, ip, r_h,r_h,r_h,r_h,r_h,r_h, tau13,&
-								dims,coords)
+								0._sp,0._sp,dims,coords)
 			call exchange_full(comm3d, id, kp, jp, ip, r_h,r_h,r_h,r_h,r_h,r_h, tau22,&
-								dims,coords)
+								0._sp,0._sp,dims,coords)
 			call exchange_full(comm3d, id, kp, jp, ip, r_h,r_h,r_h,r_h,r_h,r_h, tau23,&
-								dims,coords)
+								0._sp,0._sp,dims,coords)
 			call exchange_full(comm3d, id, kp, jp, ip, r_h,r_h,r_h,r_h,r_h,r_h, tau33,&
-								dims,coords)
+								0._sp,0._sp,dims,coords)
 		
 		
 			! 5. calculate source terms on staggered grids
@@ -747,11 +747,11 @@
 
 		! 6. wrap sources
 		call exchange_along_dim(comm3d, id, kp, jp, ip, r_h,r_h,r_h,r_h,r_h,r_h, su, &
-						    dims,coords)			
+						    0._sp,0._sp,dims,coords)			
 		call exchange_along_dim(comm3d, id, kp, jp, ip, r_h,r_h,r_h,r_h,r_h,r_h, sv,&
-							dims,coords)
+							0._sp,0._sp,dims,coords)
 		call exchange_along_dim(comm3d, id, kp, jp, ip, r_h,r_h,r_h,r_h,r_h,r_h, sw,&
-							dims,coords)
+							0._sp,0._sp,dims,coords)
 
 
 		! su, sv, and su are now centred on i+1/2
