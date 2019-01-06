@@ -268,9 +268,9 @@
                     ! last update of eq 38 smolarkiewicz 1984
                     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
                     ut_sav(k,i)=ut_sav(k,i) - 0.25_sp*dt*ut(k,i) * &
-                     ( (ut(k,i+1)-ut(k,i-1))/(dx(i-1))-u_div1 )
+                     ( (ut(k,i+1)-ut(k,i-1))/(dx(i-1))+u_div1 )
                     wt_sav(k,i)=wt_sav(k,i) - 0.25_sp*dt*wt(k,i) * &
-                     ( (wt(k+1,i)-wt(k-1,i))/(dz(k-1))-u_div3 )
+                     ( (wt(k+1,i)-wt(k-1,i))/(dz(k-1))+u_div3 )
                     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 
@@ -719,9 +719,9 @@
                     ! last update of eq 38 smolarkiewicz 1984
                     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
                     ut_sav(k,i)=ut_sav(k,i) - 0.25_sp*dt*ut(k,i) * &
-                     ( (ut(k,i+1)-ut(k,i-1))/(dx(i-1))-u_div1 )
+                     ( (ut(k,i+1)-ut(k,i-1))/(dx(i-1))+u_div1 )
                     wt_sav(k,i)=wt_sav(k,i) - 0.25_sp*dt*wt(k,i) * &
-                     ( (wt(k+1,i)-wt(k-1,i))/(dz(k-1))-u_div3 )
+                     ( (wt(k+1,i)-wt(k-1,i))/(dz(k-1))+u_div3 )
                     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 
