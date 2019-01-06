@@ -25,7 +25,8 @@
             real(sp), dimension(:,:,:,:), allocatable :: q
             real(sp), dimension(:), allocatable ::	dx, dy, dz, dxn,dyn,dzn, &
             										x, y, z, xn,yn,zn, &
-            										rhoa, rhoan,lamsq, lamsqn
+            										rhoa, rhoan,lamsq, lamsqn, &
+            										lbc,ubc
             										 
         end type grid
 
