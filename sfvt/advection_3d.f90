@@ -6,7 +6,8 @@
     use nrtype
     
     private
-    public :: mpdata_3d, mpdata_vec_3d, first_order_upstream_3d, adv_ref_state
+    public :: mpdata_3d, mpdata_vec_3d, first_order_upstream_3d, adv_ref_state, &
+            mpdata_3d_add
     real(sp), parameter :: small=1e-60_sp
     
 	contains
@@ -85,6 +86,78 @@
 	end subroutine first_order_upstream_3d
 	
 	
+	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+	! multi-dimensional advection using the smolarkiewicz scheme                                                 !
+	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+	!>@author
+	!>Paul J. Connolly, The University of Manchester
+	!>@brief
+	!>call mp-data after adding 1-d array then subtract 1-d array
+	!>@param[in] dt
+	!>@param[in] dx,dy,dz, dxn, dyn, dzn, rhoa, rhoan
+	!>@param[in] ip,jp,kp,l_h,r_h
+	!>@param[in] u
+	!>@param[in] v
+	!>@param[in] w
+	!>@param[inout] psi
+	!>@param[in] psi_1d
+	!>@param[in] lbc,ubc
+	!>@param[in] kord, monotone: order of MPDATA and whether it is monotone
+	!>@param[in] comm3d, id, dims, coords: mpi variables
+	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+	subroutine mpdata_3d_add(dt,dx,dy,dz,dxn,dyn,dzn,&
+						rhoa,rhoan, &
+						ip,jp,kp,l_h,r_h,u,v,w,psi_in,psi_1d,lbc,ubc, &
+						kord,monotone, comm3d, id, &
+						dims,coords)
+	use nrtype
+	use mpi_module
+	use mpi
+	
+	implicit none
+	
+	
+	integer(i4b), intent(in) :: id, comm3d
+	integer(i4b), dimension(3), intent(in) :: dims, coords
+	real(sp), intent(in) :: dt
+	integer(i4b), intent(in) :: ip, jp, kp, l_h, r_h,kord
+	real(sp), dimension(-r_h+1:kp+r_h,-r_h+1:jp+r_h,-l_h+1:ip+r_h), &
+		intent(in) :: u
+	real(sp), dimension(-r_h+1:kp+r_h,-l_h+1:jp+r_h,-r_h+1:ip+r_h), &
+		intent(in) :: v
+	real(sp), dimension(-l_h+1:kp+r_h,-r_h+1:jp+r_h,-r_h+1:ip+r_h), &
+		intent(in) :: w
+	real(sp), dimension(-r_h+1:kp+r_h,-r_h+1:jp+r_h,-r_h+1:ip+r_h), &
+		intent(inout) :: psi_in
+	real(sp), intent(inout) :: lbc, ubc
+	real(sp), dimension(-r_h+1:kp+r_h), intent(in) :: psi_1d
+	real(sp), dimension(-l_h+1:ip+r_h), intent(in) :: dx, dxn
+	real(sp), dimension(-l_h+1:jp+r_h), intent(in) :: dy, dyn
+	real(sp), dimension(-l_h+1:kp+r_h), intent(in) :: dz, dzn, rhoa, rhoan
+	logical :: monotone
+	
+	! locals
+	integer(i4b) :: k
+	
+	! add 1d array
+	do k=1-l_h,kp+r_h
+	    psi_in(k,:,:)=psi_in(k,:,:)+psi_1d(k)
+	enddo
+	
+	! call advection routine
+    call mpdata_3d(dt,dx,dy,dz,dxn,dyn,dzn,rhoa,rhoan, &
+        ip,jp,kp,l_h,r_h,u,v,w,psi_in,lbc,ubc, &
+        kord,monotone,comm3d,id, &
+        dims,coords)
+	
+	! subtract 1d array
+	do k=1-l_h,kp+r_h
+	    psi_in(k,:,:)=psi_in(k,:,:)-psi_1d(k)
+	enddo
+	
+	end subroutine mpdata_3d_add
+	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+	
 	
 	
 	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -106,12 +179,14 @@
 	!>@param[in] v
 	!>@param[in] w
 	!>@param[inout] psi
+	!>@param[in] lbc,ubc
 	!>@param[in] kord, monotone: order of MPDATA and whether it is monotone
 	!>@param[in] comm3d, id, dims, coords: mpi variables
 	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 	subroutine mpdata_3d(dt,dx,dy,dz,dxn,dyn,dzn,&
 						rhoa,rhoan, &
-						ip,jp,kp,l_h,r_h,u,v,w,psi_in,kord,monotone, comm3d, id, &
+						ip,jp,kp,l_h,r_h,u,v,w,psi_in,lbc,ubc, &
+						kord,monotone, comm3d, id, &
 						dims,coords)
 	use nrtype
 	use mpi_module
@@ -132,6 +207,7 @@
 		intent(in), target :: w
 	real(sp), dimension(-r_h+1:kp+r_h,-r_h+1:jp+r_h,-r_h+1:ip+r_h), &
 		intent(inout), target :: psi_in
+	real(sp), intent(inout) :: lbc, ubc
 	real(sp), dimension(-l_h+1:ip+r_h), intent(in) :: dx, dxn
 	real(sp), dimension(-l_h+1:jp+r_h), intent(in) :: dy, dyn
 	real(sp), dimension(-l_h+1:kp+r_h), intent(in) :: dz, dzn, rhoa, rhoan
@@ -163,15 +239,19 @@
 	
 
 	! has to be positive definite
-	minlocal=minval(psi_in(1:kp,1:jp,1:ip))
+	minlocal=min(minval(psi_in(1:kp,1:jp,1:ip)),lbc,ubc)
 	call mpi_allreduce(minlocal,minglobal,1,MPI_REAL8,MPI_MIN, comm3d,error)
 
 	psi_in=psi_in-minglobal
+	lbc=lbc-minglobal
+	ubc=ubc-minglobal
 	
 	psi_local_sum=sum(psi_in(1:kp,1:jp,1:ip))
 	call MPI_Allreduce(psi_local_sum, psi_sum, 1, MPI_REAL8, MPI_SUM, comm3d, error)
  	if(psi_sum.lt.small) then
  	    psi_in(:,:,:)=psi_in(:,:,:)+minglobal
+ 	    lbc=lbc+minglobal
+ 	    ubc=ubc+minglobal
  	    return
 	endif
 	u_store2=0._sp
@@ -367,11 +447,11 @@
 			endif
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 			call exchange_full(comm3d, id, kp, jp, ip, r_h,r_h,r_h,r_h,l_h,r_h, &
-														ut,dims,coords)
+														ut,0._sp,0._sp,dims,coords)
 			call exchange_full(comm3d, id, kp, jp, ip, r_h,r_h,l_h,r_h,r_h,r_h, &
-														vt,dims,coords)
+														vt,0._sp,0._sp,dims,coords)
 			call exchange_full(comm3d, id, kp, jp, ip, l_h,r_h,r_h,r_h,r_h,r_h, &
-														wt,dims,coords)
+														wt,0._sp,0._sp,dims,coords)
 		endif
 		
 		
@@ -485,17 +565,17 @@
 			! exchange halos for beta_i_up, down
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 			call exchange_along_dim(comm3d, id, kp, jp, ip, r_h,r_h,r_h,r_h,r_h,r_h, &
-														beta_i_up,dims,coords)
+													beta_i_up,0._sp,0._sp,dims,coords)
 			call exchange_along_dim(comm3d, id, kp, jp, ip, r_h,r_h,r_h,r_h,r_h,r_h, &
-														beta_i_down,dims,coords)
+													beta_i_down,0._sp,0._sp,dims,coords)
 			call exchange_along_dim(comm3d, id, kp, jp, ip, r_h,r_h,r_h,r_h,r_h,r_h, &
-														beta_j_up,dims,coords)
+													beta_j_up,0._sp,0._sp,dims,coords)
 			call exchange_along_dim(comm3d, id, kp, jp, ip, r_h,r_h,r_h,r_h,r_h,r_h, &
-														beta_j_down,dims,coords)
+													beta_j_down,0._sp,0._sp,dims,coords)
 			call exchange_along_dim(comm3d, id, kp, jp, ip, r_h,r_h,r_h,r_h,r_h,r_h, &
-														beta_k_up,dims,coords)
+													beta_k_up,0._sp,0._sp,dims,coords)
 			call exchange_along_dim(comm3d, id, kp, jp, ip, r_h,r_h,r_h,r_h,r_h,r_h, &
-														beta_k_down,dims,coords)
+													beta_k_down,0._sp,0._sp,dims,coords)
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 								
@@ -535,11 +615,11 @@
 			wt_sav => w_store1
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 			call exchange_full(comm3d, id, kp, jp, ip, r_h,r_h,r_h,r_h,l_h,r_h, &
-														ut,dims,coords)
+														ut,0._sp,0._sp,dims,coords)
 			call exchange_full(comm3d, id, kp, jp, ip, r_h,r_h,l_h,r_h,r_h,r_h, &
-														vt,dims,coords)
+														vt,0._sp,0._sp,dims,coords)
 			call exchange_full(comm3d, id, kp, jp, ip, l_h,r_h,r_h,r_h,r_h,r_h, &
-														wt,dims,coords)
+														wt,0._sp,0._sp,dims,coords)
 
 		endif
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -561,7 +641,7 @@
 			! set halos																	 !
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!		
 			call exchange_full(comm3d, id, kp, jp, ip, r_h,r_h,r_h,r_h,r_h,r_h, &
-									psi_old,dims,coords)
+									psi_old,lbc,ubc,dims,coords)
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!			
 		endif		
  	enddo
@@ -578,6 +658,8 @@
 	if (associated(psi_old) ) nullify(psi_old)
 
 	psi_in=psi_in+minglobal
+	lbc=lbc+minglobal
+	ubc=ubc+minglobal
 	end subroutine mpdata_3d
 	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 	
@@ -654,12 +736,14 @@
 	!>@param[in] v
 	!>@param[in] w
 	!>@param[inout] psi
+	!>@param[in] lbc,ubc
 	!>@param[in] kord, monotone: order of MPDATA and whether it is monotone
 	!>@param[in] comm3d, id, dims, coords: mpi variables
 	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 	subroutine mpdata_vec_3d(dt,dx,dy,dz,dxn,dyn,dzn,&
 						rhoa,rhoan, &
-						ip,jp,kp,nq,l_h,r_h,u,v,w,psi_in,kord,monotone, comm3d, id, &
+						ip,jp,kp,nq,l_h,r_h,u,v,w,psi_in,lbc,ubc, &
+						kord,monotone, comm3d, id, &
 						dims,coords)
 	use nrtype
 	use mpi_module
@@ -680,6 +764,7 @@
 		intent(in), target :: w
 	real(sp), dimension(-r_h+1:kp+r_h,-r_h+1:jp+r_h,-r_h+1:ip+r_h,1:nq), &
 		intent(inout), target :: psi_in
+	real(sp), intent(inout), dimension(nq) :: lbc, ubc
 	real(sp), dimension(-l_h+1:ip+r_h), intent(in) :: dx, dxn
 	real(sp), dimension(-l_h+1:jp+r_h), intent(in) :: dy, dyn
 	real(sp), dimension(-l_h+1:kp+r_h), intent(in) :: dz, dzn, rhoa, rhoan
@@ -713,9 +798,11 @@
 
 	! has to be positive definite
 	do n=1,nq
-        minlocal=minval(psi_in(1:kp,1:jp,1:ip,n))
+        minlocal=min(minval(psi_in(1:kp,1:jp,1:ip,n)),lbc(n),ubc(n))
         call mpi_allreduce(minlocal,minglobal(n),1,MPI_REAL8,MPI_MIN, comm3d,error)
         psi_in(:,:,:,n)=psi_in(:,:,:,n)-minglobal(n)
+        lbc(n)=lbc(n)-minglobal(n)
+        ubc(n)=ubc(n)-minglobal(n)
 	enddo
 	
 	psi_local_sum=sum(psi_in(1:kp,1:jp,1:ip,1))
@@ -723,6 +810,8 @@
  	if(psi_sum.lt.small) then 
  	    do n=1,nq
  	        psi_in(:,:,:,n)=psi_in(:,:,:,n)+minglobal(n)
+            lbc(n)=lbc(n)+minglobal(n)
+            ubc(n)=ubc(n)+minglobal(n)
  	    enddo
  	    return
 	endif
@@ -922,11 +1011,11 @@
 			endif
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 			call exchange_full(comm3d, id, kp, jp, ip, r_h,r_h,r_h,r_h,l_h,r_h, &
-														ut,dims,coords)
+														ut,0._sp,0._sp,dims,coords)
 			call exchange_full(comm3d, id, kp, jp, ip, r_h,r_h,l_h,r_h,r_h,r_h, &
-														vt,dims,coords)
+														vt,0._sp,0._sp,dims,coords)
 			call exchange_full(comm3d, id, kp, jp, ip, l_h,r_h,r_h,r_h,r_h,r_h, &
-														wt,dims,coords)
+														wt,0._sp,0._sp,dims,coords)
 		endif
 		
 		
@@ -1040,17 +1129,17 @@
 			! exchange halos for beta_i_up, down
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 			call exchange_along_dim(comm3d, id, kp, jp, ip, r_h,r_h,r_h,r_h,r_h,r_h, &
-														beta_i_up,dims,coords)
+													beta_i_up,0._sp,0._sp,dims,coords)
 			call exchange_along_dim(comm3d, id, kp, jp, ip, r_h,r_h,r_h,r_h,r_h,r_h, &
-														beta_i_down,dims,coords)
+													beta_i_down,0._sp,0._sp,dims,coords)
 			call exchange_along_dim(comm3d, id, kp, jp, ip, r_h,r_h,r_h,r_h,r_h,r_h, &
-														beta_j_up,dims,coords)
+													beta_j_up,0._sp,0._sp,dims,coords)
 			call exchange_along_dim(comm3d, id, kp, jp, ip, r_h,r_h,r_h,r_h,r_h,r_h, &
-														beta_j_down,dims,coords)
+													beta_j_down,0._sp,0._sp,dims,coords)
 			call exchange_along_dim(comm3d, id, kp, jp, ip, r_h,r_h,r_h,r_h,r_h,r_h, &
-														beta_k_up,dims,coords)
+													beta_k_up,0._sp,0._sp,dims,coords)
 			call exchange_along_dim(comm3d, id, kp, jp, ip, r_h,r_h,r_h,r_h,r_h,r_h, &
-														beta_k_down,dims,coords)
+													beta_k_down,0._sp,0._sp,dims,coords)
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 								
@@ -1090,11 +1179,11 @@
 			wt_sav => w_store1
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 			call exchange_full(comm3d, id, kp, jp, ip, r_h,r_h,r_h,r_h,l_h,r_h, &
-														ut,dims,coords)
+														ut,0._sp,0._sp,dims,coords)
 			call exchange_full(comm3d, id, kp, jp, ip, r_h,r_h,l_h,r_h,r_h,r_h, &
-														vt,dims,coords)
+														vt,0._sp,0._sp,dims,coords)
 			call exchange_full(comm3d, id, kp, jp, ip, l_h,r_h,r_h,r_h,r_h,r_h, &
-														wt,dims,coords)
+														wt,0._sp,0._sp,dims,coords)
 
 		endif
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -1113,7 +1202,7 @@
                 ! set halos																 !
                 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!		
                 call exchange_full(comm3d, id, kp, jp, ip, r_h,r_h,r_h,r_h,r_h,r_h, &
-                                        psi_in(:,:,:,n),dims,coords)
+                                        psi_in(:,:,:,n),lbc(n),ubc(n),dims,coords)
                 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!			
             endif		
         enddo
@@ -1136,6 +1225,8 @@
 
     do n=1,nq
     	psi_in(:,:,:,n)=psi_in(:,:,:,n)+minglobal(n)
+    	lbc(n)=lbc(n)+minglobal(n)
+    	ubc(n)=ubc(n)+minglobal(n)
     enddo
 	end subroutine mpdata_vec_3d
 	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!

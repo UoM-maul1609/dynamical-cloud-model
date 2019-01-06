@@ -21,6 +21,7 @@
 	!>@param[inout] ut,vt,wt, q: prognostics
 	!>@param[in] rhoa, rhoan: reference variables
 	!>@param[in] lamsq, lamsqn: reference variables
+	!>@param[inout] lbc,ubc: boundary conditions
 	!>@param[in] coords: for Cartesian topology
 	!>@param[inout] new_file: flag for if this is a new file
 	!>@param[in] outputfile: netcdf output
@@ -39,6 +40,7 @@
 				q, &
 				rhoa,rhoan, &
 				lamsq,lamsqn, &
+				lbc,ubc,&
 				coords, &
 				new_file,outputfile, output_interval, &
 				viscous, &
@@ -76,7 +78,7 @@
 		real(sp), &
 			dimension(1-l_h:kpp+r_h,1-r_h:jpp+r_h,1-r_h:ipp+r_h,1:nq), target, &
 			intent(inout) :: q
-					
+		real(sp), dimension(nq), intent(inout) :: lbc,ubc
 		! locals:		
 		integer(i4b) :: n,n2, cur=1, i,j,k, error, rank2
 		real(sp) :: time, time_last_output, output_time, a
@@ -141,7 +143,8 @@
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!		
 			do n2=1,nq
                 call exchange_full(ring_comm, id, kpp, jpp, ipp, &
-                                    r_h,r_h,r_h,r_h,r_h,r_h,q(:,:,:,n2),dims,coords)
+                                    r_h,r_h,r_h,r_h,r_h,r_h,q(:,:,:,n2),&
+                                    lbc(n2),ubc(n2),dims,coords)
             enddo
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!	
 
@@ -161,13 +164,14 @@
 				case (1)
 				    do n2=1,nq
                         call mpdata_3d(dt,dx,dy,dz,dxn,dyn,dzn,rhoa,rhoan,&
-                            ipp,jpp,kpp,l_h,r_h,u,v,w,q(:,:,:,n2),kord,monotone,&
+                            ipp,jpp,kpp,l_h,r_h,u,v,w,q(:,:,:,n2),lbc(n2),ubc(n2),&
+                            kord,monotone,&
                             ring_comm,id, &
                             dims,coords)
                     enddo
 				case (2)
 					call mpdata_vec_3d(dt,dx,dy,dz,dxn,dyn,dzn,rhoa,rhoan,&
-						ipp,jpp,kpp,nq,l_h,r_h,u,v,w,q(:,:,:,:),kord, &
+						ipp,jpp,kpp,nq,l_h,r_h,u,v,w,q(:,:,:,:),lbc,ubc,kord, &
 						monotone,ring_comm,id, dims,coords)
 				case default
 					print *,'not coded'
@@ -181,7 +185,8 @@
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!		
 			do n2=1,nq
                 call exchange_full(ring_comm, id, kpp, jpp, ipp, &
-                                    r_h,r_h,r_h,r_h,r_h,r_h,q(:,:,:,n2),dims,coords)
+                                    r_h,r_h,r_h,r_h,r_h,r_h,q(:,:,:,n2),&
+                                    lbc(n2),ubc(n2),dims,coords)
             enddo
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!	
 
@@ -197,11 +202,11 @@
 			! set halos																	 !
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!		
 			call exchange_full(ring_comm, id, kpp, jpp, ipp, r_h,r_h,r_h,r_h,l_h,r_h,u,&
-								dims,coords)
+								0._sp,0._sp,dims,coords)
 			call exchange_full(ring_comm, id, kpp, jpp, ipp, r_h,r_h,l_h,r_h,r_h,r_h,v,&
-								dims,coords)
+								0._sp,0._sp,dims,coords)
 			call exchange_full(ring_comm, id, kpp, jpp, ipp, l_h,r_h,r_h,r_h,r_h,r_h,w,&
-								dims,coords)
+								0._sp,0._sp,dims,coords)
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 		enddo

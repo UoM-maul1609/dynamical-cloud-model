@@ -24,6 +24,7 @@
 	!>@param[inout] x,y,z,xn,yn,zn,u,v,w,q - grid positions and prognostics
 	!>@param[inout] rhoa,rhoan - reference potential temperatures
 	!>@param[inout] lamsq,lamsqn - mixing length
+	!>@param[inout] lbc, ubc
 	!>@param[in] cvis - smagorinsky parameter
 	!>@param[inout] dx,dy,dz - grid spacing on grid
 	!>@param[inout] dxn,dyn,dzn - grid spacing on grid - staggered
@@ -40,6 +41,7 @@
 			q, &
 			rhoa,rhoan, &
 			lamsq,lamsqn, &
+			lbc,ubc, &
 			cvis, &
 			dx, dy, dz, &
 			dxn, dyn, dzn, &
@@ -65,7 +67,7 @@
 		real(sp), dimension(:), allocatable, intent(inout) :: x,y,z,xn,yn,zn,dx,dy,dz, &
 															dxn,dyn,dzn, &
 															rhoa, rhoan, &
-															lamsq, lamsqn
+															lamsq, lamsqn, lbc, ubc
 
 		real(sp), intent(in) :: dx_nm, dy_nm, dz_nm, cvis
 		real(sp), intent(in) :: dt, runtime
@@ -144,6 +146,11 @@
 		allocate( q(1-l_h:kpp+r_h,1-r_h:jpp+r_h,1-r_h:ipp+r_h,1:nqg), STAT = AllocateStatus)
 		if (AllocateStatus /= 0) STOP "*** Not enough memory ***"
 
+		allocate( lbc(1:nqg), STAT = AllocateStatus)
+		if (AllocateStatus /= 0) STOP "*** Not enough memory ***"
+		allocate( ubc(1:nqg), STAT = AllocateStatus)
+		if (AllocateStatus /= 0) STOP "*** Not enough memory ***"		
+
 		allocate( x(1-l_h:ipp+r_h), STAT = AllocateStatus)
 		if (AllocateStatus /= 0) STOP "*** Not enough memory ***"
 		allocate( y(1-l_h:jpp+r_h), STAT = AllocateStatus)
@@ -187,6 +194,10 @@
 		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 		! set up grid spacing arrays                                                     !
 		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+		! lower and upper bcs
+		lbc=0._sp
+		ubc=0._sp
+		
 		! grid spacing:
 		dx(:)=dx_nm
 		dy(:)=dy_nm
@@ -274,12 +285,15 @@
 		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 		! set halos																		 !
 		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!		
-		call exchange_full(comm3d, id, kpp, jpp, ipp, r_h,r_h,r_h,r_h,l_h,r_h, u,dims,coords)
-		call exchange_full(comm3d, id, kpp, jpp, ipp, r_h,r_h,l_h,r_h,r_h,r_h, v,dims,coords)
-		call exchange_full(comm3d, id, kpp, jpp, ipp, l_h,r_h,r_h,r_h,r_h,r_h, w,dims,coords)
+		call exchange_full(comm3d, id, kpp, jpp, ipp, r_h,r_h,r_h,r_h,l_h,r_h, u,&
+		    0._sp,0._sp,dims,coords)
+		call exchange_full(comm3d, id, kpp, jpp, ipp, r_h,r_h,l_h,r_h,r_h,r_h, v,&
+		    0._sp,0._sp,dims,coords)
+		call exchange_full(comm3d, id, kpp, jpp, ipp, l_h,r_h,r_h,r_h,r_h,r_h, w,&
+		    0._sp,0._sp,dims,coords)
 		do k=1,nqg
     		call exchange_full(comm3d, id, kpp, jpp, ipp, &
-    		    l_h,r_h,r_h,r_h,r_h,r_h, q(:,:,:,k),dims,coords)		
+    		    l_h,r_h,r_h,r_h,r_h,r_h, q(:,:,:,k),lbc(k),ubc(k),dims,coords)		
 		enddo
 		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!		
 
