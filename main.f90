@@ -127,6 +127,7 @@
 			nm1%theta_read(1:nm1%n_levels), &
 			nm1%psurf,nm1%tsurf, &
 			grid1%l_halo,grid1%r_halo, &
+			grid1%thbase,grid1%thtop, &
 			grid1%coords,mp1%dims, mp1%id, mp1%ring_comm)
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
@@ -163,6 +164,7 @@
 				grid1%theta,grid1%thetan, &
 				grid1%rhoa,grid1%rhoan, &
 				grid1%lamsq,grid1%lamsqn, &
+				grid1%thbase,grid1%thtop, &
 				grid1%coords, &
 				io1%new_file, nm1%outputfile, nm1%output_interval, &
 				nm1%viscous_dissipation, &

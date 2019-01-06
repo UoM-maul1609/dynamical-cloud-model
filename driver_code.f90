@@ -26,6 +26,7 @@
 	!>@param[in] theta, thetan: reference variables
 	!>@param[in] rhoa, rhoan: reference variables
 	!>@param[in] lamsq, lamsqn: reference variables
+	!>@param[inout] thbase, thtop: bottom and base th
 	!>@param[in] coords: for Cartesian topology
 	!>@param[inout] new_file: flag for if this is a new file
 	!>@param[in] outputfile: netcdf output
@@ -48,6 +49,7 @@
 				theta,thetan, &
 				rhoa,rhoan, &
 				lamsq,lamsqn, &
+				thbase,thtop, &
 				coords, &
 				new_file,outputfile, output_interval, &
 				viscous, &
@@ -57,7 +59,7 @@
 		use mpi_module, only : exchange_full, exchange_along_dim
 		!use advection_3d, only : first_order_upstream_3d, mpdata_3d, adv_ref_state
         use advection_s_3d, only : first_order_upstream_3d, &
-                    mpdata_3d, mpdata_vec_3d, adv_ref_state
+                    mpdata_3d, mpdata_vec_3d, adv_ref_state, mpdata_3d_add
 		use d_solver, only : bicgstab, sources, advance_momentum
 
 		implicit none
@@ -70,6 +72,7 @@
 		integer(i4b), dimension(3), intent(in) :: coords, dims
 		character (len=*), intent(in) :: outputfile
 		real(sp), intent(in) :: output_interval, dt
+		real(sp), intent(inout) :: thbase, thtop
 		real(sp), dimension(1-l_h:ipp+r_h), intent(in) :: x,dx, dxn
 		real(sp), dimension(1-l_h:jpp+r_h), intent(in) :: y,dy,dyn
 		real(sp), dimension(1-l_h:kpp+r_h), intent(in) :: z,dz,dzn, theta, thetan, &
@@ -137,7 +140,7 @@
 				call output(new_file,outputfile,cur, &
 							ip,ipp,ipstart,jp,jpp,jpstart,kp,kpp,kpstart, &
 							l_h,r_h, &
-							time, x,y,z,rhoa, theta, &
+							time, x,y,z,rhoa, thetan, &
 							u,v,w,th,p, &
 							id, world_process, rank2, ring_comm)
 				!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -168,7 +171,7 @@
 			! set halos																	 !
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!		
 			call exchange_along_dim(ring_comm, id, kpp, jpp, ipp, &
-								r_h,r_h,r_h,r_h,r_h,r_h, psrc,&
+								r_h,r_h,r_h,r_h,r_h,r_h, psrc,0._sp, 0._sp, &
 								dims,coords)
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!		
 
@@ -183,22 +186,22 @@
 			! set halos																	 !
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!		
 			call exchange_along_dim(ring_comm, id, kpp, jpp, ipp, &
-								r_h,r_h,r_h,r_h,r_h,r_h, p,dims,coords)
+								r_h,r_h,r_h,r_h,r_h,r_h, p,0._sp, 0._sp, dims,coords)
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!		
             
 
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 			! advect the reference state																	 !
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!		
-			call adv_ref_state(dt,dz,dzn,rhoa,rhoan,ipp,jpp,kpp,l_h,r_h,w,th,thetan, &
-								dims,coords)
+! 			call adv_ref_state(dt,dz,dzn,rhoa,rhoan,ipp,jpp,kpp,l_h,r_h,w,th,thetan, &
+! 								dims,coords)
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-						
+
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 			! set halos																	 !
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!		
 			call exchange_full(ring_comm, id, kpp, jpp, ipp, &
-								r_h,r_h,r_h,r_h,r_h,r_h,th,dims,coords)
+								r_h,r_h,r_h,r_h,r_h,r_h,th,0._sp,0._sp,dims,coords)
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!	
 
 
@@ -212,8 +215,14 @@
 					call first_order_upstream_3d(dt,dxn,dyn,dzn,rhoa,rhoan, &
 						ipp,jpp,kpp,l_h,r_h,u,v,w,th)
 				case (1)
-					call mpdata_3d(dt,dx,dy,dz,dxn,dyn,dzn,rhoa,rhoan, &
-						ipp,jpp,kpp,l_h,r_h,u,v,w,th,kord,monotone,ring_comm,id, &
+! 					call mpdata_3d(dt,dx,dy,dz,dxn,dyn,dzn,rhoa,rhoan, &
+! 						ipp,jpp,kpp,l_h,r_h,u,v,w,th,thbase,thtop, &
+! 						kord,monotone,ring_comm,id, &
+! 						dims,coords)
+						
+					call mpdata_3d_add(dt,dx,dy,dz,dxn,dyn,dzn,rhoa,rhoan, &
+						ipp,jpp,kpp,l_h,r_h,u,v,w,th,thetan,thbase,thtop, &
+						kord,monotone,ring_comm,id, &
 						dims,coords)
 				case default
 					print *,'not coded'
@@ -221,13 +230,14 @@
 			end select
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 			
+
 			if(coords(3) == 0) th(0:1,:,:)=0._sp
 
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 			! set halos																	 !
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!		
 			call exchange_full(ring_comm, id, kpp, jpp, ipp, &
-								r_h,r_h,r_h,r_h,r_h,r_h,th,dims,coords)
+								r_h,r_h,r_h,r_h,r_h,r_h,th,0._sp,0._sp,dims,coords)
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!	
 
 			
@@ -286,11 +296,11 @@
 			! set halos																	 !
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!		
 			call exchange_full(ring_comm, id, kpp, jpp, ipp, r_h,r_h,r_h,r_h,l_h,r_h,u,&
-								dims,coords)
+								0._sp,0._sp,dims,coords)
 			call exchange_full(ring_comm, id, kpp, jpp, ipp, r_h,r_h,l_h,r_h,r_h,r_h,v,&
-								dims,coords)
+								0._sp,0._sp,dims,coords)
 			call exchange_full(ring_comm, id, kpp, jpp, ipp, l_h,r_h,r_h,r_h,r_h,r_h,w,&
-								dims,coords)
+								0._sp,0._sp,dims,coords)
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 		enddo
@@ -331,7 +341,7 @@
 	!>@param[in] kpstart: start of j index on global grid
 	!>@param[in] l_h,r_h: halo
 	!>@param[in] time: time (s)
-	!>@param[in] x,y,z, rhoa, theta: grids
+	!>@param[in] x,y,z, rhoa, thetan: grids
 	!>@param[in] u,v,w,th,p: prognostic variables
 	!>@param[in] id: id
 	!>@param[in] world_process: world_process
@@ -340,7 +350,7 @@
 	subroutine output(new_file,outputfile,n,ip,ipp,ipstart,jp,jpp,jpstart, &
 					kp,kpp,kpstart,l_h,r_h, &
 					time, &
-					x,y,z,rhoa, theta, &
+					x,y,z,rhoa, thetan, &
 					u,v,w,th,p, &
 				    id, world_process, rank, ring_comm)
 	
@@ -357,7 +367,7 @@
 		real(sp), intent(in) :: time
 		real(sp), dimension(1-l_h:ipp+r_h), intent(in) :: x
 		real(sp), dimension(1-l_h:jpp+r_h), intent(in) :: y
-		real(sp), dimension(1-l_h:kpp+r_h), intent(in) :: z,rhoa, theta
+		real(sp), dimension(1-l_h:kpp+r_h), intent(in) :: z,rhoa, thetan
 		real(sp), &
 			dimension(1-r_h:kpp+r_h,1-r_h:jpp+r_h,1-r_h:ipp+r_h), &
 			intent(inout) :: th,p
@@ -463,10 +473,10 @@
 					   "units", "kg/m3") )
 
 			! define variable: theta
-			call check( nf90_def_var(ncid, "theta", nf90_float, &
+			call check( nf90_def_var(ncid, "thetan", nf90_float, &
 						(/nz_dimid/), varid) )
 			! get id to a_dimid
-			call check( nf90_inq_varid(ncid, "theta", a_dimid) )
+			call check( nf90_inq_varid(ncid, "thetan", a_dimid) )
 			! units
 			call check( nf90_put_att(ncid, a_dimid, &
 					   "units", "K") )
@@ -592,8 +602,8 @@
 			call check( nf90_put_var(ncid, varid, rhoa(1:kpp), &
 						start = (/kpstart/)))	
 			! write variable: theta
-			call check( nf90_inq_varid(ncid, "theta", varid ) )
-			call check( nf90_put_var(ncid, varid, theta(1:kpp), &
+			call check( nf90_inq_varid(ncid, "thetan", varid ) )
+			call check( nf90_put_var(ncid, varid, thetan(1:kpp), &
 						start = (/kpstart/)))	
 		endif
 

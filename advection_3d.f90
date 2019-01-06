@@ -358,11 +358,11 @@
 			endif
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 			call exchange_full(comm3d, id, kp, jp, ip, r_h,r_h,r_h,r_h,l_h,r_h, &
-														ut,dims,coords)
+														ut,0._sp,0._sp,dims,coords)
 			call exchange_full(comm3d, id, kp, jp, ip, r_h,r_h,l_h,r_h,r_h,r_h, &
-														vt,dims,coords)
+														vt,0._sp,0._sp,dims,coords)
 			call exchange_full(comm3d, id, kp, jp, ip, l_h,r_h,r_h,r_h,r_h,r_h, &
-														wt,dims,coords)
+														wt,0._sp,0._sp,dims,coords)
 		endif
 		
 		
@@ -476,17 +476,17 @@
 			! exchange halos for beta_i_up, down
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 			call exchange_along_dim(comm3d, id, kp, jp, ip, r_h,r_h,r_h,r_h,r_h,r_h, &
-														beta_i_up,dims,coords)
+													beta_i_up,0._sp,0._sp, dims,coords)
 			call exchange_along_dim(comm3d, id, kp, jp, ip, r_h,r_h,r_h,r_h,r_h,r_h, &
-														beta_i_down,dims,coords)
+													beta_i_down,0._sp,0._sp,dims,coords)
 			call exchange_along_dim(comm3d, id, kp, jp, ip, r_h,r_h,r_h,r_h,r_h,r_h, &
-														beta_j_up,dims,coords)
+													beta_j_up,0._sp,0._sp,dims,coords)
 			call exchange_along_dim(comm3d, id, kp, jp, ip, r_h,r_h,r_h,r_h,r_h,r_h, &
-														beta_j_down,dims,coords)
+													beta_j_down,0._sp,0._sp,dims,coords)
 			call exchange_along_dim(comm3d, id, kp, jp, ip, r_h,r_h,r_h,r_h,r_h,r_h, &
-														beta_k_up,dims,coords)
+													beta_k_up,0._sp,0._sp,dims,coords)
 			call exchange_along_dim(comm3d, id, kp, jp, ip, r_h,r_h,r_h,r_h,r_h,r_h, &
-														beta_k_down,dims,coords)
+													beta_k_down,0._sp,0._sp,dims,coords)
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 								
@@ -526,11 +526,11 @@
 			wt_sav => w_store1
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 			call exchange_full(comm3d, id, kp, jp, ip, r_h,r_h,r_h,r_h,l_h,r_h, &
-														ut,dims,coords)
+													ut,0._sp,0._sp,dims,coords)
 			call exchange_full(comm3d, id, kp, jp, ip, r_h,r_h,l_h,r_h,r_h,r_h, &
-														vt,dims,coords)
+													vt,0._sp,0._sp,dims,coords)
 			call exchange_full(comm3d, id, kp, jp, ip, l_h,r_h,r_h,r_h,r_h,r_h, &
-														wt,dims,coords)
+													wt,0._sp,0._sp,dims,coords)
 
 		endif
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -552,7 +552,7 @@
 			! set halos																	 !
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!		
 			call exchange_full(comm3d, id, kp, jp, ip, r_h,r_h,r_h,r_h,r_h,r_h, &
-									psi_old,dims,coords)
+									psi_old,0._sp,0._sp,dims,coords)
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!			
 		endif		
  	enddo

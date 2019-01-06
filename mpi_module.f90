@@ -50,7 +50,7 @@
 
     private
     public :: mpi_define, block_ring, exchange_full, mpi_integer9, mp1, world_process, &
-    			mpi_cart_initialise, exchange_along_dim
+    			mpi_cart_initialise, exchange_along_dim, find_base_top
     
 
 	contains
@@ -236,6 +236,44 @@
 	end subroutine mpi_cart_initialise
 	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
+
+	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+	! find base and top of array using bcast                                             !
+	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+	!>@author
+	!>Paul J. Connolly, The University of Manchester
+	!>@brief
+	!>define some types to be used in the model
+	!>@param[in] comm3d, id, kpp, d_h, u_h, array, dims, coords
+	!>@param[inout] base, top
+    subroutine find_base_top(comm3d, id, kpp,d_h,u_h,array,base,top, dims,coords)
+        implicit none
+		integer(i4b), intent(in) :: comm3d, id, kpp, d_h,u_h
+		real(sp), intent(in), dimension(1-d_h:u_h+kpp) :: array
+		real(sp), intent(inout) :: base, top
+		integer(i4b), dimension(3), intent(in) :: dims,coords
+		
+		! locals:
+		integer(i4b), dimension(12) :: request
+		integer(i4b), dimension(MPI_STATUS_SIZE, 12) :: status
+		integer(i4b) :: error, tag1,num_messages,imess, tag2, root, rankl,ranku
+		
+		
+		call MPI_CART_RANK( comm3d, [0,0,0], rankl,error)
+		call MPI_CART_RANK( comm3d, [0,0,dims(3)-1], ranku,error)
+		
+		
+        base=array(0)
+        call MPI_Bcast(base,1,MPI_REAL8,rankl,comm3d,error)
+
+        top=array(kpp+1)
+        call MPI_Bcast(top,1,MPI_REAL8,ranku,comm3d,error)
+    
+    end subroutine find_base_top
+	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    
+
+
 	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 	! exchange along dim for a variable using Cartesian topology                         !
 	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -245,15 +283,16 @@
 	!>define some types to be used in the model
 	!>@param[in] comm3d, id, ipp, jpp, kpp, w_h,e_h,s_h,n_h,d_h,u_h
 	!>@param[inout] array: the array to exchange_halos on
-	!>@param[in] dims,coords
+	!>@param[in] lbc, ubc, dims,coords
 	subroutine exchange_along_dim(comm3d, id, kpp, jpp, ipp, &
-							d_h,u_h,s_h,n_h,w_h, e_h,  array, dims,coords)
+							d_h,u_h,s_h,n_h,w_h, e_h,  array, lbc, ubc, dims,coords)
 		implicit none
 		
 		integer(i4b), intent(in) :: comm3d, id, ipp, jpp, kpp, w_h, e_h, s_h,n_h,d_h,u_h
 		real(sp), intent(inout), &
 			 dimension(1-d_h:u_h+kpp,1-s_h:n_h+jpp,1-w_h:e_h+ipp) :: &
 			 array
+		real(sp), intent(in) :: lbc, ubc
 		integer(i4b), dimension(3), intent(in) :: dims,coords
 		
 		! locals:
@@ -387,12 +426,12 @@
 		endif
 		if ( mp1%face%s_top == -1) then
 			! adjacent cells:
-			array(kpp+1:kpp+u_h,1-s_h:jpp+n_h,1-w_h:ipp+e_h)=0._sp
+			array(kpp+1:kpp+u_h,1-s_h:jpp+n_h,1-w_h:ipp+e_h)=ubc
 			! corner cells - not relevant, because below surface and above lid			
 		endif
 		if ( mp1%face%s_bottom == -1) then
 			! adjacent cells:
-			array(1-d_h:0,1-s_h:jpp+n_h,1-w_h:ipp+e_h)=0._sp
+			array(1-d_h:0,1-s_h:jpp+n_h,1-w_h:ipp+e_h)=lbc
 			! corner cells - not relevant, because below surface and above lid			
 		endif
 		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -411,15 +450,16 @@
 	!>define some types to be used in the model
 	!>@param[in] comm3d, id, ipp, jpp, kpp, w_h,e_h,s_h,n_h,d_h,u_h
 	!>@param[inout] array: the array to exchange_halos on
-	!>@param[in] dims,coords
+	!>@param[in] lbc, ubc, dims,coords
 	subroutine exchange_full(comm3d, id, kpp, jpp, ipp, &
-							d_h,u_h,s_h,n_h,w_h, e_h,  array, dims,coords)
+							d_h,u_h,s_h,n_h,w_h, e_h,  array, lbc,ubc, dims,coords)
 		implicit none
 		
 		integer(i4b), intent(in) :: comm3d, id, ipp, jpp, kpp, w_h, e_h, s_h,n_h,d_h,u_h
 		real(sp), intent(inout), &
 			 dimension(1-d_h:u_h+kpp,1-s_h:n_h+jpp,1-w_h:e_h+ipp) :: &
 			 array
+		real(sp), intent(in) :: lbc, ubc
 		integer(i4b), dimension(3), intent(in) :: dims,coords
 		
 		! locals:
@@ -433,7 +473,7 @@
 		! exchange only only the dimensions                                              !
 		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 		call exchange_along_dim(comm3d, id, kpp, jpp, ipp, &
-							d_h,u_h,s_h,n_h,w_h, e_h,  array, dims,coords)
+							d_h,u_h,s_h,n_h,w_h, e_h,  array, lbc, ubc, dims,coords)
 		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 

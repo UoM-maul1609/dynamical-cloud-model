@@ -26,6 +26,7 @@
             real(sp), dimension(:), allocatable ::	dx, dy, dz, dxn,dyn,dzn, &
             										x, y, z, xn,yn,zn, theta, thetan, &
             										rhoa, rhoan, lamsq, lamsqn
+            real(sp) :: thbase, thtop
             										 
         end type grid
 

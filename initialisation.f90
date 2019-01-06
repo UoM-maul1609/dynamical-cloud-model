@@ -35,6 +35,7 @@
 	!>@param[in] ip,jp,kp - grid points from namelist
 	!>@param[in] n_levels,z_read,theta_read, psurf,tsurf - sounding variables
 	!>@param[in] l_h,r_h - halo for arrays
+	!>@param[inout] thbase, thtop
 	!>@param[in] coords,dims - dimensions of cartesian topology
 	!>@param[in] id - id of this PE
 	!>@param[in] comm3d - communicator for cartesian topology
@@ -57,6 +58,7 @@
 			ip, jp, kp, &
 			n_levels,z_read, theta_read,psurf,tsurf, &
 			l_h,r_h, &
+			thbase,thtop, &
 			coords,dims, id, comm3d)
 				
 		use nrtype
@@ -86,6 +88,7 @@
 		integer(i4b), dimension(3), intent(inout) :: coords
 		integer(i4b), dimension(3), intent(in) :: dims
 		integer(i4b), intent(in) :: id, comm3d
+		real(sp), intent(inout) :: thbase, thtop
 		
 		! locals:
 		integer(i4b) :: error, AllocateStatus,i,j,k
@@ -417,14 +420,23 @@
 		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 		! set halos																		 !
 		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!		
-		call exchange_full(comm3d, id, kpp, jpp, ipp, r_h,r_h,r_h,r_h,l_h,r_h, u,dims,coords)
-		call exchange_full(comm3d, id, kpp, jpp, ipp, r_h,r_h,l_h,r_h,r_h,r_h, v,dims,coords)
-		call exchange_full(comm3d, id, kpp, jpp, ipp, l_h,r_h,r_h,r_h,r_h,r_h, w,dims,coords)
-		call exchange_full(comm3d, id, kpp, jpp, ipp, r_h,r_h,r_h,r_h,r_h,r_h, th,dims,coords)
+		call exchange_full(comm3d, id, kpp, jpp, ipp, r_h,r_h,r_h,r_h,l_h,r_h, u,&
+		        0._sp,0._sp, dims,coords)
+		call exchange_full(comm3d, id, kpp, jpp, ipp, r_h,r_h,l_h,r_h,r_h,r_h, v,&
+		        0._sp,0._sp, dims,coords)
+		call exchange_full(comm3d, id, kpp, jpp, ipp, l_h,r_h,r_h,r_h,r_h,r_h, w,&
+		        0._sp,0._sp, dims,coords)
+		call exchange_full(comm3d, id, kpp, jpp, ipp, r_h,r_h,r_h,r_h,r_h,r_h, th,&
+		        0._sp,0._sp, dims,coords)
 		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!		
 
 
-
+        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        ! find top and base of array                                                     !                                           
+        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!              
+        call find_base_top(comm3d, id, kpp,l_h,r_h,thetan,thbase,thtop, dims,coords)
+        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!              
+        
 
 
 		! no dangling pointers
