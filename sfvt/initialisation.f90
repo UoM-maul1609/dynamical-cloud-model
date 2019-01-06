@@ -228,8 +228,8 @@
 		do i=1-r_h,ipp+r_h
 			do j=1-r_h,jpp+r_h
 				do k=1-r_h,kpp+r_h
-					u(k,j,i)=-5.e-4_sp*(z(k)-5000._sp)  !/sqrt(xn(i)*xn(i)+y(j)*y(j))
-					w(k,j,i)=5.e-4_sp*(x(i))  !/sqrt(x(i)*x(i)+yn(j)*yn(j))
+					u(k,j,i)=-5.e-4_sp*(zn(k)-5000._sp)  !/sqrt(xn(i)*xn(i)+y(j)*y(j))
+					w(k,j,i)=5.e-4_sp*(xn(i))  !/sqrt(x(i)*x(i)+yn(j)*yn(j))
 				enddo
 			enddo
 		enddo
@@ -245,10 +245,10 @@
 			do j=1-r_h,jpp+r_h
 				do k=1-r_h,kpp+r_h
 				    
-				    if(kp> 1) rad = (z(k)-2000._sp)**2._sp
+				    if(kp> 1) rad = (zn(k)-2000._sp)**2._sp
 						
-					if (ip > 1) rad=rad+x(i)**2._sp
-					if (jp > 1) rad=rad+2._sp*y(j)**2._sp
+					if (ip > 1) rad=rad+xn(i)**2._sp
+					if (jp > 1) rad=rad+2._sp*yn(j)**2._sp
 					
 					rad=sqrt(rad)
 					if(rad<=1000._sp) then
