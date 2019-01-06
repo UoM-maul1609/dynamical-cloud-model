@@ -6,7 +6,7 @@
     use nrtype
     implicit none
 	real(sp), dimension(:,:,:), allocatable :: &
-					a_e,a_w,a_n,a_s,a_u,a_d,a_p
+					a_e,a_w,a_n,a_s,a_u,a_d,a_p,a_c
 	logical :: bicgstab_first = .true. ! true if this is the first time bicgstab called
 	real(sp), parameter :: grav=9.81_sp ! gravity
 	
@@ -20,11 +20,12 @@
 	!>@brief
 	!>set-up matrix A so that Ax is equivalent to \f$\nabla ^2 x\f$ using finite-diff
 	!>@param[in] comm3d,id, dims, coords
-	!>@param[in] dx,dy,dz,dxn,dyn,dzn
+	!>@param[in] dt,dx,dy,dz,dxn,dyn,dzn
 	!>@param[in] ip,jp,kp,halo
 	!>@param[inout] a_e,a_w,a_n,a_s,a_u,a_d,a_p: terms to make up 7-point stencil
-	subroutine set_mat_a(comm3d,id,dims,coords, dx,dy,dz,dxn,dyn,dzn,ip,jp,kp,halo, &
-						a_e,a_w,a_n,a_s,a_u,a_d,a_p)
+	!>@param[in] su,sv,sw
+	subroutine set_mat_a(comm3d,id,dims,coords, dt,dx,dy,dz,dxn,dyn,dzn,ip,jp,kp,halo, &
+						a_e,a_w,a_n,a_s,a_u,a_d,a_p,a_c,su,sv,sw)
 		use nrtype
 		use mpi_module
 		implicit none
@@ -34,8 +35,11 @@
 		real(sp), dimension(1-halo:jp+halo) :: dy,dyn
 		real(sp), dimension(1-halo:kp+halo) :: dz,dzn
 		real(sp), dimension(-halo+1:kp+halo,-halo+1:jp+halo,-halo+1:ip+halo), &
-			intent(inout) :: a_e,a_w,a_n,a_s,a_u,a_d,a_p
+			intent(inout) :: a_e,a_w,a_n,a_s,a_u,a_d,a_p, a_c
+		real(sp), dimension(-halo+1:kp+halo,-halo+1:jp+halo,-halo+1:ip+halo), &
+			intent(in) :: su,sv,sw
 		integer(i4b), intent(in) :: ip,jp,kp, halo
+		real(sp), intent(in) :: dt
 				
 		! local
 		integer(i4b) :: i,j,k
@@ -47,9 +51,10 @@
 		a_w=0._sp
 		a_u=0._sp
 		a_d=0._sp
+		a_c=0._sp
 !$omp simd	
 		do i=1,ip
-			do j=1,jp
+			do j=1,jp			    
 				do k=1,kp
 					a_e(k,j,i)=1._sp/( dx(i-1)*dxn(i) )
 					a_w(k,j,i)=1._sp/( dx(i-1)*dxn(i-1) )
@@ -61,9 +66,47 @@
                             -1._sp/( dy(j-1)*dyn(j) ) -1._sp/( dy(j-1)*dyn(j-1) )  &
                             -1._sp/( dz(k-1)*dzn(k) ) -1._sp/( dz(k-1)*dzn(k-1) ) 
 				enddo
+				if(coords(3)==0) then
+				    k=1
+                    a_e(k,j,i)=0._sp
+                    a_w(k,j,i)=0._sp
+                    a_n(k,j,i)=0._sp
+                    a_s(k,j,i)=0._sp
+                    a_u(k,j,i)=1._sp/( dz(k-1)*dzn(k) )
+                    a_d(k,j,i)=1._sp/( dz(k-1)*dzn(k-1) )
+                    a_p(k,j,i)=-1._sp/( dx(i-1)*dxn(i) ) -1._sp/( dx(i-1)*dxn(i-1) ) &
+                            -1._sp/( dy(j-1)*dyn(j) ) -1._sp/( dy(j-1)*dyn(j-1) )  &
+                            -1._sp/( dz(k-1)*dzn(k) ) -1._sp/( dz(k-1)*dzn(k-1) ) + &
+                            1._sp/( dx(i-1)*dxn(i) ) + & ! a_e
+                            1._sp/( dx(i-1)*dxn(i-1) ) + & ! a_w
+                            1._sp/( dy(j-1)*dyn(j) ) + & ! a_n
+                            1._sp/( dy(j-1)*dyn(j-1) )  ! a_s
+                    a_c(k,j,i)=1._sp/( dx(i-1)*dxn(i) )*dxn(i)*su(k,j,i)/(2._sp*dt) - &
+                            1._sp/( dx(i-1)*dxn(i-1) )*dxn(i-1)*su(k,j,i-1)/(2._sp*dt) + &
+                            1._sp/( dy(j-1)*dyn(j) )*dyn(j)*sv(k,j,i)/(2._sp*dt) - &
+                            1._sp/( dy(j-1)*dyn(j-1) )*dyn(j-1)*sv(k,j-1,i)/(2._sp*dt) 
+                endif
 			enddo
 		enddo
-!$omp end simd	
+!$omp end simd
+
+!     if(coords(3)==0) then
+! 		do i=1,ip
+! 			do j=1,jp
+!                 a_u(1,j,i)=a_u(1,j,i)+a_d(1,j,i)
+!                 a_d(1,j,i)=0._sp    
+!             enddo
+!         enddo
+!     endif
+		
+!     if(coords(3)==dims(3)-1) then
+! 		do i=1,ip
+! 			do j=1,jp
+!                 a_u(kp,j,i)=a_u(kp,j,i)+a_d(kp,j,i)
+!                 a_d(kp,j,i)=0._sp    
+!             enddo
+!         enddo
+!     endif
 		
 ! 	call exchange_halos(comm3d, id, kp, jp, ip, &
 ! 		halo,halo,halo,halo,halo,halo, a_p,dims,coords)
@@ -90,17 +133,17 @@
 	!>multiply matrix A by x
 	!>@param[in] comm3d,id, dims, coords
 	!>@param[in] ip,jp,kp,halo
-	!>@param[in] a_e,a_w,a_n,a_s,a_u,a_d,a_p: terms to make up 7-point stencil
+	!>@param[in] a_e,a_w,a_n,a_s,a_u,a_d,a_p,a_c: terms to make up 7-point stencil
 	!>@param[inout] ax,x: matrix ax and x
 	subroutine mat_ax(comm3d,id,dims,coords, ip,jp,kp,halo, &
-						a_e,a_w,a_n,a_s,a_u,a_d,a_p,ax,x)
+						a_e,a_w,a_n,a_s,a_u,a_d,a_p,a_c,ax,x)
 		use nrtype
-		use mpi_module, only : exchange_along_dim
+		use mpi_module, only : exchange_along_dim, exchange_full
 		implicit none
 		integer(i4b), intent(in) :: id, comm3d
 		integer(i4b), dimension(3), intent(in) :: dims,coords
 		real(sp), dimension(-halo+1:kp+halo,-halo+1:jp+halo,-halo+1:ip+halo), &
-			intent(in) :: a_e,a_w,a_n,a_s,a_u,a_d,a_p
+			intent(in) :: a_e,a_w,a_n,a_s,a_u,a_d,a_p,a_c
 		real(sp), dimension(-halo+1:kp+halo,-halo+1:jp+halo,-halo+1:ip+halo), &
 			intent(inout) :: ax,x
 		integer(i4b), intent(in) :: ip,jp,kp, halo
@@ -116,16 +159,16 @@
 		do i=1,ip
 			do j=1,jp
 				do k=1,kp
-					ax(k,j,i) = a_w(k,j,i)*x(k,j,i-1) + a_e(k,j,i)*x(k,j,i+1) + &
-								a_s(k,j,i)*x(k,j-1,i) + a_n(k,j,i)*x(k,j+1,i) + &
-								a_d(k,j,i)*x(k-1,j,i) + a_u(k,j,i)*x(k+1,j,i) + &
-								a_p(k,j,i)*x(k,j,i) 
+                    ax(k,j,i) = a_w(k,j,i)*x(k,j,i-1) + a_e(k,j,i)*x(k,j,i+1) + &
+                                a_s(k,j,i)*x(k,j-1,i) + a_n(k,j,i)*x(k,j+1,i) + &
+                                a_d(k,j,i)*x(k-1,j,i) + a_u(k,j,i)*x(k+1,j,i) + &
+                                a_p(k,j,i)*x(k,j,i) +a_c(k,j,i)
 				enddo
 			enddo
 		enddo
 !$omp end simd
 
-! 		call exchange_halos(comm3d, id, kp, jp, ip, &
+! 		call exchange_full(comm3d, id, kp, jp, ip, &
 ! 			halo,halo,halo,halo,halo,halo, ax,dims,coords)
 
 ! 		ax(0,:,:)=ax(ip,:,:)
@@ -143,10 +186,10 @@
 	!>precondition the matrix using Jacobi iteration
 	!>@param[in] comm3d,id, dims,coords
 	!>@param[in] ip,jp,kp,halo
-	!>@param[in] a_e,a_w,a_n,a_s,a_u,a_d,a_p: terms to make up 7-point stencil and x
+	!>@param[in] a_e,a_w,a_n,a_s,a_u,a_d,a_p,a_c: terms to make up 7-point stencil and x
 	!>@param[inout] s,r,prec,prit
 	subroutine precondition(comm3d,id,dims,coords, &
-				ip,jp,kp,halo, a_e,a_w,a_n,a_s,a_u,a_d,a_p, &
+				ip,jp,kp,halo, a_e,a_w,a_n,a_s,a_u,a_d,a_p,a_c, &
 						s,r,prit)
 		use nrtype
 		use mpi_module, only : exchange_along_dim
@@ -154,7 +197,7 @@
 		integer(i4b), intent(in) :: id, comm3d
 		integer(i4b), dimension(3), intent(in) :: dims,coords
 		real(sp), dimension(-halo+1:kp+halo,-halo+1:jp+halo,-halo+1:ip+halo), &
-			intent(in) :: r,a_e,a_w,a_n,a_s,a_u,a_d,a_p
+			intent(in) :: r,a_e,a_w,a_n,a_s,a_u,a_d,a_p,a_c
 		real(sp), dimension(-halo+1:kp+halo,-halo+1:jp+halo,-halo+1:ip+halo), &
 			intent(inout) :: s
 		integer(i4b), intent(in) :: ip,jp,kp, halo, prit
@@ -167,7 +210,7 @@
 		s = r/(a_p)
 		do it=1,prit
 			call mat_ax(comm3d, id, dims,coords,ip,jp,kp,halo, &
-						a_e,a_w,a_n,a_s,a_u,a_d,a_p,t,s)
+						a_e,a_w,a_n,a_s,a_u,a_d,a_p,a_c,t,s)
 			s = s + (r-t)/(a_p)
 			
 			! MPI:
@@ -193,14 +236,14 @@
 	!>@param[in] dt
 	!>@param[in] xg,yg,zg,dx,dy,dz,dxn,dyn,dzn
 	!>@param[in] ip,jp,kp,l_h,r_h
-	!>@param[in] u
-	!>@param[in] v
-	!>@param[in] w
+	!>@param[in] su
+	!>@param[in] sv
+	!>@param[in] sw
 	!>@param[inout] x
 	!>@param[inout] b
 	!>@param[in] test_solver	
 	subroutine bicgstab(comm3d,id,rank, dims, coords, &
-			dt,xg,yg,zg,dx,dy,dz,dxn,dyn,dzn,ip,jp,kp,l_h,r_h,u,v,w,x,b,test_solver)
+			dt,xg,yg,zg,dx,dy,dz,dxn,dyn,dzn,ip,jp,kp,l_h,r_h,su,sv,sw,x,b,test_solver)
 		use nrtype
 		implicit none
 		integer(i4b), intent(in) :: id, comm3d, rank
@@ -208,11 +251,11 @@
 		real(sp), intent(in) :: dt
 		integer(i4b), intent(in) :: ip, jp, kp, l_h,r_h
 		real(sp), dimension(-r_h+1:kp+r_h,-r_h+1:jp+r_h,-l_h+1:ip+r_h), &
-			intent(in) :: u
+			intent(in) :: su
 		real(sp), dimension(-r_h+1:kp+r_h,-l_h+1:jp+r_h,-r_h+1:ip+r_h), &
-			intent(in) :: v
+			intent(in) :: sv
 		real(sp), dimension(-l_h+1:kp+r_h,-r_h+1:jp+r_h,-r_h+1:ip+r_h), &
-			intent(in) :: w
+			intent(in) :: sw
 		real(sp), dimension(-r_h+1:kp+r_h,-r_h+1:jp+r_h,-r_h+1:ip+r_h), &
 			intent(inout) :: x
 		real(sp), dimension(-r_h+1:kp+r_h,-r_h+1:jp+r_h,-r_h+1:ip+r_h), &
@@ -248,9 +291,11 @@
 			if (status /= 0) STOP "*** Not enough memory ***"
 			allocate( a_p(1-r_h:kp+r_h,1-r_h:jp+r_h,1-r_h:ip+r_h), STAT = status)
 			if (status /= 0) STOP "*** Not enough memory ***"
+			allocate( a_c(1-r_h:kp+r_h,1-r_h:jp+r_h,1-r_h:ip+r_h), STAT = status)
+			if (status /= 0) STOP "*** Not enough memory ***"
 			
-			call set_mat_a(comm3d,id,dims,coords,dx,dy,dz,dxn,dyn,dzn,ip,jp,kp,r_h, &
-						a_e,a_w,a_n,a_s,a_u,a_d,a_p)
+			call set_mat_a(comm3d,id,dims,coords,dt,dx,dy,dz,dxn,dyn,dzn,ip,jp,kp,r_h, &
+						a_e,a_w,a_n,a_s,a_u,a_d,a_p,a_c,su,sv,sw)
 		
 			if(test_solver) then
 				do i=1,ip
@@ -273,7 +318,8 @@
 
 	
 		! calculate the initial residual
-		call mat_ax(comm3d,id,dims,coords,ip,jp,kp,r_h, a_e,a_w,a_n,a_s,a_u,a_d,a_p,ax,x)
+		call mat_ax(comm3d,id,dims,coords,ip,jp,kp,r_h, &
+		    a_e,a_w,a_n,a_s,a_u,a_d,a_p,a_c,ax,x)
 		r  = b - ax
 		cr = r
 		p  = 0.0_sp
@@ -292,21 +338,21 @@
 			bet = ( rho/nrm )*( alf/omg )
 			t   = r - bet*(omg*v1)
 			call precondition(comm3d,id,dims,coords, &
-						ip,jp,kp,r_h, a_e,a_w,a_n,a_s,a_u,a_d,a_p, &
+						ip,jp,kp,r_h, a_e,a_w,a_n,a_s,a_u,a_d,a_p,a_c, &
 						s,t,prit)
 			p   = s + bet*p	
 						
 			call mat_ax(comm3d,id,dims,coords, &
-						ip,jp,kp,r_h, a_e,a_w,a_n,a_s,a_u,a_d,a_p,v1,p) 
+						ip,jp,kp,r_h, a_e,a_w,a_n,a_s,a_u,a_d,a_p,a_c,v1,p) 
 			nrm = inn_prod(comm3d,cr,v1,ip,jp,kp,r_h)
 			
 			alf = rho/nrm
 			s   = r - alf*v1
 			call precondition(comm3d,id,dims,coords, &
-						ip,jp,kp,r_h, a_e,a_w,a_n,a_s,a_u,a_d,a_p, &
+						ip,jp,kp,r_h, a_e,a_w,a_n,a_s,a_u,a_d,a_p, a_c,&
 						cs,s,prit)
 			call mat_ax(comm3d,id,dims,coords, &
-						ip,jp,kp,r_h, a_e,a_w,a_n,a_s,a_u,a_d,a_p,t,cs)
+						ip,jp,kp,r_h, a_e,a_w,a_n,a_s,a_u,a_d,a_p,a_c,t,cs)
 			tt  = inn_prod(comm3d,t,t,ip,jp,kp,r_h)
 			ts  = inn_prod(comm3d,t,s,ip,jp,kp,r_h)
 			omg = ts/tt
@@ -434,6 +480,7 @@
 		real(sp), dimension(-r_h+1:kp+r_h,-r_h+1:jp+r_h,-r_h+1:ip+r_h) :: &
 			s,tau11,tau12,tau13,tau22,tau23,tau33
 		
+		! using current time-step
 		! sources for u:
 !$omp simd	
 		do i=2-l_h,ip
@@ -471,7 +518,7 @@
 			enddo
 		enddo
 !$omp end simd	
-		
+
 		! sources for w:
 !$omp simd	
 		do i=1,ip
@@ -708,7 +755,7 @@
 
 
 		! su, sv, and su are now centred on i+1/2
-
+        
 
 
 		! rhs of poisson (centred difference):
@@ -747,9 +794,10 @@
 	!>@param[inout] w,zw
 	!>@param[in] p,su,sv,sw
 	!>@param[in] rhoa,rhoan
+	!>@param[in] dims, coords
 	subroutine advance_momentum(comm3d,id,rank, &
 			dt,dx,dy,dz,dxn,dyn,dzn,rhoa,rhoan,ip,jp,kp,l_h,r_h,&
-			u,v,w,zu,zv,zw,su,sv,sw,p)
+			u,v,w,zu,zv,zw,su,sv,sw,p,dims,coords)
 		use nrtype
 		implicit none
 		integer(i4b), intent(in) :: id, comm3d, rank
@@ -774,6 +822,7 @@
 		real(sp), dimension(-l_h+1:ip+r_h), intent(in) :: dx, dxn
 		real(sp), dimension(-l_h+1:jp+r_h), intent(in) :: dy, dyn
 		real(sp), dimension(-l_h+1:kp+r_h), intent(in) :: dz, dzn, rhoa, rhoan
+		integer(i4b), dimension(3), intent(in) :: dims,coords
 	
 		! locals
 		integer(i4b) :: i,j,k
@@ -786,6 +835,11 @@
 					u(k,j,i)=(rhoan(k)*zu(k,j,i)+( su(k,j,i) - &
 						( p(k,j,i+1)-p(k,j,i) ) / (dxn(i)) )*dt )/rhoan(k)
 				enddo
+				if(coords(3)==0) then
+                    k=1
+                    u(k,j,i)=(rhoan(k)*zu(k,j,i)+( su(k,j,i) - &
+                        ( p(k,j,i)+dxn(i)*su(k,j,i)-p(k,j,i) ) / (dxn(i)) )*dt )/rhoan(k)
+                endif
 			enddo
 		enddo
 !$omp end simd	
@@ -798,6 +852,11 @@
 					v(k,j,i)=(rhoan(k)*zv(k,j,i)+( sv(k,j,i) - &
 						( p(k,j+1,i)-p(k,j,i) ) / (dyn(j)) )*dt ) /rhoan(k)
 				enddo
+				if(coords(3)==0) then
+                    k=1
+                    v(k,j,i)=(rhoan(k)*zv(k,j,i)+( sv(k,j,i) - &
+                        ( p(k,j,i)+dyn(j)*sv(k,j,i)-p(k,j,i) ) / (dyn(j)) )*dt ) /rhoan(k)	
+                endif
 			enddo
 		enddo
 !$omp end simd	

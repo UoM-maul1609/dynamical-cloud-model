@@ -245,7 +245,7 @@
 		yn=y-0.5_sp*dy_nm
 
 		! set up vertical level array
-		z=dz_nm*(/(i,i=-l_h+kpstart-1,kpp+r_h+kpstart-2)/)
+		z=dz_nm*(/(i,i=-l_h+kpstart-1,kpp+r_h+kpstart-2)/)+0.5_sp*dz_nm
 		zn=z-0.5_sp*dz_nm
 		
 		! set up mixing length array
@@ -351,6 +351,9 @@
 		zu(:,:,:)=0._sp
 		zv(:,:,:)=0._sp
 		zw(:,:,:)=0._sp
+		tu(:,:,:)=0._sp
+		tv(:,:,:)=0._sp
+		tw(:,:,:)=0._sp
 		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!		
 
 

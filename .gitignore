@@ -12,3 +12,5 @@ doxygen
 papers
 tests
 matlab-dev
+*.dSYM
+

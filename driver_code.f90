@@ -103,13 +103,13 @@
 		rank2=dims(1)*dims(2)*dims(3)
 		
 		! associate pointers - for efficiency, when swapping arrays in leap-frog scheme
-		u => ut
+		u => ut   ! current time-step
 		v => vt
 		w => wt
-		zu => zut
+		zu => zut ! previous time-step
 		zv => zvt
 		zw => zwt
-		tu => tut
+		tu => tut ! next-time-step
 		tv => tvt
 		tw => twt
 		
@@ -149,11 +149,11 @@
 			endif
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-			if(coords(3) == 0) w(1-l_h:0,:,:)=0._sp
+			if(coords(3) == 0) w(0,:,:)=-w(1,:,:)
 			!if((coords(3)+1) == dims(3)) w(kpp+1:kpp+r_h,:,:)=0._sp
 			!if((coords(3)+1) == dims(3)) w(kpp+1:kpp+r_h,:,:)=w(kpp-r_h+1:kpp,:,:)
 			
-						
+				
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 			! calculate sources of momentum and pressure                                 !
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -176,7 +176,7 @@
 			! find pressure perturbation                                                 !
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 			call bicgstab(ring_comm, id, rank2,dims,coords, &
-				dt,x,y,z,dx,dy,dz,dxn,dyn,dzn,ipp,jpp,kpp,l_h,r_h,u,v,w,p,psrc,.false.)
+			 dt,x,y,z,dx,dy,dz,dxn,dyn,dzn,ipp,jpp,kpp,l_h,r_h,su,sv,sw,p,psrc,.false.)
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -185,12 +185,12 @@
 			call exchange_along_dim(ring_comm, id, kpp, jpp, ipp, &
 								r_h,r_h,r_h,r_h,r_h,r_h, p,dims,coords)
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!		
-
+            
 
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 			! advect the reference state																	 !
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!		
-			call adv_ref_state(dt,dz,dzn,rhoa,rhoan,ipp,jpp,kpp,l_h,r_h,w,th,theta, &
+			call adv_ref_state(dt,dz,dzn,rhoa,rhoan,ipp,jpp,kpp,l_h,r_h,w,th,thetan, &
 								dims,coords)
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 						
@@ -221,6 +221,7 @@
 			end select
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 			
+			if(coords(3) == 0) th(0:1,:,:)=0._sp
 
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 			! set halos																	 !
@@ -240,7 +241,7 @@
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 			call advance_momentum(ring_comm, id, rank2,&
 				2._sp*dt,dx,dy,dz,dxn,dyn,dzn,rhoa,rhoan,ipp,jpp,kpp,l_h,r_h,&
-				tu,tv,tw,zu,zv,zw,su,sv,sw,p)
+				tu,tv,tw,zu,zv,zw,su,sv,sw,p,dims,coords)
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 

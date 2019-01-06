@@ -2,10 +2,9 @@
  &run_vars
 	nm1%outputfile = '/tmp/output.nc',
 	nm1%subgrid_model=2, ! 1 = constant viscosity, 2=smagorinsky
-	nm1%viscous_dissipation=.true.,
+	nm1%viscous_dissipation=.false.,
 	nm1%restart=.false.,
-	nm1%cvis=0.1, ! usually between 0.1 and 0.2 - think LEM has factor of 2 higher because
-	              ! of definition of Sij
+	nm1%cvis=0.23, ! 0.23 desireable
 	nm1%runtime= 7200.,
 	nm1%dt=5.,
 	nm1%advection_scheme=1, ! 0=upstream, 1=mpdata (for scalars)
