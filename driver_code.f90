@@ -189,21 +189,22 @@
 								r_h,r_h,r_h,r_h,r_h,r_h, p,0._sp, 0._sp, dims,coords)
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!		
             
+            
+            if((advection_scheme == 0) .or. (advection_scheme == 1)) then
+                !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+                ! advect the reference state	     									 !
+                !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!		
+                call adv_ref_state(dt,dz,dzn,rhoa,rhoan,ipp,jpp,kpp,l_h,r_h,w,th,thetan, &
+                                    dims,coords)
+                !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-			! advect the reference state																	 !
-			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!		
-! 			call adv_ref_state(dt,dz,dzn,rhoa,rhoan,ipp,jpp,kpp,l_h,r_h,w,th,thetan, &
-! 								dims,coords)
-			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-
-			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-			! set halos																	 !
-			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!		
-			call exchange_full(ring_comm, id, kpp, jpp, ipp, &
-								r_h,r_h,r_h,r_h,r_h,r_h,th,0._sp,0._sp,dims,coords)
-			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!	
-
+                !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+                ! set halos																 !
+                !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!		
+                call exchange_full(ring_comm, id, kpp, jpp, ipp, &
+                                    r_h,r_h,r_h,r_h,r_h,r_h,th,0._sp,0._sp,dims,coords)
+                !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!	
+            endif
 
 			
 
@@ -215,11 +216,11 @@
 					call first_order_upstream_3d(dt,dxn,dyn,dzn,rhoa,rhoan, &
 						ipp,jpp,kpp,l_h,r_h,u,v,w,th)
 				case (1)
-! 					call mpdata_3d(dt,dx,dy,dz,dxn,dyn,dzn,rhoa,rhoan, &
-! 						ipp,jpp,kpp,l_h,r_h,u,v,w,th,thbase,thtop, &
-! 						kord,monotone,ring_comm,id, &
-! 						dims,coords)
-						
+					call mpdata_3d(dt,dx,dy,dz,dxn,dyn,dzn,rhoa,rhoan, &
+						ipp,jpp,kpp,l_h,r_h,u,v,w,th,thbase,thtop, &
+						kord,monotone,ring_comm,id, &
+						dims,coords)						
+				case(2)
 					call mpdata_3d_add(dt,dx,dy,dz,dxn,dyn,dzn,rhoa,rhoan, &
 						ipp,jpp,kpp,l_h,r_h,u,v,w,th,thetan,thbase,thtop, &
 						kord,monotone,ring_comm,id, &

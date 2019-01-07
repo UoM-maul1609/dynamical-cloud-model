@@ -7,7 +7,8 @@
 	nm1%cvis=0.23, ! 0.23 desireable
 	nm1%runtime= 7200.,
 	nm1%dt=5.,
-	nm1%advection_scheme=1, ! 0=upstream, 1=mpdata (for scalars)
+	nm1%advection_scheme=2, ! 0=upstream, 1=mpdata (for scalars with separate ref state),
+	                        ! 2=mpdata (for scalars with ref state added)
 	nm1%monotone=.true.,    ! monotone advection   (for scalars)
 	nm1%kord=3,    			! order for mpdata advection scheme
 	nm1%output_interval=10.,
