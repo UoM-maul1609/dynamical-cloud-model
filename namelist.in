@@ -1,0 +1,24 @@
+
+ &run_vars
+	nm1%outputfile = '/tmp/output.nc',
+	nm1%subgrid_model=2, ! 1 = constant viscosity, 2=smagorinsky
+	nm1%viscous_dissipation=.true.,
+	nm1%restart=.false.,
+	nm1%cvis=0.1, ! usually between 0.1 and 0.2 - think LEM has factor of 2 higher because
+	              ! of definition of Sij
+	nm1%z0=1.e-1, ! roughness length for momentum (m)
+	nm1%z0th=1.e-1, ! roughness length for scalars (m)
+	nm1%runtime= 14400.,
+	nm1%dt=1.,
+	nm1%advection_scheme=2, ! 0=upstream, 1=mpdata , 2=mpdata v-flux (for scalars)
+	nm1%subgrid_scheme=0,   ! 0=only option
+	nm1%monotone=.true.,    ! monotone advection   (for scalars)
+	nm1%kord=3,    			! order for mpdata advection scheme
+	nm1%output_interval=200.,
+	nm1%ip=100,
+	nm1%jp=1,
+	nm1%kp=120,
+	nm1%dx=200.,
+	nm1%dy=200.,
+	nm1%dz=10./
+	
