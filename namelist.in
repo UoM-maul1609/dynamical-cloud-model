@@ -3,6 +3,8 @@
 	nm1%outputfile = '/tmp/output.nc',
 	nm1%subgrid_model=2, ! 1 = constant viscosity, 2=smagorinsky
 	nm1%viscous_dissipation=.true.,
+	nm1%z0=1.e-4,
+	nm1%z0th=1.e-4,
 	nm1%restart=.false.,
 	nm1%cvis=0.23, ! 0.23 desireable
 	nm1%runtime= 7200.,
@@ -13,6 +15,8 @@
 	nm1%kord=3,    			! order for mpdata advection scheme
 	nm1%output_interval=10.,
 	nm1%rotation_period_hours=24.,
+	nm1%moisture=.true.,
+	nm1%nq=3,
 	nm1%ip=1,
 	nm1%jp=100,
 	nm1%kp=120,

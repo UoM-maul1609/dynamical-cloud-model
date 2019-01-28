@@ -21,8 +21,10 @@
             integer(i4b), dimension(3) :: coords
             real(sp) :: f, re, g, dt
             real(sp), dimension(:,:,:), allocatable :: u,v, w, rho, th, p, &
-            										su, sv, sw, psrc,zu,zv,zw,tu,tv,tw
-            real(sp), dimension(:,:,:,:), allocatable :: q
+            										su, sv, sw, psrc,zu,zv,zw,tu,tv,tw, &
+            										sth,strain,vism,vist
+
+            real(sp), dimension(:,:,:,:), allocatable :: q, sq, viss
             real(sp), dimension(:), allocatable ::	dx, dy, dz, dxn,dyn,dzn, &
             										x, y, z, xn,yn,zn, theta, thetan, &
             										rhoa, rhoan, lamsq, lamsqn
@@ -45,15 +47,15 @@
             			initially_geostrophic, &
             			viscous_dissipation, &
             			dissipate_h, nudge, restart, &
-            			monotone
-            integer(i4b) :: ip, jp, kp, subgrid_model, advection_scheme, kord
+            			monotone, moisture
+            integer(i4b) :: nq,ip, jp, kp, subgrid_model, advection_scheme, kord
             real(sp) :: vis, &
             			runtime, dt, output_interval, &
             			rotation_period_hours, &
             			nudge_timescale, &
             			cvis,  &
             			dx, dy, dz
-            real(sp) :: psurf,tsurf
+            real(sp) :: psurf,tsurf,z0,z0th
             integer(i4b) :: n_levels
             real(sp), dimension(n_lev) :: theta_read, z_read
             real(sp), dimension(n_q,n_lev) :: q_read

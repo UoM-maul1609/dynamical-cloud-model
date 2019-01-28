@@ -22,6 +22,9 @@
 	!>allocate arrays on each PE, and initialise them
 	!>@param[inout] dt,runtime,ntim - time variables
 	!>@param[inout] x,y,z,xn,yn,zn,u,v,w,p,th,rho - grid positions and prognostics
+	!>@param[inout] sth,strain,vism,vist - more prognostics
+	!>@param[in] z0,z0th - roughness lengths 
+	!>@param[inout] q,sq,viss - q-variable
 	!>@param[inout] zu,zv,zw,tu,tv,tw - previous time-step and temporary storage
 	!>@param[inout] su,sv,sw,psrc - grid positions and prognostics
 	!>@param[inout] theta,thetan - reference potential temperatures
@@ -33,6 +36,7 @@
 	!>@param[inout] ipp,jpp,kpp,ipstart,jpstart,kpstart - number of grid / starting position
 	!>@param[in] dx_nm,dy_nm,dz_nm - grid spacing from namelist
 	!>@param[in] ip,jp,kp - grid points from namelist
+	!>@param[in] moisture, nq - whether to have clouds and number of q-variables
 	!>@param[in] n_levels,z_read,theta_read, psurf,tsurf - sounding variables
 	!>@param[in] l_h,r_h - halo for arrays
 	!>@param[inout] thbase, thtop
@@ -45,6 +49,8 @@
 			zu,zv,zw,&
 			tu,tv,tw,&
 			p,th,rho, &
+			sth,strain,vism,vist,z0,z0th, &
+			q, sq, viss, &
 			su,sv,sw,psrc, &
 			theta,thetan, &
 			rhoa,rhoan, &
@@ -56,6 +62,7 @@
 			ipstart, jpstart, kpstart, &
 			dx_nm, dy_nm, dz_nm, &
 			ip, jp, kp, &
+			moisture,nq,&
 			n_levels,z_read, theta_read,psurf,tsurf, &
 			l_h,r_h, &
 			thbase,thtop, &
@@ -72,16 +79,20 @@
 		real(sp), dimension(:,:,:), allocatable, intent(inout) :: &
 														u,v,w,zu,zv,zw,tu,tv,tw,&
 														p,th,rho, &
-														su,sv,sw,psrc
+														su,sv,sw,psrc, &
+														sth,strain,vism,vist
+		real(sp), dimension(:,:,:,:), allocatable, intent(inout) :: &
+														q,sq,viss
 		real(sp), dimension(:), allocatable, intent(inout) :: x,y,z,xn,yn,zn,dx,dy,dz, &
 															dxn,dyn,dzn, theta,thetan, &
 															rhoa, rhoan, lamsq, lamsqn
 
-		real(sp), intent(in) :: dx_nm, dy_nm, dz_nm, cvis
+		real(sp), intent(in) :: dx_nm, dy_nm, dz_nm, cvis,z0,z0th
 		real(sp), intent(in) :: dt, runtime
 		integer(i4b), intent(inout) :: ipp, jpp, kpp, ipstart, jpstart, kpstart
 		integer(i4b), intent(inout) :: ntim
-		integer(i4b), intent(in) :: ip, jp, kp, l_h, r_h
+		integer(i4b), intent(in) :: ip, jp, kp, l_h, r_h, nq
+		logical :: moisture
 		integer(i4b), intent(in) :: n_levels
 		real(sp), dimension(n_levels), target, intent(in) :: z_read,theta_read
 		real(sp), intent(in) :: psurf, tsurf
@@ -185,6 +196,27 @@
 		allocate( psrc(1-r_h:kpp+r_h,1-r_h:jpp+r_h,1-r_h:ipp+r_h), STAT = AllocateStatus)
 		if (AllocateStatus /= 0) STOP "*** Not enough memory ***"
 
+		allocate( sth(1-r_h:kpp+r_h,1-r_h:jpp+r_h,1-r_h:ipp+r_h), STAT = AllocateStatus)
+		if (AllocateStatus /= 0) STOP "*** Not enough memory ***"
+		allocate( strain(1-r_h:kpp+r_h,1-r_h:jpp+r_h,1-r_h:ipp+r_h), STAT = AllocateStatus)
+		if (AllocateStatus /= 0) STOP "*** Not enough memory ***"
+		allocate( vism(1-r_h:kpp+r_h,1-r_h:jpp+r_h,1-r_h:ipp+r_h), STAT = AllocateStatus)
+		if (AllocateStatus /= 0) STOP "*** Not enough memory ***"
+		allocate( vist(1-r_h:kpp+r_h,1-r_h:jpp+r_h,1-r_h:ipp+r_h), STAT = AllocateStatus)
+		if (AllocateStatus /= 0) STOP "*** Not enough memory ***"
+		if (moisture) then
+            allocate( q(1-r_h:kpp+r_h,1-r_h:jpp+r_h,1-r_h:ipp+r_h,1:nq), &
+                STAT = AllocateStatus)
+            if (AllocateStatus /= 0) STOP "*** Not enough memory ***"
+            allocate( sq(1-r_h:kpp+r_h,1-r_h:jpp+r_h,1-r_h:ipp+r_h,1:nq), &
+                STAT = AllocateStatus)
+            if (AllocateStatus /= 0) STOP "*** Not enough memory ***"
+            allocate( viss(1-r_h:kpp+r_h,1-r_h:jpp+r_h,1-r_h:ipp+r_h,1:nq), &
+                STAT = AllocateStatus)
+            if (AllocateStatus /= 0) STOP "*** Not enough memory ***"
+		endif	
+
+
 		allocate( x(1-l_h:ipp+r_h), STAT = AllocateStatus)
 		if (AllocateStatus /= 0) STOP "*** Not enough memory ***"
 		allocate( y(1-l_h:jpp+r_h), STAT = AllocateStatus)
@@ -223,7 +255,8 @@
 		allocate( dyn(1-l_h:jpp+r_h), STAT = AllocateStatus)
 		if (AllocateStatus /= 0) STOP "*** Not enough memory ***"
 		allocate( dzn(1-l_h:kpp+r_h), STAT = AllocateStatus)
-		if (AllocateStatus /= 0) STOP "*** Not enough memory ***"		
+		if (AllocateStatus /= 0) STOP "*** Not enough memory ***"	
+				
 		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 
@@ -253,9 +286,9 @@
 		
 		! set up mixing length array
 		lamsq=1._sp / (1._sp/(cvis*(dx_nm+dy_nm+dz)/3._sp)**2._sp + &
-				1._sp/(0.4_sp*(z + 1.e-4_sp))**2._sp)
+				1._sp/(0.4_sp*(z + z0))**2._sp)
 		lamsqn=1._sp / (1._sp/(cvis*(dx_nm+dy_nm+dzn)/3._sp)**2._sp + &
-				1._sp/(0.4_sp*(zn + 1.e-4_sp))**2._sp)		
+				1._sp/(0.4_sp*(zn + z0))**2._sp)		
 		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 

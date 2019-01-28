@@ -427,8 +427,8 @@
 	!>\f$\nabla ^2 f = \rho \f$
 	!>@param[in] comm3d,id, rank, dims, coords
 	!>@param[in] dt
-	!>@param[in] xg,yg,zg,dx,dy,dz,dxn,dyn,dzn
-	!>@param[in] ip,jp,kp,l_h,r_h
+	!>@param[in] xg,yg,zg,zng,dx,dy,dz,dxn,dyn,dzn
+	!>@param[in] ip,jp,kp,l_h,r_h,nq
 	!>@param[in] zu
 	!>@param[in] zv
 	!>@param[in] zw
@@ -436,23 +436,35 @@
 	!>@param[in] v
 	!>@param[in] w
 	!>@param[inout] su,sv,sw,rhs
+	!>@param[in] q
+	!>@param[inout] sq,viss
 	!>@param[in] th,theta,thetan,rhoa,rhoan
+	!>@param[inout] sth,strain,vism,vist
 	!>@param[in] lamsq,lamsqn: smag mixing length parameter
+	!>@param[in] z0,z0th: roughness lengths
 	!>@param[in] viscous: logical for applying viscosity
+	!>@param[in] moisture: if we have moisture
 	subroutine sources(comm3d,id,rank, dims, coords, &
-			dt,xg,yg,zg,dx,dy,dz,dxn,dyn,dzn,ip,jp,kp,l_h,r_h,&
+			dt,xg,yg,zg,zng,dx,dy,dz,dxn,dyn,dzn,ip,jp,kp,l_h,r_h,&
+			nq, &
 			zu,zv,zw, &
-			u,v,w,su,sv,sw,rhs, &
-			th,theta,thetan,rhoa,rhoan,lamsq,lamsqn,viscous)
+			u,v,w,su,sv,sw,&
+			q,sq,viss, &
+			rhs, &
+			th,sth,strain,vism,vist,theta,thetan,rhoa,rhoan,lamsq,lamsqn,&
+			z0,z0th,&
+			viscous, &
+			moisture)
 		use nrtype
 		use mpi_module, only : exchange_full, exchange_along_dim
+		use subgrid_3d, only : calculate_subgrid_3d
 		implicit none
 		integer(i4b), intent(in) :: id, comm3d, rank
 		integer(i4b), dimension(3), intent(in) :: dims, coords
-		logical, intent(in) :: viscous
+		logical, intent(in) :: viscous,moisture
 		
-		real(sp), intent(in) :: dt
-		integer(i4b), intent(in) :: ip, jp, kp, l_h,r_h
+		real(sp), intent(in) :: dt,z0,z0th
+		integer(i4b), intent(in) :: ip, jp, kp, l_h,r_h,nq
 		real(sp), dimension(-r_h+1:kp+r_h,-r_h+1:jp+r_h,-l_h+1:ip+r_h), &
 			intent(in) :: u,zu
 		real(sp), dimension(-r_h+1:kp+r_h,-l_h+1:jp+r_h,-r_h+1:ip+r_h), &
@@ -467,10 +479,16 @@
 		real(sp), dimension(-r_h+1:kp+r_h,-r_h+1:jp+r_h,-r_h+1:ip+r_h), &
 			intent(inout) :: sw
 		real(sp), dimension(-r_h+1:kp+r_h,-r_h+1:jp+r_h,-r_h+1:ip+r_h), &
-			intent(inout) :: rhs
+			intent(inout) :: rhs,sth,strain,vism,vist
+
+		real(sp), dimension(-r_h+1:kp+r_h,-r_h+1:jp+r_h,-r_h+1:ip+r_h,1:nq), &
+			intent(in) :: q
+		real(sp), dimension(-r_h+1:kp+r_h,-r_h+1:jp+r_h,-r_h+1:ip+r_h,1:nq), &
+			intent(inout) :: sq,viss
+
 		real(sp), dimension(-l_h+1:ip+r_h), intent(in) :: xg,dx, dxn
 		real(sp), dimension(-l_h+1:jp+r_h), intent(in) :: yg,dy, dyn
-		real(sp), dimension(-l_h+1:kp+r_h), intent(in) :: zg,dz, dzn, theta,thetan, &
+		real(sp), dimension(-l_h+1:kp+r_h), intent(in) :: zg,zng,dz, dzn, theta,thetan, &
 															rhoa, rhoan,lamsq,lamsqn
 		real(sp), dimension(-r_h+1:kp+r_h,-r_h+1:jp+r_h,-r_h+1:ip+r_h), &
 			intent(in) :: th
@@ -540,223 +558,28 @@
 		enddo		
 !$omp end simd	
 
-		if(viscous) then
+
+        if(viscous) then
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 			! sub-grid model
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-			! 1. calculate S on i,j,k
-!$omp simd	
-			do i=1,ip
-				do j=1,jp
-					do k=1,kp
-						s(k,j,i) = &
-							!(du/dx)**2 + (dv/dy)**2 + (dw/dz)**2
-								((zu(k,j,i) - zu(k,j,i-1))/dxn(i-1))**2 + &
-								((zv(k,j,i) - zv(k,j-1,i))/dyn(j-1))**2 + &
-								((zw(k,j,i) - zw(k-1,j,i))/dzn(k-1))**2 + &
-							! 0.5*(du/dy+dv/dx)**2 - 
-							! the 0.125 is 0.25 for average squared and 0.5 prefactor
-							0.125_sp*( ((zu(k,j+1,i)+zu(k,j+1,i-1))- &
-									  (zu(k,j-1,i)+zu(k,j-1,i-1)) ) &
-									  	/ (dy(j)+dy(j-1)) + &
-									  ((zv(k,j,i+1)+zv(k,j-1,i+1))- &
-									  (zv(k,j,i-1)+zv(k,j-1,i-1)) ) &
-									  	/ (dx(i)+dx(i-1)) )**2 + &
-							! 0.5*(du/dz+dw/dx)**2									  
-							0.125_sp*( ((zu(k+1,j,i)+zu(k+1,j,i-1))- &
-									  (zu(k-1,j,i)+zu(k-1,j,i-1)) ) &
-									  	/ (dz(k)+dz(k-1)) + &
-									  ((zw(k,j,i+1)+zw(k-1,j,i+1))- &
-									  (zw(k,j,i-1)+zw(k-1,j,i-1)) ) &
-									  	/ (dx(i)+dx(i-1)) )**2 + &
-							! 0.5*(dv/dz+dw/dy)**2									  									  
-							0.125_sp*( ((zv(k+1,j,i)+zv(k+1,j-1,i))- &
-									  (zv(k-1,j,i)+zv(k-1,j-1,i)) ) &
-									  	/ (dz(k)+dz(k-1)) + &
-									  ((zw(k,j+1,i)+zw(k-1,j+1,i))- &
-									  (zw(k,j-1,i)+zw(k-1,j-1,i)) ) &
-									  	/ (dy(j)+dy(j-1)) )**2
-								
-					enddo
-				enddo
-			enddo
-!$omp end simd	
-			! 2. wrap S
-! 			call exchange_halos(comm3d, id, kp, jp, ip, r_h,r_h,r_h,r_h,r_h,r_h, s,&
-! 								dims,coords)
-			
-			! 3. calculate tau11, tau12, tau13, tau22, tau23, tau33 on i,j,k
-!$omp simd	
-			do i=1,ip
-				do j=1,jp
-					do k=1,kp
-						! du/dx
-						tau11(k,j,i) = ((zu(k,j,i) - zu(k,j,i-1))/dxn(i-1))* &
-										lamsq(k)*sqrt(2._sp*s(k,j,i))
-					enddo
-				enddo
-			enddo
-!$omp end simd	
-!$omp simd	
-			do i=1,ip
-				do j=1,jp
-					do k=1,kp
-						! dv/dy
-						tau22(k,j,i) = ((zv(k,j,i) - zv(k,j-1,i))/dyn(j-1))* &
-										lamsq(k)*sqrt(2._sp*s(k,j,i))
-					enddo
-				enddo
-			enddo
-!$omp end simd	
-!$omp simd	
-			do i=1,ip
-				do j=1,jp
-					do k=1,kp
-						! dw/dz
-						tau33(k,j,i) = ((zw(k,j,i) - zw(k-1,j,i))/dzn(k-1))* &
-										lamsq(k)*sqrt(2._sp*s(k,j,i))
-					enddo
-				enddo
-			enddo
-!$omp end simd	
-!$omp simd	
-			do i=1,ip
-				do j=1,jp
-					do k=1,kp
-						! 1/2*(du/dy+dv/dx)
-						tau12(k,j,i) = &
-							0.25_sp*( ((zu(k,j+1,i)+zu(k,j+1,i-1))- &
-									  (zu(k,j-1,i)+zu(k,j-1,i-1)) ) &
-									  	/ (dy(j)+dy(j-1)) + &
-									  ((zv(k,j,i+1)+zv(k,j-1,i+1))- &
-									  (zv(k,j,i-1)+zv(k,j-1,i-1)) ) &
-									  	/ (dx(i)+dx(i-1)) )* &
-									  	lamsq(k)*sqrt(2._sp*s(k,j,i))
-					enddo
-				enddo
-			enddo
-!$omp end simd	
-!$omp simd	
-			do i=1,ip
-				do j=1,jp
-					do k=1,kp
-						! 1/2*(du/dz+dw/dx)
-						tau13(k,j,i) = &
-							0.25_sp*( ((zu(k+1,j,i)+zu(k+1,j,i-1))- &
-									  (zu(k-1,j,i)+zu(k-1,j,i-1)) ) &
-									  	/ (dz(k)+dz(k-1)) + &
-									  ((zw(k,j,i+1)+zw(k-1,j,i+1))- &
-									  (zw(k,j,i-1)+zw(k-1,j,i-1)) ) &
-									  	/ (dx(i)+dx(i-1)) )* &
-									  	lamsq(k)*sqrt(2._sp*s(k,j,i))
-					enddo
-				enddo
-			enddo
-!$omp end simd	
-!$omp simd	
-			do i=1,ip
-				do j=1,jp
-					do k=1,kp
-						! 1/2*(dv/dz+dw/dy)
-						tau23(k,j,i) = &				
-							0.25_sp*( ((zv(k+1,j,i)+zv(k+1,j-1,i))- &
-									  (zv(k-1,j,i)+zv(k-1,j-1,i)) ) &
-									  	/ (dz(k)+dz(k-1)) + &
-									  ((zw(k,j+1,i)+zw(k-1,j+1,i))- &
-									  (zw(k,j-1,i)+zw(k-1,j-1,i)) ) &
-									  	/ (dy(j)+dy(j-1)) )* &
-									  	lamsq(k)*sqrt(2._sp*s(k,j,i))
-		
-					enddo
-				enddo
-			enddo
-!$omp end simd	
-		
-		
-			! 4. wrap taus
-			call exchange_full(comm3d, id, kp, jp, ip, r_h,r_h,r_h,r_h,r_h,r_h, tau11,& 
-								0._sp,0._sp,dims,coords)
-			call exchange_full(comm3d, id, kp, jp, ip, r_h,r_h,r_h,r_h,r_h,r_h, tau12,&
-								0._sp,0._sp,dims,coords)
-			call exchange_full(comm3d, id, kp, jp, ip, r_h,r_h,r_h,r_h,r_h,r_h, tau13,&
-								0._sp,0._sp,dims,coords)
-			call exchange_full(comm3d, id, kp, jp, ip, r_h,r_h,r_h,r_h,r_h,r_h, tau22,&
-								0._sp,0._sp,dims,coords)
-			call exchange_full(comm3d, id, kp, jp, ip, r_h,r_h,r_h,r_h,r_h,r_h, tau23,&
-								0._sp,0._sp,dims,coords)
-			call exchange_full(comm3d, id, kp, jp, ip, r_h,r_h,r_h,r_h,r_h,r_h, tau33,&
-								0._sp,0._sp,dims,coords)
-		
-		
-			! 5. calculate source terms on staggered grids
-!$omp simd	
-			do i=1,ip
-				do j=1,jp
-					do k=1,kp
-						su(k,j,i) = su(k,j,i) + &
-							2._sp*rhoa(k)*( (tau11(k,j,i+1)-tau11(k,j,i))/dx(i) + &
-								0.5_sp*((tau12(k,j+1,i+1)+tau12(k,j+1,i))- &
-										(tau12(k,j-1,i+1)+tau12(k,j-1,i)) ) &
-											/(dy(j)+dy(j-1)) + &
-								0.5_sp*((tau13(k+1,j,i+1)+tau13(k+1,j,i))- &
-										(tau13(k-1,j,i+1)+tau13(k-1,j,i)) ) &
-											/(dz(k)+dz(k-1)) )
-					enddo
-				enddo
-			enddo
-!$omp end simd	
-			
-!$omp simd	
-			do i=1,ip
-				do j=1,jp
-					do k=1,kp
-						sv(k,j,i) = sv(k,j,i) + &
-							2._sp*rhoa(k)*( &
-								0.5_sp*((tau12(k,j+1,i+1)+tau12(k,j,i+1))- &
-										(tau12(k,j+1,i-1)+tau12(k,j,i-1)) ) &
-											/(dx(i)+dx(i-1)) + &
-								(tau22(k,j+1,i)-tau22(k,j,i))/dy(j) + &
-								0.5_sp*((tau23(k+1,j+1,i)+tau23(k+1,j,i))- &
-										(tau23(k-1,j+1,i)+tau23(k-1,j,i)) ) &
-											/(dz(k)+dz(k-1)) )
-					enddo
-				enddo
-			enddo
-!$omp end simd	
-			
-!$omp simd	
-			do i=1,ip
-				do j=1,jp
-					do k=1,kp
-						sw(k,j,i) = sw(k,j,i) + &
-							2._sp*rhoan(k)*( &
-								0.5_sp*((tau13(k+1,j,i+1)+tau13(k,j,i+1))- &
-										(tau13(k+1,j,i-1)+tau13(k,j,i-1)) ) &
-											/(dx(i)+dx(i-1)) + &
-								0.5_sp*((tau23(k+1,j+1,i)+tau23(k,j+1,i))- &
-										(tau23(k+1,j-1,i)+tau23(k,j-1,i)) ) &
-											/(dy(j)+dy(j-1)) ) + &
-								(tau33(k+1,j,i)-tau33(k,j,i))/dz(k) 
-					enddo
-				enddo
-			enddo
-!$omp end simd	
-			
+            call calculate_subgrid_3d(dt,zg,zng,dx,dy,dz,rhoa, theta,&
+                                        dxn,dyn,dzn,rhoan, thetan,&
+                                        ip,jp,kp,nq,l_h,r_h,u,v,w,zu,zv, zw, &
+                                        th,q, &
+                                        lamsq, z0,z0th, &
+                                        vism,vist, viss,strain, &
+                                        tau11,tau22,tau33,tau12,&
+                                        tau13,tau23, &
+                                        su,sv,sw,sth,sq, &
+                                        moisture, &
+                                        comm3d,id,dims,coords)
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-		endif
-
-		! 6. wrap sources
-		call exchange_along_dim(comm3d, id, kp, jp, ip, r_h,r_h,r_h,r_h,r_h,r_h, su, &
-						    0._sp,0._sp,dims,coords)			
-		call exchange_along_dim(comm3d, id, kp, jp, ip, r_h,r_h,r_h,r_h,r_h,r_h, sv,&
-							0._sp,0._sp,dims,coords)
-		call exchange_along_dim(comm3d, id, kp, jp, ip, r_h,r_h,r_h,r_h,r_h,r_h, sw,&
-							0._sp,0._sp,dims,coords)
-
-
-		! su, sv, and su are now centred on i+1/2
+        endif
+        
         
 
+		! su, sv, and su are now centred on i+1/2        
 
 		! rhs of poisson (centred difference):
 !$omp simd	

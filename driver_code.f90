@@ -17,12 +17,15 @@
 	!>@param[in] ip, jp, kp: dims for full domain
 	!>@param[in] ipp, jpp, kpp: dims for this block of data
 	!>@param[in] l_h,r_h, ipstart,jpstart,kpstart: halo and dims
-	!>@param[in] x,y,z, dx, dy, dz, dxn, dyn, dzn: grids
+	!>@param[in] x,y,z, xn,ym,zn,dx, dy, dz, dxn, dyn, dzn: grids
 	!>@param[inout] ut,vt,wt: prognostics
 	!>@param[inout] zut,zvt,zwt: prognostics - previous time-step
 	!>@param[inout] tut,tvt,twt: prognostics - temp storage
-	!>@param[inout] th,p: prognostic variables
+	!>@param[inout] th,sth,p: prognostic variables
 	!>@param[inout] su,sv,sw,psrc: more prognostic variables
+	!>@param[inout] strain,vism,vist - viscosity subgrid 
+	!>@param[in] z0,z0th - roughness lengths 
+	!>@param[inout] q,sq,viss - for clouds and subgrid
 	!>@param[in] theta, thetan: reference variables
 	!>@param[in] rhoa, rhoan: reference variables
 	!>@param[in] lamsq, lamsqn: reference variables
@@ -33,19 +36,22 @@
 	!>@param[in] output_interval: interval for output (s)
 	!>@param[in] viscous: logical for applying viscous dissipation
 	!>@param[in] advection_scheme, kord, monotone: flags for advection schemes
+	!>@param[in] moisture, nq: flag for moisture and number of q-variables
 	!>@param[in] dims,id, world_process, ring_comm: mpi variables
     subroutine model_driver(ntim,dt,l_h,r_h, &
     			ip,jp,kp, &
     			ipp,jpp,kpp, &
 				ipstart, jpstart, kpstart, &
-				x,y,z, &
+				x,y,z, xn,yn,zn, &
 				dx,dy,dz, &
 				dxn,dyn,dzn, &
 				ut,vt,wt,&
 				zut,zvt,zwt,&
 				tut,tvt,twt,&
-				th,p, &
+				th,sth,p, &
 				su,sv,sw,psrc, &
+				strain, vism, vist, z0,z0th, &
+				q,sq,viss, &
 				theta,thetan, &
 				rhoa,rhoan, &
 				lamsq,lamsqn, &
@@ -54,6 +60,7 @@
 				new_file,outputfile, output_interval, &
 				viscous, &
 				advection_scheme, kord, monotone, &
+				moisture, nq, &
 				dims,id, world_process, rank, ring_comm)
 		use nrtype
 		use mpi_module, only : exchange_full, exchange_along_dim
@@ -61,21 +68,22 @@
         use advection_s_3d, only : first_order_upstream_3d, &
                     mpdata_3d, mpdata_vec_3d, adv_ref_state, mpdata_3d_add
 		use d_solver, only : bicgstab, sources, advance_momentum
+		use subgrid_3d, only : advance_scalar_fields_3d
 
 		implicit none
 		logical, intent(inout) :: new_file
-		logical, intent(in) :: viscous, monotone
+		logical, intent(in) :: viscous, monotone, moisture
 		integer(i4b), intent(in) :: ntim,ip,jp,kp, ipp,jpp,kpp, &
 						l_h,r_h, ipstart, jpstart, kpstart, &
-						advection_scheme, kord
+						advection_scheme, kord, nq
 		integer(i4b), intent(in) :: id, world_process, ring_comm, rank
 		integer(i4b), dimension(3), intent(in) :: coords, dims
 		character (len=*), intent(in) :: outputfile
-		real(sp), intent(in) :: output_interval, dt
+		real(sp), intent(in) :: output_interval, dt, z0,z0th
 		real(sp), intent(inout) :: thbase, thtop
-		real(sp), dimension(1-l_h:ipp+r_h), intent(in) :: x,dx, dxn
-		real(sp), dimension(1-l_h:jpp+r_h), intent(in) :: y,dy,dyn
-		real(sp), dimension(1-l_h:kpp+r_h), intent(in) :: z,dz,dzn, theta, thetan, &
+		real(sp), dimension(1-l_h:ipp+r_h), intent(in) :: x,xn,dx, dxn
+		real(sp), dimension(1-l_h:jpp+r_h), intent(in) :: y,yn,dy,dyn
+		real(sp), dimension(1-l_h:kpp+r_h), intent(in) :: z,zn,dz,dzn, theta, thetan, &
 														rhoa, rhoan,lamsq, lamsqn
 		real(sp), &
 			dimension(1-r_h:kpp+r_h,1-r_h:jpp+r_h,1-r_h:ipp+r_h), &
@@ -90,6 +98,14 @@
 		real(sp), &
 			dimension(1-l_h:kpp+r_h,1-r_h:jpp+r_h,1-r_h:ipp+r_h), target, &
 			intent(inout) :: wt,zwt,twt
+
+		real(sp), &
+			dimension(1-l_h:kpp+r_h,1-r_h:jpp+r_h,1-r_h:ipp+r_h), &
+			intent(inout) ::sth,strain,vism,vist
+
+		real(sp), &
+			dimension(1-l_h:kpp+r_h,1-r_h:jpp+r_h,1-r_h:ipp+r_h,1:nq), &
+			intent(inout) :: q,sq,viss
 					
 		! locals:		
 		integer(i4b) :: n,n2, cur=1, i,j,k, error, rank2
@@ -161,10 +177,16 @@
 			! calculate sources of momentum and pressure                                 !
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 			call sources(ring_comm, id, rank2, dims,coords, &
-				dt,x,y,z,dx,dy,dz,dxn,dyn,dzn,ipp,jpp,kpp,l_h,r_h,&
+				dt,x,y,z,zn,dx,dy,dz,dxn,dyn,dzn,ipp,jpp,kpp,l_h,r_h,&
+				nq, &
 				zu,zv,zw, &
-				u,v,w,su,sv,sw,psrc, &
-				th,theta,thetan,rhoa,rhoan,lamsq,lamsqn,viscous)
+				u,v,w,su,sv,sw, &
+				q,sq,viss, &
+				psrc, &
+				th,sth, strain,vism,vist, &
+				theta,thetan,rhoa,rhoan,lamsq,lamsqn, &
+				z0,z0th, &
+				viscous, moisture)
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -232,6 +254,7 @@
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 			
 
+
 			if(coords(3) == 0) th(0:1,:,:)=0._sp
 
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -254,6 +277,20 @@
 				2._sp*dt,dx,dy,dz,dxn,dyn,dzn,rhoa,rhoan,ipp,jpp,kpp,l_h,r_h,&
 				tu,tv,tw,zu,zv,zw,su,sv,sw,p,dims,coords)
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+			! advance scalars 1 time-step                                                !
+			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+            if(viscous) then
+                    ! advance fields
+                    call advance_scalar_fields_3d(dt,&
+                        q(:,:,:,1:nq),sq(:,:,:,1:nq),&
+                        th,sth,rhoa,rhoan,ipp,jpp,kpp,nq,l_h,r_h)            
+            endif
+			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+
+
 
 
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
