@@ -172,7 +172,7 @@
                         tau11,tau22,tau33,tau12, &
                         tau13, tau23, &
                         su,sv,sw,sth, sq(:,:,:,1:nq), &
-                        ring_comm,id,dims,coords)
+                        .true., ring_comm,id,dims,coords)
                         
                     ! note I think dt should be 2dt for u and 1dt for theta, etc
                     call advance_fields_3d(dt,tu,tv,tw,zu,zv,zw,su,sv,sw,&

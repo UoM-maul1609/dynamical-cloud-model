@@ -6,7 +6,7 @@
     use nrtype
     
     private
-    public :: calculate_subgrid_3d,advance_fields_3d
+    public :: calculate_subgrid_3d,advance_fields_3d,advance_scalar_fields_3d
     
     ! variables / parameters used in subgrid model
     ! note when kvon=0.4, prn should be 0.95 - see Jacobson (page 242 - from Hogstrom)
@@ -33,6 +33,7 @@
 	!>@param[in] th,q, lamsq, z0,z0th
 	!>@param[inout] vism, vist,viss,strain, tau11, tau22, tau33, tau12, tau13, tau23, 
 	!>                su, sv, sw,sth,sq
+	!>@param[in] moisture - flag for moisture
     !>@param[in] comm3d, id, dims, coords: mpi variables
 	subroutine calculate_subgrid_3d(dt,z,zn,dx,dy,dz,rhoa, theta,&
 	                                dxn,dyn,dzn,rhoan, thetan,&
@@ -42,7 +43,7 @@
 	                                vism,vist, viss,strain, &
 	                                tau11,tau22,tau33,tau12,&
 	                                tau13,tau23, &
-	                                su,sv,sw,sth,sq, &
+	                                su,sv,sw,sth,sq, moisture, &
 	                                comm3d,id,dims,coords)
 	use nrtype
 	use mpi_module
@@ -57,9 +58,9 @@
 	real(sp), dimension(-r_h+1:kp+r_h,-r_h+1:jp+r_h,-l_h+1:ip+r_h), &
 		intent(in) :: u, zu
 	real(sp), dimension(-r_h+1:kp+r_h,-l_h+1:jp+r_h,-r_h+1:ip+r_h), &
-		intent(inout) :: v, zv
+		intent(in) :: v, zv
 	real(sp), dimension(-l_h+1:kp+r_h,-r_h+1:jp+r_h,-r_h+1:ip+r_h), &
-		intent(inout) :: w, zw, th
+		intent(in) :: w, zw, th
 	real(sp), dimension(-r_h+1:kp+r_h,-r_h+1:jp+r_h,-r_h+1:ip+r_h,nq), &
 		intent(in) :: q
 	real(sp), dimension(-r_h+1:kp+r_h,-r_h+1:jp+r_h,-r_h+1:ip+r_h,nq), &
@@ -74,6 +75,7 @@
 	        dz, dzn, rhoa, rhoan, theta, thetan
     real(sp), dimension(-l_h+1:kp+r_h), intent(in) :: lamsq
     real(sp), intent(in) :: z0,z0th
+    logical, intent(in) :: moisture
 	
 	! locals
 	integer(i4b) :: i,j,k,n, ktmp,ktmp1
@@ -177,11 +179,14 @@
         0._sp,0._sp,dims,coords)
 
 
-    ! viscosity for q-fields
-    do n=1,nq
-        viss(:,:,:,n)=vist(:,:,:)
-    enddo
-
+    if(moisture) then
+        ! viscosity for q-fields
+        do n=1,nq
+            viss(:,:,:,n)=vist(:,:,:)
+        enddo
+    endif
+    
+    
     ! calculate elements of tau on p-points (in vertical)
     do i=1,ip
         do j=1,jp
@@ -308,40 +313,45 @@
     ! full exchange    
     call exchange_full(comm3d, id, kp, jp, ip, r_h,r_h,r_h,r_h,l_h,r_h,sth,&
         0._sp,0._sp,dims,coords)
-    sq=0._sp
-    ! q-fields
-    do n=1,nq
-        ! calculate q sources due to viscosity
-        ! diffusion along i calculated via i+1/2 and i-1/2 terms
-        do i=1,ip
-            do j=1,jp
-                do k=1,kp
-                    ! note, vist has already been multiplied by rhoa
-                    sq(k,j,i,n)=sq(k,j,i,n)+ &
-                     (0.25_sp*((vist(k,j,i)+vist(k,j,i-1)+vist(k-1,j,i)+vist(k-1,j,i-1))*&
-                              (q(k,j,i-1,n)-q(k,j,i,n))/dxn(i-1) - &
-                              (vist(k,j,i+1)+vist(k,j,i)+vist(k-1,j,i+1)+vist(k-1,j,i))*&
-                              (q(k,j,i,n)-q(k,j,i+1,n))/dxn(i) ) / dx(i-1)  &
-                     + &
-                     0.25_sp*((vist(k,j,i)+vist(k,j-1,i)+vist(k-1,j,i)+vist(k-1,j-1,i))*&
-                              (q(k,j-1,i,n)-q(k,j,i,n))/dyn(j-1) - &
-                              (vist(k,j+1,i)+vist(k,j,i)+vist(k-1,j+1,i)+vist(k-1,j,i))*&
-                              (q(k,j,i,n)-q(k,j+1,i,n))/dyn(j) ) / dy(j-1)  &
-                     + &
-                             (vist(k-1,j,i)* (q(k-1,j,i,n)-q(k,j,i,n))/dz(k-1) - &
-                             vist(k,j,i)* (q(k,j,i,n)-q(k+1,j,i,n))/dz(k) ) / dz(k-1)  ) &
-                             / rhoan(k)                     
+        
+        
+    if(moisture) then
+        sq=0._sp
+        ! q-fields
+        do n=1,nq
+            ! calculate q sources due to viscosity
+            ! diffusion along i calculated via i+1/2 and i-1/2 terms
+            do i=1,ip
+                do j=1,jp
+                    do k=1,kp
+                        ! note, vist has already been multiplied by rhoa
+                        sq(k,j,i,n)=sq(k,j,i,n)+ &
+                         (0.25_sp*&
+                         ((vist(k,j,i)+vist(k,j,i-1)+vist(k-1,j,i)+vist(k-1,j,i-1))*&
+                                  (q(k,j,i-1,n)-q(k,j,i,n))/dxn(i-1) - &
+                        (vist(k,j,i+1)+vist(k,j,i)+vist(k-1,j,i+1)+vist(k-1,j,i))*&
+                                  (q(k,j,i,n)-q(k,j,i+1,n))/dxn(i) ) / dx(i-1)  &
+                         + &
+                         0.25_sp*&
+                         ((vist(k,j,i)+vist(k,j-1,i)+vist(k-1,j,i)+vist(k-1,j-1,i))*&
+                                  (q(k,j-1,i,n)-q(k,j,i,n))/dyn(j-1) - &
+                        (vist(k,j+1,i)+vist(k,j,i)+vist(k-1,j+1,i)+vist(k-1,j,i))*&
+                                  (q(k,j,i,n)-q(k,j+1,i,n))/dyn(j) ) / dy(j-1)  &
+                         + &
+                                 (vist(k-1,j,i)* (q(k-1,j,i,n)-q(k,j,i,n))/dz(k-1) - &
+                            vist(k,j,i)* (q(k,j,i,n)-q(k+1,j,i,n))/dz(k) ) / dz(k-1)  ) &
+                                 / rhoan(k)                     
                         
                     
+                    enddo
                 enddo
             enddo
-        enddo
     
-        ! full exchange    
-        call exchange_full(comm3d, id, kp, jp, ip, r_h,r_h,r_h,r_h,l_h,r_h,&
-            sq(:,:,:,n),0._sp,0._sp,dims,coords)
-    enddo
-
+            ! full exchange    
+            call exchange_full(comm3d, id, kp, jp, ip, r_h,r_h,r_h,r_h,l_h,r_h,&
+                sq(:,:,:,n),0._sp,0._sp,dims,coords)
+        enddo
+    endif
 
     
 	end subroutine calculate_subgrid_3d
@@ -559,6 +569,55 @@
     end subroutine advance_fields_3d
     
     	
+	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+	! Advance fields due to diffusion term                                               !
+	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+	!>@author
+	!>Paul J. Connolly, The University of Manchester
+	!>@brief
+	!>just add the source term to the current value of the field
+	!>@param[in] sq,sth,ipp, jpp, kpp, nq, l_h,r_h,dt, rhoa, rhoan
+	!>@param[inout] q,th
+    subroutine advance_scalar_fields_3d(dt, &
+        q,sq,th,sth,rhoa,rhoan,ip,jp,kp,nq,l_h,r_h)
+	use nrtype
+	use mpi_module
+	use mpi
+    
+    implicit none
+    real(sp), intent(in), dimension(-r_h+1:kp+r_h,-r_h+1:jp+r_h,-l_h+1:ip+r_h) :: &
+        sth
+    real(sp), intent(in), dimension(-r_h+1:kp+r_h) :: &
+        rhoa,rhoan
+    real(sp), intent(inout), dimension(-r_h+1:kp+r_h,-r_h+1:jp+r_h,-l_h+1:ip+r_h) :: &
+        th
+    real(sp), intent(in), dimension(-r_h+1:kp+r_h,-r_h+1:jp+r_h,-l_h+1:ip+r_h,nq) :: sq
+    real(sp), intent(inout), dimension(-r_h+1:kp+r_h,-r_h+1:jp+r_h,-l_h+1:ip+r_h,nq) :: q
+    integer(i4b), intent(in) :: ip, jp, kp, nq, l_h, r_h
+    real(sp), intent(in) :: dt
+    ! locals
+    integer(i4b) :: i,j,k,n
+    
+    do i=1-l_h,ip+r_h
+        do j=1-l_h,jp+r_h
+            do k=1-l_h,kp+r_h
+                th(k,j,i)=th(k,j,i)+sth(k,j,i)*dt
+            enddo
+        enddo
+    enddo
+    
+    do n=1,nq
+        do i=1-l_h,ip+r_h
+            do j=1-l_h,jp+r_h
+                do k=1-l_h,kp+r_h
+                    q(k,j,i,n)=q(k,j,i,n)+sq(k,j,i,n)*dt
+                enddo
+            enddo
+        enddo
+    enddo    
+    
+    end subroutine advance_scalar_fields_3d
+    
 	
 
     end module subgrid_3d
