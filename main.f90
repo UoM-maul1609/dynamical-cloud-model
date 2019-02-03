@@ -157,7 +157,7 @@
             ! Do parallel tridag                            	   				   !
             !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
             call parallel_tridag(pts1%a,pts1%b,pts1%c,pts1%r,pts1%xsol, &
-                nm1%kp,grid1%kp,grid1%kpstart, &
+                grid1%kp, &
                 mp1%coords,mp1%dims, mp1%id, mp1%sub_comm)
             !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 

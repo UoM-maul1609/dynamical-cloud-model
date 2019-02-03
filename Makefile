@@ -24,19 +24,19 @@ FFLAGS2 =  $(DEBUG) -O3 -o
 
 
 main.exe	:  main.$(OBJ) variables.$(OBJ)  parallel_tridag.$(OBJ) mpi_module.$(OBJ) \
-			 initialisation.$(OBJ) model_lib.a 
+			 initialisation.$(OBJ) pts_lib.a 
 	$(FOR2) $(FFLAGSOMP)main.exe main.$(OBJ) variables.$(OBJ)  parallel_tridag.$(OBJ) \
 			 mpi_module.$(OBJ) \
-			 initialisation.$(OBJ) -lm model_lib.a \
+			 initialisation.$(OBJ) -lm pts_lib.a \
 		     $(DEBUG)
 # 	$(FOR2) $(FFLAGSOMP)main.exe main.$(OBJ) variables.$(OBJ)  parallel_tridag.$(OBJ) \
 # 			 mpi_module.$(OBJ) \
 # 			 initialisation.$(OBJ) -lm model_lib.a \
 # 		 ${NETCDFLIB} -I ${NETCDFMOD} ${NETCDF_LIB} $(DEBUG)
-model_lib.a	:   nrtype.$(OBJ) nr.$(OBJ) nrutil.$(OBJ) locate.$(OBJ) polint.$(OBJ) \
+pts_lib.a	:   nrtype.$(OBJ) nr.$(OBJ) nrutil.$(OBJ) locate.$(OBJ) polint.$(OBJ) \
 				tridag.$(OBJ) rkqs.$(OBJ) rkck.$(OBJ) odeint.$(OBJ) zbrent.$(OBJ) \
 				random.$(OBJ)
-	$(AR) rc model_lib.a nrutil.$(OBJ) locate.$(OBJ) polint.$(OBJ) tridag.$(OBJ) \
+	$(AR) rc pts_lib.a nrutil.$(OBJ) locate.$(OBJ) polint.$(OBJ) tridag.$(OBJ) \
 				rkqs.$(OBJ) rkck.$(OBJ) odeint.$(OBJ) zbrent.$(OBJ) \
 				random.$(OBJ)
 locate.$(OBJ)	: locate.f90
@@ -78,5 +78,5 @@ main.$(OBJ)   : main.f90 variables.$(OBJ) nrtype.$(OBJ)  mpi_module.$(OBJ) \
 
 clean :
 	rm *.exe  *.o *.mod *~ \
-	model_lib.a
+	pts_lib.a
 

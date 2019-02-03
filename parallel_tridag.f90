@@ -267,13 +267,13 @@
     !>@param[in] kp,kpp,kpstart: dimensions for problem
     !>@param[in] comm3d,id, dims, coords: mpi stuff
     subroutine parallel_tridag(a,b,c,r,x, &
-        kp,kpp,kpstart,coords,dims, id, comm3d)
+        kpp,coords,dims, id, comm3d)
         use nr, only : tridag
         use mpi
         use mpi_module
         implicit none
-        integer(i4b), intent(in) :: kp,kpp,kpstart
-        integer(i4b), dimension(3), intent(inout) :: coords
+        integer(i4b), intent(in) :: kpp
+        integer(i4b), dimension(3), intent(in) :: coords
         integer(i4b), dimension(3), intent(in) :: dims
         integer(i4b), intent(in) :: id, comm3d
         
@@ -288,7 +288,7 @@
 
             
 
-
+        
        
         
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -304,6 +304,7 @@
             xlh(i)=(r(i)-a(i)*xlh(i-1))/denom
         enddo
         
+
         ! back substitution
         xr(kpp)=xlh(kpp)
         xlh(kpp)=-xuh(kpp)
@@ -312,6 +313,7 @@
             xr(i)=xlh(i)-xuh(i)*xr(i+1)
             xlh(i)=-xuh(i)*xlh(i+1)
             denom=b(i)-c(i)*xuh(i+1)
+            denom=sign(1._sp,denom+1.e-60_sp)*max(abs(denom),1.e-15)
             if(denom .eq. 0._sp) stop
             xuh(i)=a(i)/denom
         enddo
@@ -321,12 +323,11 @@
         do i=2,kpp
             xuh(i)=-xuh(i)*xuh(i-1)
         enddo
+        
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         
         if(pts1%nprocv==1) then
-!             up=xr
             x=xr
-            !print *,up -un
             return
         endif
         
@@ -344,9 +345,9 @@
         pts1%outdata(6+(pts1%thispe-1)*8)=xlh(kpp)
         pts1%outdata(7+(pts1%thispe-1)*8)=-1._sp
         pts1%outdata(8+(pts1%thispe-1)*8)=-xr(kpp) 
-        
         ! http://mpitutorial.com/tutorials/mpi-scatter-gather-and-allgather/
         msend=pts1%outdata(1+(pts1%thispe-1)*8:8+(pts1%thispe-1)*8)  ! message to send
+        
         call MPI_allgather(msend,8,MPI_REAL8,pts1%mvrecv,8,MPI_REAL8,comm3d,error)
         pts1%outdata=pts1%mvrecv
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -365,11 +366,12 @@
             pts1%reducc(i)=pts1%outdata(ibase+2)
             pts1%reducr(i)=pts1%outdata(ibase+3)
         enddo
-
         ! solve reduced system
         call tridag(pts1%reduca(2:pts1%sz),pts1%reducb,pts1%reducc(1:pts1%sz-1),&
             pts1%reducr,pts1%coeffs)
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        !print *,xr
+        !pause
 
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         ! part 4: pick out the appropriate elements of coeffs                        !
