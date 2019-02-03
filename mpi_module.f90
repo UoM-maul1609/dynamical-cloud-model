@@ -2,6 +2,10 @@
 	!>Paul Connolly, The University of Manchester
 	!>@brief
 	!>mpi routines for dynamical cloud model
+	!> note: should be able to get significant speed up by using irecv, isend and waits
+	!> need to pre-allocate correct buffer sizes for this though
+	!> could probably also do away with the if statements - call isend and irecv anyway 
+	!> - even if an mpi call is not required
     module mpi_module
     use nrtype
     use mpi
@@ -36,7 +40,10 @@
         	logical :: reorder=.true.
         	integer(i4b) :: ndim=3
         	integer(i4b), dimension(3) :: dims, coords
+        	logical, dimension(3) :: remain_dims=[.false.,.false.,.true.]
+        	integer(i4b) :: colour,height
         	integer(i4b) :: ring_comm
+        	integer(i4b) :: sub_comm
         	type(mpi_faces) :: face
         	type(mpi_edges) :: edge
         	type(mpi_corners) :: cnr
@@ -153,7 +160,9 @@
 		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 		! coordinates of this PE:
 		call MPI_CART_COORDS(mp1%ring_comm, mp1%id, 3, mp1%coords, error)
-		
+		mp1%colour=(mp1%coords(1)+1)*(mp1%dims(1))+(mp1%coords(2)+1)
+		mp1%height=mp1%coords(3)
+
 		call mpi_find_rank(mp1%coords,mp1%dims,-1,-1,0,mp1%edge%s_ws_bt,mp1%edge%r_en_bt)
 		call mpi_find_rank(mp1%coords,mp1%dims,-1,+1,0, mp1%edge%s_wn_bt,mp1%edge%r_es_bt)
 		call mpi_find_rank(mp1%coords,mp1%dims,+1,-1,0, mp1%edge%s_es_bt,mp1%edge%r_wn_bt)
@@ -167,7 +176,7 @@
 		call mpi_find_rank(mp1%coords,mp1%dims,-1,0,-1,mp1%edge%s_bw_sn,mp1%edge%r_te_sn)
 		call mpi_find_rank(mp1%coords,mp1%dims,+1,0,-1,mp1%edge%s_be_sn,mp1%edge%r_tw_sn)
 		call mpi_find_rank(mp1%coords,mp1%dims,-1,0,+1,mp1%edge%s_tw_sn,mp1%edge%r_be_sn)
-		call mpi_find_rank(mp1%coords,mp1%dims,+1,0,+1,mp1%edge%s_te_sn,mp1%edge%r_bw_sn)
+		call mpi_find_rank(mp1%coords,mp1%dims,+1,0,+1,mp1%edge%s_te_sn,mp1%edge%r_bw_sn)		
 		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 
@@ -183,6 +192,17 @@
 		call mpi_find_rank(mp1%coords,mp1%dims,+1,-1,+1, mp1%cnr%s_est,mp1%cnr%r_wnb)
 		call mpi_find_rank(mp1%coords,mp1%dims,-1,+1,+1, mp1%cnr%s_wnt,mp1%cnr%r_esb)
 		call mpi_find_rank(mp1%coords,mp1%dims,+1,+1,+1, mp1%cnr%s_ent,mp1%cnr%r_wsb)
+		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+
+
+		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        ! create sub communicator for vertical comms                                     !
+		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+		if(mp1%id  < mp1%dx * mp1%dy * mp1%dz) then
+            call MPI_Cart_sub(mp1%ring_comm,mp1%remain_dims,&
+                mp1%sub_comm,mp1%error)
+        endif
 		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 		
@@ -645,7 +665,8 @@
 						tag1, MPI_COMM_WORLD, status,error)
 					call MPI_Wait(request, status, error)
 				endif	
-				!----						
+				!----	
+				
 			end subroutine exchange_corner
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
@@ -696,7 +717,11 @@
 				endif	
 				!----
 		
-									
+                if ( send == id) then
+                    ! adjacent cells:
+                    array(r_kl:r_ku,r_jl:r_ju,r_il:r_iu)= &
+                        array(s_kl:s_ku,s_jl:s_ju,s_il:s_iu)
+                endif
 									
 			end subroutine exchange_edges
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!

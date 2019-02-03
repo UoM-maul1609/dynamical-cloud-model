@@ -741,7 +741,7 @@
 			! local variables:
 			integer(i4b) :: doy,diy, year
 			real(sp) :: tod, cos_theta_s, frac
-			real(sp), dimension(0:kp) :: sigma_ray, tau, taun,dtau,dtaun
+			real(sp), dimension(0:kp+1) :: sigma_ray, tau, taun,dtau,dtaun
 			real(sp), dimension(kp+1,nbands) :: blt
 			logical :: leap
 			real(sp) :: omg_s=1._sp, ga=0._sp, gamma1, gamma2, gamma3
@@ -782,7 +782,7 @@
 				!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 				! extinction:															 !
 				!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-				do k=1,kp
+				do k=1,kp+1
 					! number of molecules per cubic metre of air multiplied by 
 					! collision cross-section:
 					sigma_ray(k)=rhoan(k)*navog/ma*b_s_g(m)
@@ -799,6 +799,7 @@
 				! sigma_ray is the extinction on p-points
 				! tau is optical depth on w-points
 				! mpi - add bottom taus to all and add cumulative
+				tau(kp+1)=0._sp
 				tau(kp)=0._sp
 				do k=kp-1,0,-1
 					! cumulative extinction x dz
@@ -856,10 +857,10 @@
 					if(cos_theta_s > 0._sp) then
 					    ! short-wave (see equations 9.121 Jacobson):
 						Skp=-dtau(k-1)*gamma3*omg_s*sflux_l(m)* &
-						    exp(-0.5_sp*(tau(k-1)+tau(k-1))/cos_theta_s)
+						    exp(-0.5_sp*(tau(k)+tau(k-1))/cos_theta_s)
 						Skm=dtau(k-1)*(1._sp-gamma3)* &
 								omg_s*sflux_l(m)*&
-								exp(-0.5_sp*(tau(k-1)+tau(k-1))/cos_theta_s)
+								exp(-0.5_sp*(tau(k)+tau(k-1))/cos_theta_s)
 					endif
 					! long wave (see equations 9.122 Jacobson):
 					Skp=Skp-dtau(k-1)*2._sp*pi*(1-omg_s)*blt(k,m)
@@ -907,7 +908,6 @@
 				endif
 				r(1)=r(1)+emiss*pi*blt(1,m)
 				!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-				
 				
 				
 				!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
