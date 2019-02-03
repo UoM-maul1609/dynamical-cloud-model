@@ -29,6 +29,7 @@
         use initialisation
         use radiation
         use drivers
+        use pts
         
         implicit none
         character (len=200) :: nmlfile = ' '
@@ -143,7 +144,9 @@
 		  radg1%sflux_l, radg1%b_s_g, &
 		  radg1%ext_s_g, radg1%flux_u, radg1%flux_d, radg1%rad_power,  &
 		  grid1%l_halo, grid1%r_halo, grid1%rhoan, grid1%thetan, &
-		  grid1%coords,mp1%dims, mp1%id, mp1%ring_comm)
+		  radg1%nprocv,radg1%mvrecv, &
+		  radg1%tdstart,radg1%tdend,radg1%a,radg1%b,radg1%c,radg1%r,radg1%u, &
+		  grid1%coords,mp1%dims, mp1%id, mp1%sub_comm)
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 
@@ -160,6 +163,16 @@
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 
+        if(mp1%id < mp1%dx * mp1%dy * mp1%dz) then
+            !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+            ! Set up problem                                	   	    	   !
+            !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+            call set_tridag(.false.,pts1%an,pts1%bn,pts1%cn,pts1%rn,&
+                pts1%un,pts1%up,pts1%a,pts1%b,pts1%c,pts1%r,pts1%xsol, &
+                nm1%kp,radg1%tdend,grid1%kpstart, &
+                mp1%coords,mp1%dims, mp1%id, mp1%sub_comm)
+            !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        endif
 
 
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -169,6 +182,8 @@
 				nm1%ip, nm1%jp, nm1%kp, &
 				grid1%ip, grid1%jp, grid1%kp, &
 				grid1%ipstart, grid1%jpstart, grid1%kpstart, &
+				radg1%tdstart,radg1%tdend, &
+				radg1%a,radg1%b,radg1%c,radg1%r,radg1%u, &
 				radg1%ntot, radg1%ns, radg1%nl, &
 				radg1%flux_u, radg1%flux_d, radg1%rad_power, &
 				grid1%x, grid1%y, grid1%z, &
@@ -181,9 +196,11 @@
 				nm2%start_year, nm2%start_mon, nm2%start_day,&
 				nm2%start_hour, nm2%start_min,nm2%start_sec, &
 				radg1%lat, radg1%lon, radg1%albedo, radg1%emiss,nm2%quad_flag, &
+				radg1%nprocv,radg1%mvrecv, &
 				grid1%coords, &
 				io1%new_file, nm1%outputfile, nm1%output_interval, &
-				mp1%dims,mp1%id, world_process, mp1%rank, mp1%ring_comm)
+				mp1%dims,mp1%id, world_process, mp1%rank, mp1%ring_comm, &
+				mp1%sub_comm)
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 

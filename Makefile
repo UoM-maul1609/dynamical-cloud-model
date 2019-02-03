@@ -1,3 +1,9 @@
+PTS_DIR = pts
+
+.PHONY: pts_code cleanall
+CLEANDIRS = $(PTS_DIR) ./
+
+
 DEBUG = -fbounds-check -g 
 OPT    =-O3
 
@@ -25,17 +31,25 @@ FFLAGS2 =  $(DEBUG) -O3 -o
 
 
 main.exe	:  main.$(OBJ) variables.$(OBJ)  radiation.$(OBJ) mpi_module.$(OBJ) \
-			 initialisation.$(OBJ) driver_code.$(OBJ) model_lib.a 
+			 initialisation.$(OBJ) driver_code.$(OBJ) rtm_lib.a 
 	$(FOR2) $(FFLAGSOMP)main.exe main.$(OBJ) variables.$(OBJ)  radiation.$(OBJ) \
 			 mpi_module.$(OBJ) \
-			 initialisation.$(OBJ) driver_code.$(OBJ) -lm model_lib.a \
+			 initialisation.$(OBJ) driver_code.$(OBJ) \
+			 -lm rtm_lib.a \
 		 ${NETCDFLIB} -I ${NETCDFMOD} ${NETCDF_LIB} $(DEBUG)
-model_lib.a	:   nrtype.$(OBJ) nr.$(OBJ) nrutil.$(OBJ) locate.$(OBJ) polint.$(OBJ) \
+rtm_lib.a	:   nrtype.$(OBJ) nr.$(OBJ) nrutil.$(OBJ) locate.$(OBJ) polint.$(OBJ) \
 				tridag.$(OBJ) rkqs.$(OBJ) rkck.$(OBJ) odeint.$(OBJ) zbrent.$(OBJ) \
-				random.$(OBJ)
-	$(AR) rc model_lib.a nrutil.$(OBJ) locate.$(OBJ) polint.$(OBJ) tridag.$(OBJ) \
+				random.$(OBJ) pts_code
+	$(AR) rc rtm_lib.a nrutil.$(OBJ) locate.$(OBJ) polint.$(OBJ) tridag.$(OBJ) \
 				rkqs.$(OBJ) rkck.$(OBJ) odeint.$(OBJ) zbrent.$(OBJ) \
-				random.$(OBJ)
+				random.$(OBJ) \
+                $(PTS_DIR)/nrutil.$(OBJ) $(PTS_DIR)/locate.$(OBJ) \
+                $(PTS_DIR)/polint.$(OBJ) $(PTS_DIR)/tridag.$(OBJ) \
+				$(PTS_DIR)/rkqs.$(OBJ) $(PTS_DIR)/rkck.$(OBJ) $(PTS_DIR)/odeint.$(OBJ) \
+				$(PTS_DIR)/zbrent.$(OBJ) \
+				$(PTS_DIR)/random.$(OBJ) \
+				$(PTS_DIR)/initialisation.$(OBJ) \
+				$(PTS_DIR)/parallel_tridag.$(OBJ) 
 locate.$(OBJ)	: locate.f90
 	$(FOR) locate.f90 $(FFLAGS)locate.$(OBJ)
 polint.$(OBJ)	: polint.f90
@@ -67,13 +81,21 @@ driver_code.$(OBJ) : driver_code.f90 nrtype.$(OBJ) radiation.$(OBJ)
 mpi_module.$(OBJ) : mpi_module.f90 
 	$(FOR) mpi_module.f90 $(FFLAGS)mpi_module.$(OBJ)
 radiation.$(OBJ) : radiation.f90 nrtype.$(OBJ) nr.$(OBJ) mpi_module.$(OBJ) \
-					initialisation.$(OBJ)
-	$(FOR) radiation.f90 $(FFLAGSOMP)radiation.$(OBJ)
+					initialisation.$(OBJ) pts_code
+	$(FOR) radiation.f90 $(FFLAGSOMP)radiation.$(OBJ) -I$(PTS_DIR)
 main.$(OBJ)   : main.f90 variables.$(OBJ) nrtype.$(OBJ)  mpi_module.$(OBJ) \
-			initialisation.$(OBJ) radiation.$(OBJ) driver_code.$(OBJ) 
-	$(FOR)  main.f90 -I ${NETCDFMOD} $(FFLAGS)main.$(OBJ) 
+			initialisation.$(OBJ) radiation.$(OBJ) driver_code.$(OBJ) pts_code
+	$(FOR)  main.f90 -I ${NETCDFMOD} $(FFLAGS)main.$(OBJ) -I$(PTS_DIR)
 
-clean :
+pts_code:
+	$(MAKE) -C $(PTS_DIR)
+
+clean: 
 	rm *.exe  *.o *.mod *~ \
-	model_lib.a
+	rtm_lib.a
 
+cleanall:
+	for i in $(CLEANDIRS); do \
+		$(MAKE) -C $$i clean; \
+	done
+	

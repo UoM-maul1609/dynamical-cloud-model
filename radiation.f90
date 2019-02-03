@@ -12,6 +12,7 @@
         type radg
         	integer(i4b) :: year, mon, day, hour, sec
         	integer(i4b) :: doy, diy
+        	integer(i4b) :: nprocv
         	real(sp) :: albedo, emiss, lat, lon
         	integer(i4b) :: ns, nl, ntot
             real(sp), dimension(:), allocatable ::	b_s_g, &
@@ -19,7 +20,11 @@
             real(sp), dimension(:), allocatable ::	ext_s_g ! extinction for Rayleigh
             real(sp), dimension(:,:,:,:), allocatable :: flux_u, flux_d
             real(sp), dimension(:,:,:), allocatable :: rad_power
-            real(sp), dimension(:), allocatable :: sflux_l									 
+            real(sp), dimension(:), allocatable :: sflux_l	
+            real(sp), dimension(:), allocatable :: mvrecv	
+            real(sp), dimension(:), allocatable :: a,b,c,r,u
+            integer(i4b) :: tdstart,tdend
+            							 
         end type radg
 
 
@@ -136,7 +141,10 @@
 											sflux_l, b_s_g, &
 											ext_s_g, flux_u, flux_d, rad_power, &
 											l_h, r_h, rhoan, thetan, &
+											nprocv,mvrecv, &
+											tdstart,tdend,a,b,c,r,u, &
 											coords,dims, id, comm3d)
+			use mpi
 			implicit none
 			character (len=200), intent(in) :: albedo_r, emiss_r
 			real(sp), intent(inout) :: alb, emiss
@@ -154,20 +162,42 @@
 			real(sp), intent(in), dimension(1-l_h:kp+r_h) :: rhoan, thetan
 			real(sp), dimension(:,:,:,:), allocatable, intent(inout) :: flux_d,flux_u
 			real(sp), dimension(:,:,:), allocatable, intent(inout) :: rad_power
+			integer(i4b), intent(inout) :: nprocv,tdstart,tdend
+			real(sp), dimension(:), allocatable, intent(inout) :: mvrecv,a,b,c,r,u
 			integer(i4b), dimension(3), intent(inout) :: coords
 			integer(i4b), dimension(3), intent(in) :: dims
 			integer(i4b), intent(in) :: id, comm3d
 			
 		
 			real(sp) :: sum_upper, sum_lower, x_upper, x_lower, fac
-			integer(i4b) :: AllocateStatus, i, j,doy
+			integer(i4b) :: AllocateStatus, i, j,doy, error
 			logical :: leap
 			
 ! if the pe is not being used in the cartesian topology, do not use here
 			if(id>=dims(1)*dims(2)*dims(3)) return 
 		
 				
-		
+		    ! find out how many procs in this communicator
+		    call MPI_Comm_size(comm3d, nprocv,error)
+            
+            
+            !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+            ! array bounds for tridag solver                                             !
+            !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+            tdend=kp*2
+            if(coords(3)==0) then 
+                ! bottom level: 1 is for lower BC
+                tdstart=2
+                tdend=tdend+1
+            else 
+                tdstart=1
+            endif
+            
+            if(coords(3)==(dims(3)-1)) then
+                tdend=tdend+1
+            endif
+            !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+            
 
 			! some calcs
 			! set the lat / lon
@@ -202,6 +232,19 @@
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 			! allocate memory
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+			allocate( a(1:tdend), STAT = AllocateStatus)
+			if (AllocateStatus /= 0) STOP "*** Not enough memory ***"
+			allocate( b(1:tdend), STAT = AllocateStatus)
+			if (AllocateStatus /= 0) STOP "*** Not enough memory ***"
+			allocate( c(1:tdend), STAT = AllocateStatus)
+			if (AllocateStatus /= 0) STOP "*** Not enough memory ***"
+			allocate( r(1:tdend), STAT = AllocateStatus)
+			if (AllocateStatus /= 0) STOP "*** Not enough memory ***"
+			allocate( u(1:tdend), STAT = AllocateStatus)
+			if (AllocateStatus /= 0) STOP "*** Not enough memory ***"
+			allocate( mvrecv(1:nprocv), STAT = AllocateStatus)
+			if (AllocateStatus /= 0) STOP "*** Not enough memory ***"
+
 			allocate( lambda(1:ntot), STAT = AllocateStatus)
 			if (AllocateStatus /= 0) STOP "*** Not enough memory ***"
 			allocate( lambda_low(1:ntot), STAT = AllocateStatus)
@@ -716,19 +759,26 @@
         !>   D_{k+1} \\ \vdots \\\mu F_s \\
         !>   \end{bmatrix} 
         !>   \f$
+        !>@param[in] comm3d,id, dims, coords: mpi stuff
 		subroutine solve_fluxes(start_year,start_mon,start_day, &
 								start_hour,start_min,start_sec, &
 								lat, lon, &
 								time, nbands,ns,nl,ip,jp,kp,r_h, &
+								tdstart,tdend,a,b,c,r,u, &
 								lambda_low, lambda_high, lambda,b_s_g, sflux_l,&
 								rhoan, thetan, dz,dzn, albedo, emiss, &
-								quad_flag, flux_u, flux_d)
+								quad_flag, flux_u, flux_d, &
+								nprocv,mvrecv, &
+								coords,dims, id, comm3d)
 			use nr, only : tridag
+			use mpi
+			use pts
 			implicit none
 			integer(i4b), intent(in) :: start_year, start_mon, start_day, start_hour, &
 							start_min, start_sec
 			real(sp), intent(in) :: time
-			integer(i4b), intent(in) :: nbands, ns, nl, ip, jp, kp, r_h
+			integer(i4b), intent(in) :: nbands, ns, nl, ip, jp, kp, r_h, nprocv
+			real(sp), intent(in), dimension(nprocv) :: mvrecv
 			real(sp), dimension(nbands), intent(in) :: &
 					lambda_low, lambda_high, lambda, b_s_g, sflux_l
 			real(sp), intent(in), dimension(1-r_h:kp+r_h) :: rhoan, thetan, dz,dzn
@@ -737,20 +787,29 @@
 					flux_u, flux_d
 			real(sp), intent(in) :: lat, lon, albedo, emiss
 			integer(i4b), intent(in) :: quad_flag	
+
+            integer(i4b), dimension(3), intent(in) :: coords
+            integer(i4b), dimension(3), intent(in) :: dims
+            integer(i4b), intent(in) :: id, comm3d
+            
+            integer(i4b), intent(in) :: tdstart,tdend
+            real(sp), dimension(1:tdend), intent(inout) :: a,b,c,r,u
+
 			
 			! local variables:
-			integer(i4b) :: doy,diy, year
-			real(sp) :: tod, cos_theta_s, frac
-			real(sp), dimension(0:kp+1) :: sigma_ray, tau, taun,dtau,dtaun
+			integer(i4b) :: doy,diy, year,error
+			real(sp) :: tod, cos_theta_s, frac,msend
+			real(sp), dimension(0:kp+1) :: sigma_ray, taun,dtau,dtaun
+			real(sp), dimension(0:kp+1) :: tau
 			real(sp), dimension(kp+1,nbands) :: blt
 			logical :: leap
 			real(sp) :: omg_s=1._sp, ga=0._sp, gamma1, gamma2, gamma3
 			
-			integer(i4b) :: it, itermax=1, k, m,j,i
+			integer(i4b) :: it, itermax=1, k, m,j,i,kend,kstart
 			real(sp) :: Ac, Bc, Cc, Dc, alp, bet, gam, del, &
 						Ak, Bk, Ck, Dk, Ek, Fk, Gk, Hk, Skp, Skm
-			real(sp), dimension(2*kp+2) :: b,r,u
-			real(sp), dimension(2*kp-1+2) :: a,c
+			!real(sp), dimension(2*(kp+1)) :: b,r,u
+			!real(sp), dimension(2*kp+1) :: a,c
 			
 			
 			
@@ -772,26 +831,30 @@
             !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
             ! calculate planck function at all levels p-points:						     !
             !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-            do k=1,kp+1
+            do k=1,kp+1 
                 call inband_planck(nbands,lambda_low,lambda_high,thetan(k),blt(k,:))
             enddo
             !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+            if(dims(3)==(coords(3)+1)) then
+                kend=kp
+            else 
+                kend=kp+1
+            endif
 
 			do m=1,nbands
 
 				!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 				! extinction:															 !
 				!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-				do k=1,kp+1
+				
+				do k=1,kend ! PARALLEL: when PE not top you need to know kp+1
 					! number of molecules per cubic metre of air multiplied by 
 					! collision cross-section:
 					sigma_ray(k)=rhoan(k)*navog/ma*b_s_g(m)
 				enddo
 				!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 			
-			
-			    ! for parallel solver tau and dtau need some parallel communication:
-			    ! mpi_allgather
 			
 				!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 				! optical depth:														 !
@@ -801,16 +864,31 @@
 				! mpi - add bottom taus to all and add cumulative
 				tau(kp+1)=0._sp
 				tau(kp)=0._sp
-				do k=kp-1,0,-1
+				do k=kend-1,0,-1 ! PARALLEL: kp needs to be set when not top
 					! cumulative extinction x dz
 					tau(k)=tau(k+1)+sigma_ray(k+1)*dz(k) 
 				enddo
+				
+				
+				
 			
+			    ! for parallel solver tau and dtau need some parallel communication:
+                ! http://mpitutorial.com/tutorials/mpi-scatter-gather-and-allgather/
+                msend=tau(1)  ! message to send
+                call MPI_allgather(msend,1,MPI_REAL8,mvrecv,1,MPI_REAL8,comm3d,error)
+			    tau=tau+sum(mvrecv(  coords(3)+2:dims(3)  ))
+			    
+			    
+			    
+			    
 			    ! change in optical depth on w-points
-				do k=kp-1,0,-1
+				do k=kp,0,-1 
 				    dtau(k)=tau(k+1)-tau(k) 
 				enddo
-				dtau(kp)=0._sp
+                msend=dtau(1)  ! message to send
+                call MPI_allgather(msend,1,MPI_REAL8,mvrecv,1,MPI_REAL8,comm3d,error)
+                if((coords(3)+1).lt.(dims(3))) dtau(kp+1)=mvrecv(coords(3)+2)
+				if(coords(3)==(dims(3)-1)) dtau(kp)=0._sp
 				!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 			
@@ -837,11 +915,13 @@
 				!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 				! set up tridiagonal problem:											 !
 				!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-				do k=2,kp+1
+				! dtau(0,kp+1) needs to be set
+				! tau(0,kp+1) needs to be set				
+				do k=1,kp
 					! define coefficients for FDE:
-					Ac=1._sp-0.5_sp*dtau(k-1)*gamma1
-					Bc=-1._sp-0.5_sp*dtau(k-1)*gamma1
-					Cc=0.5_sp*dtau(k-1)*gamma2
+					Ac=1._sp-0.5_sp*dtau(k)*gamma1
+					Bc=-1._sp-0.5_sp*dtau(k)*gamma1
+					Cc=0.5_sp*dtau(k)*gamma2
 					Dc=Cc
 					alp=-Cc
 					bet=-Cc
@@ -856,38 +936,64 @@
 					Skm=0._sp
 					if(cos_theta_s > 0._sp) then
 					    ! short-wave (see equations 9.121 Jacobson):
-						Skp=-dtau(k-1)*gamma3*omg_s*sflux_l(m)* &
-						    exp(-0.5_sp*(tau(k)+tau(k-1))/cos_theta_s)
-						Skm=dtau(k-1)*(1._sp-gamma3)* &
+						Skp=-dtau(k)*gamma3*omg_s*sflux_l(m)* &
+						    exp(-0.5_sp*(tau(k+1)+tau(k))/cos_theta_s)
+						Skm=dtau(k)*(1._sp-gamma3)* &
 								omg_s*sflux_l(m)*&
-								exp(-0.5_sp*(tau(k)+tau(k-1))/cos_theta_s)
+								exp(-0.5_sp*(tau(k+1)+tau(k))/cos_theta_s)
 					endif
 					! long wave (see equations 9.122 Jacobson):
-					Skp=Skp-dtau(k-1)*2._sp*pi*(1-omg_s)*blt(k,m)
-					Skm=Skm+dtau(k-1)*2._sp*pi*(1-omg_s)*blt(k,m)
+					Skp=Skp-dtau(k)*2._sp*pi*(1-omg_s)*blt(k+1,m)
+					Skm=Skm+dtau(k)*2._sp*pi*(1-omg_s)*blt(k+1,m)
 					Dk=Skp-Cc/gam*Skm
 					Ek=(del-Dc*bet/Bc)
 					Fk=(alp-Ac*bet/Bc)
 					Gk=(gam-Cc*bet/Bc)
 					Hk=Skm-bet*Skp/Bc
 						
-				
+						
+						
 					! lower diag:
-					a(2*(k-1)-1) = Ak
-					a(2*(k-1))   = Ek
-				
+					! a(1) needs to be set when not bottom
+					if(coords(3)==0) then
+                        a(2*k)     = Ak !2,4,6,8
+                        a(2*k+1)   = Ek !3,5,7,9
+                    else
+                        a(2*k-1) = Ak !1,3,5,7
+                        a(2*k)   = Ek !2,4,6,8
+                    endif				
+
+
 					! upper diag:
-					c(2*(k-1)) = Ck
-					c(2*k-1)   = Gk
+					! c(kpp) gets set to zero on top PE
+					if(coords(3)==0) then
+                        c(2*k) = Ck !2,4,6
+                        c(2*k+1)   = Gk !3,5,7
+                    else
+                        c(2*k-1) = Ck !1,3,5
+                        c(2*k)   = Gk !2,4,6                    
+                    endif				
+				
+				
 				
 				
 					! diagonal:
-					b(2*(k-1)) = Bk
-					b(2*k-1)   = Fk
-					! rhs:
-					r(2*(k-1)) = Dk
-					r(2*k-1)   = Hk
+					if(coords(3)==0) then
+                        b(2*k) = Bk !2,4,6
+                        b(2*k+1)   = Fk !3,5,7
+                    else
+                        b(2*k-1) = Bk !1,3,5
+                        b(2*k)   = Fk !2,4,6
+                    endif                
 
+					! rhs:
+					if(coords(3)==0) then
+                        r(2*k) = Dk !2,4,6
+                        r(2*k+1)   = Hk !3,5,7
+                    else
+                        r(2*k-1) = Dk !1,3,5
+                        r(2*k)   = Hk !2,4,6
+                    endif
 				enddo
 				
 				
@@ -895,44 +1001,87 @@
 				!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 				! boundary conditions
 				!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-				! mpi - simple checks
-				b(1)=1._sp
-				c(1)=-albedo
-				b(2*kp+2)=1._sp
-				a(2*kp-1+2)=0._sp ! no contribution from upward flux in last equation
-				r(1)=0._sp
-				r(2*kp+2)=0._sp ! toa downward flux at night
-				if(cos_theta_s > 0._sp) then
-					r(1)=albedo*cos_theta_s*sflux_l(m)*exp(-tau(0)/cos_theta_s)
-					r(2*kp+2)=cos_theta_s*sflux_l(m) ! toa downward flux - day
+				if(coords(3)==0) then
+				    a(1)=0._sp ! this is specific to parallel
+                    b(1)=1._sp ! diagonal, so fine
+                    c(1)=-albedo ! ! c(1) has to be set in both serial and parallel
+    				r(1)=0._sp
+                    if(cos_theta_s > 0._sp) then
+                        r(1)=albedo*cos_theta_s*sflux_l(m)*exp(-tau(0)/cos_theta_s)
+                    endif
+    				r(1)=r(1)+emiss*pi*blt(1,m)
 				endif
-				r(1)=r(1)+emiss*pi*blt(1,m)
+				
+                
+                if(coords(3)==(dims(3)-1)) then
+                    a(tdend)=0._sp ! no contribution from upward flux in last equation
+    				b(tdend)=1._sp
+    				r(tdend)=0._sp ! toa downward flux at night
+    				c(tdend)=0._sp ! this is specific to parallel
+                    if(cos_theta_s > 0._sp) then
+                        r(tdend)=cos_theta_s*sflux_l(m) ! toa downward flux - day
+                    endif
+                endif                
 				!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+				
 				
 				
 				!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 				! solve tridiagonal matrix:												 !
 				!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-				call tridag(a,b,c,r,u)
+				call parallel_tridag(a,b,c,r,u,tdend,coords,dims, id, comm3d)
 				!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-				
-				
-				
+                
+                
+                
 				!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 				! assumes temperature is given by reference state:						 !
+				! message passing done out of this routine                               !
 				!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-				do i=1,ip	
-					do j=1,jp
-						do k=1,kp+1
-						    ! sets the surface fluxes too
-							flux_u(k-1,j,i,m)=u(2*(k)-1)
-							flux_d(k-1,j,i,m)=u(2*k)
-						enddo
-					enddo
-				enddo
+                kstart=1
+                if(coords(3)==0) then
+                    do i=1,ip	
+                        do j=1,jp
+                            ! flux_d(kp) recv
+                            do k=1,kp
+                                ! sets the surface fluxes too
+                                flux_u(k-kstart,j,i,m)=u(2*(k)-1)
+                                flux_d(k-kstart,j,i,m)=u(2*k)
+                            enddo
+                            flux_u(kp+1-kstart,j,i,m)=u(2*(kp+1)-1)
+                            
+                        enddo
+                    enddo
+                else if (coords(3)==(dims(3)-1)) then
+                    do i=1,ip	
+                        do j=1,jp
+                            flux_d(0,j,i,m)=u(1) ! needs to be passed to below
+                            do k=1,kp
+                                flux_u(k,j,i,m)=u(2*(k)) ! 2,4,6
+                                flux_d(k,j,i,m)=u(2*k+1) ! 3,5,7
+                            enddo
+                        enddo
+                    enddo
+                else
+                    do i=1,ip	
+                        do j=1,jp
+                            flux_d(0,j,i,m)=u(1) ! needs to be passed to below
+                            ! mpi_issend to one below
+                            ! mpi_irecv from above flux_d(kp,j,i,m)=
+                            do k=1,kp-1
+                                flux_u(k,j,i,m)=u(2*(k))
+                                flux_d(k,j,i,m)=u(2*k+1)
+                            enddo
+                            flux_u(kp,j,i,m)=u(2*kp)
+                        enddo
+                    enddo
+                endif
+                
 				!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 				
-			enddo						
+			enddo
+			
+									
 		end subroutine solve_fluxes
 		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 

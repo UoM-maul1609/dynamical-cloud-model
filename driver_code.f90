@@ -33,6 +33,8 @@
     			ip,jp,kp, &
     			ipp,jpp,kpp, &
 				ipstart, jpstart, kpstart, &
+				tdstart,tdend, &
+				a,b,c,r,usol, &
 				nbands, ns,nl, flux_u, flux_d, rad_power, &
 				x,y,z, &
 				dx,dy,dz, &
@@ -43,11 +45,12 @@
 				sflux_l, b_s_g, &
 				start_year,start_mon, start_day,start_hour,start_min,start_sec, &
 				lat, lon, albedo, emiss,quad_flag, &
+				nprocv,mvrecv, &
 				coords, &
 				new_file,outputfile, output_interval, &
-				dims,id, world_process, rank, ring_comm)
+				dims,id, world_process, rank, ring_comm,sub_comm)
 		use nrtype
-		use mpi_module, only : exchange_full, exchange_along_dim
+		use mpi_module, only : exchange_full, exchange_along_dim, exchange_fluxes
 		use radiation, only : solve_fluxes
 		use mpi
 
@@ -56,11 +59,14 @@
 		logical, intent(inout) :: new_file
 		real(sp), dimension(nbands) :: lambda, b_s_g, lambda_low,&
 										lambda_high, delta_lambda, sflux_l
+		real(sp), intent(in), dimension(nprocv) :: mvrecv
 		integer(i4b), intent(in) :: ntim,ip,jp,kp, ipp,jpp,kpp, &
-						l_h,r_h, ipstart, jpstart, kpstart, nbands, ns, nl
-		integer(i4b), intent(in) :: id, world_process, ring_comm, rank
+						l_h,r_h, ipstart, jpstart, kpstart, nbands, ns, nl, &
+						tdstart,tdend
+		integer(i4b), intent(in) :: id, world_process, ring_comm, sub_comm,rank,nprocv
 		integer(i4b), dimension(3), intent(in) :: coords, dims
 		character (len=*), intent(in) :: outputfile
+		real(sp), intent(inout), dimension(1:tdend) :: a,b,c,r,usol
 		real(sp), intent(in) :: output_interval, dt
 		real(sp), dimension(1-r_h:kpp+r_h,1-r_h:jpp+r_h,1-r_h:ipp+r_h,1:nbands) :: &
 						flux_d,flux_u
@@ -75,8 +81,10 @@
 									start_hour, start_min, start_sec
 		! locals:		
 		integer(i4b) :: n,n2, cur=1, i,j,k, error, rank2
-		real(sp) :: time, time_last_output, output_time, a
+		real(sp) :: time, time_last_output, output_time
+
 		
+        if(id>=dims(1)*dims(2)*dims(3)) return 
 
 
 		
@@ -98,12 +106,19 @@
 								start_hour,start_min,start_sec, &
 								lat, lon, &
 								time, nbands,ns,nl,ipp,jpp,kpp,r_h, &
+								tdstart,tdend,a,b,c,r,usol, &
 								lambda_low, lambda_high, lambda,b_s_g,sflux_l, &
 								rhoan, thetan, dz,dzn, albedo, emiss, &
-								quad_flag, flux_u, flux_d)
+								quad_flag, flux_u, flux_d, &
+								nprocv,mvrecv, &
+								coords,dims, id, sub_comm)
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-		
+
+		    call exchange_fluxes(ring_comm, id, kpp, jpp, ipp, &
+							r_h,r_h,r_h,r_h,r_h, r_h,  flux_d, dims,coords)
+							
+							
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 			! write netcdf variables                                                     !
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -135,7 +150,7 @@
 
 			! update temperatures here
 			
-			call mpi_barrier(MPI_COMM_WORLD,error)
+			call mpi_barrier(ring_comm,error)
 
 		enddo
 		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!

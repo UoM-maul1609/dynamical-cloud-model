@@ -57,7 +57,7 @@
 
     private
     public :: mpi_define, block_ring, exchange_full, mpi_integer9, mp1, world_process, &
-    			mpi_cart_initialise, exchange_along_dim, find_base_top
+    			mpi_cart_initialise, exchange_along_dim, find_base_top, exchange_fluxes
     
 
 	contains
@@ -292,6 +292,62 @@
     end subroutine find_base_top
 	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     
+
+
+
+	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+	! exchange along dim for a variable using Cartesian topology                         !
+	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+	!>@author
+	!>Paul J. Connolly, The University of Manchester
+	!>@brief
+	!>define some types to be used in the model
+	!>@param[in] comm3d, id, ipp, jpp, kpp, w_h,e_h,s_h,n_h,d_h,u_h
+	!>@param[inout] array: the array to exchange_halos on
+	!>@param[in] lbc, ubc, dims,coords
+	subroutine exchange_fluxes(comm3d, id, kpp, jpp, ipp, &
+							d_h,u_h,s_h,n_h,w_h, e_h,  array, dims,coords)
+		implicit none
+		
+		integer(i4b), intent(in) :: comm3d, id, ipp, jpp, kpp, w_h, e_h, s_h,n_h,d_h,u_h
+		real(sp), intent(inout), &
+			 dimension(1-d_h:u_h+kpp,1-s_h:n_h+jpp,1-w_h:e_h+ipp) :: &
+			 array
+		integer(i4b), dimension(3), intent(in) :: dims,coords
+		
+		! locals:
+		integer(i4b), dimension(12) :: request
+		integer(i4b), dimension(MPI_STATUS_SIZE, 12) :: status
+		integer(i4b) :: error, tag1,num_messages,imess, tag2
+		
+		
+
+			
+		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+		! message passing for adjacent cells in up / down direction                      !
+		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+		tag1=11
+		! send to the bottom:
+		call MPI_Issend(array(0,1:jpp,1:ipp), &
+			(ipp*jpp)*u_h, MPI_REAL8, mp1%face%s_bottom, &
+			tag1, comm3d, request(1),error)
+
+		! receive from the bottom of upper cell:
+		call MPI_Recv(array(kpp:kpp+u_h,1:jpp,1:ipp), &
+			(ipp*jpp)*u_h, MPI_REAL8, mp1%face%r_bottom, &
+			tag1, comm3d, status(:,1),error)
+		call MPI_Wait(request(1), status(:,1), error)
+		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+
+
+
+
+
+
+	end subroutine exchange_fluxes
+	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
 
 
 	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
