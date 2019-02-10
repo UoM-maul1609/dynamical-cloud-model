@@ -115,7 +115,7 @@
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 
-		    call exchange_fluxes(ring_comm, id, kpp, jpp, ipp, &
+		    call exchange_fluxes(ring_comm, id, kpp, jpp, ipp, nbands,&
 							r_h,r_h,r_h,r_h,r_h, r_h,  flux_d, dims,coords)
 							
 							
@@ -137,6 +137,7 @@
 							ip,ipp,ipstart,jp,jpp,jpstart,kp,kpp,kpstart, &
 							l_h,r_h,nbands, &
 							time, x,y,z,rhoa, theta, &
+							lambda_low, lambda_high,&
 							lambda,sflux_l,flux_u,flux_d,rad_power, &
 							id, world_process, rank2, ring_comm)
 				!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -191,7 +192,7 @@
 	!>@param[in] l_h,r_h: halo
 	!>@param[in] time: time (s)
 	!>@param[in] x,y,z, rhoa, theta: grids
-	!>@param[in] lambda, sflux_l
+	!>@param[in] lambda_low_lambda_high,lambda, sflux_l
 	!>@param[in] u,v,w,th,p: prognostic variables
 	!>@param[in] id: id
 	!>@param[in] world_process: world_process
@@ -201,6 +202,7 @@
 					kp,kpp,kpstart,l_h,r_h,nbands, &
 					time, &
 					x,y,z,rhoa, theta, &
+					lambda_low, lambda_high,&
 					lambda,sflux_l,flux_u,flux_d,rad_power, &
 				    id, world_process, rank, ring_comm)
 	
@@ -224,7 +226,7 @@
 		real(sp), &
 			dimension(1-r_h:kpp+r_h,1-r_h:jpp+r_h,1-r_h:ipp+r_h), &
 			intent(in) :: rad_power
-		real(sp), dimension(nbands) :: lambda, sflux_l
+		real(sp), dimension(nbands) :: lambda_low,lambda_high,lambda, sflux_l
 		
 		integer(i4b), intent(in) :: id ,world_process, rank, ring_comm
 	
@@ -281,6 +283,24 @@
 			call check( nf90_put_att(ncid, a_dimid, &
 					   "units", "seconds") )
 						
+			! define variable: lambda_low
+			call check( nf90_def_var(ncid, "lambda_low", nf90_float, &
+						(/nb_dimid/), varid) )
+			! get id to a_dimid
+			call check( nf90_inq_varid(ncid, "lambda_low", a_dimid) )
+			! units
+			call check( nf90_put_att(ncid, a_dimid, &
+					   "units", "m") )
+					   
+			! define variable: lambda_high
+			call check( nf90_def_var(ncid, "lambda_high", nf90_float, &
+						(/nb_dimid/), varid) )
+			! get id to a_dimid
+			call check( nf90_inq_varid(ncid, "lambda_high", a_dimid) )
+			! units
+			call check( nf90_put_att(ncid, a_dimid, &
+					   "units", "m") )
+					   
 			! define variable: lambda
 			call check( nf90_def_var(ncid, "lambda", nf90_float, &
 						(/nb_dimid/), varid) )
@@ -450,6 +470,14 @@
 			call check( nf90_put_var(ncid, varid, theta(1:kpp), &
 						start = (/kpstart/)))	
 			if(id==world_process) then
+				! write variable: lambda_low
+				call check( nf90_inq_varid(ncid, "lambda_low", varid ) )
+				call check( nf90_put_var(ncid, varid, lambda_low(1:nbands), &
+							start = (/1/)))				
+				! write variable: lambda_high
+				call check( nf90_inq_varid(ncid, "lambda_high", varid ) )
+				call check( nf90_put_var(ncid, varid, lambda_high(1:nbands), &
+							start = (/1/)))				
 				! write variable: lambda
 				call check( nf90_inq_varid(ncid, "lambda", varid ) )
 				call check( nf90_put_var(ncid, varid, lambda(1:nbands), &

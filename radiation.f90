@@ -447,7 +447,7 @@
 ! 			na=1._sp+1e-8_sp*( 8342.13_sp+(2406030._sp/(130._sp-lambda_mu**(-2))) + &
 ! 						(15997._sp/(38.9_sp-lambda_mu**(-2)))	)
 			! Peck and Reeder, 1972:
-			na=1._sp+1e-8_sp*( 8060.51_sp+(2480990._sp/(132.274_sp-lambda_mu**(-2))) + &
+			na=1._sp+1.e-8_sp*( 8060.51_sp+(2480990._sp/(132.274_sp-lambda_mu**(-2))) + &
 						(17455.7_sp/(39.32957_sp-lambda_mu**(-2)))	)
 	
 		end subroutine real_refractive_air
@@ -800,7 +800,7 @@
 			integer(i4b) :: doy,diy, year,error
 			real(sp) :: tod, cos_theta_s, frac,msend
 			real(sp), dimension(0:kp+1) :: sigma_ray, taun,dtau,dtaun
-			real(sp), dimension(0:kp+1) :: tau
+			real(sp), dimension(0:kp+1) :: tau,direct
 			real(sp), dimension(kp+1,nbands) :: blt
 			logical :: leap
 			real(sp) :: omg_s=1._sp, ga=0._sp, gamma1, gamma2, gamma3
@@ -848,7 +848,7 @@
 				! extinction:															 !
 				!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 				
-				do k=1,kend ! PARALLEL: when PE not top you need to know kp+1
+				do k=1,kend 
 					! number of molecules per cubic metre of air multiplied by 
 					! collision cross-section:
 					sigma_ray(k)=rhoan(k)*navog/ma*b_s_g(m)
@@ -863,8 +863,9 @@
 				! tau is optical depth on w-points
 				! mpi - add bottom taus to all and add cumulative
 				tau(kp+1)=0._sp
-				tau(kp)=0._sp
-				do k=kend-1,0,-1 ! PARALLEL: kp needs to be set when not top
+				tau(kp)=0._sp ! for top level tau(kp) needs to be defined taking into 
+				              ! account the atmosphere above domain
+				do k=kend-1,0,-1 
 					! cumulative extinction x dz
 					tau(k)=tau(k+1)+sigma_ray(k+1)*dz(k) 
 				enddo
@@ -883,7 +884,8 @@
 			    
 			    ! change in optical depth on w-points
 				do k=kp,0,-1 
-				    dtau(k)=tau(k+1)-tau(k) 
+				    dtau(k)=(tau(k+1)-tau(k) ) ! tau = 0 at top, so set to negative 
+				                                ! to get derivative in correct direction
 				enddo
                 msend=dtau(1)  ! message to send
                 call MPI_allgather(msend,1,MPI_REAL8,mvrecv,1,MPI_REAL8,comm3d,error)
@@ -891,7 +893,22 @@
 				if(coords(3)==(dims(3)-1)) dtau(kp)=0._sp
 				!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-			
+
+				!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+                ! store direct radiation                                                 !
+				!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+                direct=0._sp
+                if(cos_theta_s > 0._sp) then
+                    do k=0,kp
+                        direct(k)=cos_theta_s*sflux_l(m)* &
+                                exp(-0.5_sp*(tau(k+1)+tau(k))/cos_theta_s)
+                    enddo			
+                endif
+				!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+                
+                
+                
+                
 				!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 				! diffuse phase function scaling on p-points:							 !
 				!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -909,7 +926,7 @@
 						stop
 				end select
 				!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-			
+			    
 				
 			
 				!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -923,6 +940,7 @@
 					Bc=-1._sp-0.5_sp*dtau(k)*gamma1
 					Cc=0.5_sp*dtau(k)*gamma2
 					Dc=Cc
+					
 					alp=-Cc
 					bet=-Cc
 					gam=-Bc
@@ -943,8 +961,9 @@
 								exp(-0.5_sp*(tau(k+1)+tau(k))/cos_theta_s)
 					endif
 					! long wave (see equations 9.122 Jacobson):
-					Skp=Skp-dtau(k)*2._sp*pi*(1-omg_s)*blt(k+1,m)
-					Skm=Skm+dtau(k)*2._sp*pi*(1-omg_s)*blt(k+1,m)
+					Skp=Skp-dtau(k)*2._sp*pi*(1._sp-omg_s)*blt(k+1,m)
+					Skm=Skm+dtau(k)*2._sp*pi*(1._sp-omg_s)*blt(k+1,m)
+
 					Dk=Skp-Cc/gam*Skm
 					Ek=(del-Dc*bet/Bc)
 					Fk=(alp-Ac*bet/Bc)
@@ -1019,7 +1038,9 @@
     				r(tdend)=0._sp ! toa downward flux at night
     				c(tdend)=0._sp ! this is specific to parallel
                     if(cos_theta_s > 0._sp) then
-                        r(tdend)=cos_theta_s*sflux_l(m) ! toa downward flux - day
+                        !r(tdend)=cos_theta_s*sflux_l(m) ! toa downward flux - day
+                                                        ! should be multiplied by tau(kp) 
+                                                        ! for atmosphere above
                     endif
                 endif                
 				!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -1076,8 +1097,23 @@
                         enddo
                     enddo
                 endif
-                
+                if((coords(3)==0).and.(coords(3)==(dims(3)-1))) then
+                    do i=1,ip	
+                        do j=1,jp
+                            flux_d(kp+1-kstart,j,i,m)=u(2*(kp+1))                            
+                        enddo
+                    enddo
+                endif
 				!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+                if(cos_theta_s > 0._sp) then
+                    do i=1,ip	
+                        do j=1,jp
+                            do k=0,kp
+                                flux_d(k,j,i,m)=  flux_d(k,j,i,m)+direct(k)
+                            enddo                        
+                        enddo
+                    enddo
+                endif
 				
 			enddo
 			

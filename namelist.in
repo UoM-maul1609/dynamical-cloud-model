@@ -28,14 +28,14 @@
 	
  &rad_vars
  	nm2%start_year=2017,
- 	nm2%start_mon=7,
+ 	nm2%start_mon=1,
  	nm2%start_day=31,
  	nm2%start_hour=15,
  	nm2%start_min=50,
  	nm2%start_sec=0,
  	nm2%lat_ref=53.495871,
  	nm2%lon_ref=-2.345043,
- 	nm2%quad_flag=1, ! 0 is quadrature, 1 is Eddington
+ 	nm2%quad_flag=0, ! 0 is quadrature, 1 is Eddington
  	nm2%albedo="Grass",
  	nm2%emissivity="Grass",
  	nm2%ns=10,

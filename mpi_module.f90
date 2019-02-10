@@ -302,16 +302,17 @@
 	!>Paul J. Connolly, The University of Manchester
 	!>@brief
 	!>define some types to be used in the model
-	!>@param[in] comm3d, id, ipp, jpp, kpp, w_h,e_h,s_h,n_h,d_h,u_h
+	!>@param[in] comm3d, id, ipp, jpp, kpp, nbands,w_h,e_h,s_h,n_h,d_h,u_h
 	!>@param[inout] array: the array to exchange_halos on
 	!>@param[in] lbc, ubc, dims,coords
-	subroutine exchange_fluxes(comm3d, id, kpp, jpp, ipp, &
+	subroutine exchange_fluxes(comm3d, id, kpp, jpp, ipp, nbands,&
 							d_h,u_h,s_h,n_h,w_h, e_h,  array, dims,coords)
 		implicit none
 		
-		integer(i4b), intent(in) :: comm3d, id, ipp, jpp, kpp, w_h, e_h, s_h,n_h,d_h,u_h
+		integer(i4b), intent(in) :: comm3d, id, ipp, jpp, kpp, nbands,&
+		     w_h, e_h, s_h,n_h,d_h,u_h
 		real(sp), intent(inout), &
-			 dimension(1-d_h:u_h+kpp,1-s_h:n_h+jpp,1-w_h:e_h+ipp) :: &
+			 dimension(1-d_h:u_h+kpp,1-s_h:n_h+jpp,1-w_h:e_h+ipp,nbands) :: &
 			 array
 		integer(i4b), dimension(3), intent(in) :: dims,coords
 		
@@ -328,17 +329,16 @@
 		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 		tag1=11
 		! send to the bottom:
-		call MPI_Issend(array(0,1:jpp,1:ipp), &
-			(ipp*jpp)*u_h, MPI_REAL8, mp1%face%s_bottom, &
+		call MPI_Issend(array(0,1:jpp,1:ipp,1:nbands), &
+			(ipp*jpp*nbands)*u_h, MPI_REAL8, mp1%face%s_bottom, &
 			tag1, comm3d, request(1),error)
 
 		! receive from the bottom of upper cell:
-		call MPI_Recv(array(kpp:kpp+u_h,1:jpp,1:ipp), &
-			(ipp*jpp)*u_h, MPI_REAL8, mp1%face%r_bottom, &
+		call MPI_Recv(array(kpp,1:jpp,1:ipp,1:nbands), &
+			(ipp*jpp*nbands)*u_h, MPI_REAL8, mp1%face%r_bottom, &
 			tag1, comm3d, status(:,1),error)
 		call MPI_Wait(request(1), status(:,1), error)
 		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-
 
 
 
