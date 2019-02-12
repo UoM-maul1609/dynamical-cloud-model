@@ -558,6 +558,9 @@
 		enddo		
 !$omp end simd	
 
+        ! damping layer for theta, u,v,w=0 here (need to calculate horizontal means
+        ! total sum / MPI_reduce) - at start make sure we know ip and jp on each proc
+
 
         if(viscous) then
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -575,6 +578,14 @@
                                         moisture, &
                                         comm3d,id,dims,coords)
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+		else
+            ! full exchange    
+            call exchange_full(comm3d, id, kp, jp, ip, r_h,r_h,r_h,r_h,l_h,r_h,su,&
+                0._sp,0._sp,dims,coords)
+            call exchange_full(comm3d, id, kp, jp, ip, r_h,r_h,r_h,r_h,l_h,r_h,sv,&
+                0._sp,0._sp,dims,coords)
+            call exchange_full(comm3d, id, kp, jp, ip, r_h,r_h,r_h,r_h,l_h,r_h,sw,&
+                0._sp,0._sp,dims,coords)		
         endif
         
         
