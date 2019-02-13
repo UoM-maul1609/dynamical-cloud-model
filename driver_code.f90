@@ -87,6 +87,8 @@
 		real(sp), dimension(:,:,:), pointer :: w,zw,tw
 ! 		real(sp), &
 ! 			dimension(1-r_h:kpp+r_h,1-r_h:jpp+r_h,1-r_h:ipp+r_h) :: th2
+
+        if(id>=dims(1)*dims(2)*dims(3)) return 
 		
 
 		time_last_output=-output_interval

@@ -88,12 +88,12 @@ advection_2d.$(OBJ) advection_3d.$(OBJ)
 	$(FOR) driver_code_ser.f90 -I ${NETCDFMOD}  $(FFLAGS)driver_code_ser.$(OBJ)
 mpi_module.$(OBJ) : mpi_module.f90 
 	$(FOR) mpi_module.f90 $(FFLAGS)mpi_module.$(OBJ)
-advection_1d.$(OBJ) : advection_1d.f90 
-	$(FOR) advection_1d.f90 -cpp $(FFLAGSOMP)advection_1d.$(OBJ)
-advection_2d.$(OBJ) : advection_2d.f90 
-	$(FOR) advection_2d.f90 -cpp $(FFLAGSOMP)advection_2d.$(OBJ)
-advection_3d.$(OBJ) : advection_3d.f90 
-	$(FOR) advection_3d.f90 $(FFLAGSOMP)advection_3d.$(OBJ)
+advection_1d.$(OBJ) : advection_1d.F90 
+	$(FOR) advection_1d.F90 -cpp $(FFLAGSOMP)advection_1d.$(OBJ)
+advection_2d.$(OBJ) : advection_2d.F90 
+	$(FOR) advection_2d.F90 -cpp $(FFLAGSOMP)advection_2d.$(OBJ)
+advection_3d.$(OBJ) : advection_3d.F90 
+	$(FOR) advection_3d.F90 $(FFLAGSOMP)advection_3d.$(OBJ)
 main.$(OBJ)   : main.f90 variables.$(OBJ) mpi_module.$(OBJ) initialisation.$(OBJ) \
 				 driver_code.$(OBJ) advection_1d.$(OBJ) advection_2d.$(OBJ) \
 				 advection_3d.$(OBJ) 

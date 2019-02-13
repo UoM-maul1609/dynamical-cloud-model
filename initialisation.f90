@@ -214,8 +214,8 @@
 		yn=y+0.5_sp*dy_nm
 
 		! set up vertical level array
-		z=dz_nm*(/(i,i=-l_h+kpstart-1,kpp+r_h+kpstart-2)/)
-		zn=z+0.5_sp*dz_nm
+		z=dz_nm*(/(i,i=-l_h+kpstart-1,kpp+r_h+kpstart-2)/)+0.5_sp*dz_nm
+		zn=z-0.5_sp*dz_nm
 		
 		! temporary density
 		rhoa=1._sp
