@@ -78,7 +78,6 @@
 
 
 
-
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 		! initialise variables in mpi module:
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -108,6 +107,10 @@
 		call allocate_and_set(  nm1%dt,nm1%runtime,grid1%ntim, &
 			grid1%x, grid1%y, grid1%z, &
 			grid1%xn, grid1%yn, grid1%zn, &
+			grid1%ubar, grid1%vbar, grid1%wbar,grid1%thbar, grid1%qbar, &
+			grid1%dampfacn, grid1%dampfac, &
+			nm1%damping_layer, &
+			nm1%damping_thickness,nm1%damping_tau, &
 			grid1%u,grid1%v,grid1%w,&
 			grid1%zu,grid1%zv,grid1%zw,&
 			grid1%tu,grid1%tv,grid1%tw,&
@@ -161,6 +164,8 @@
 				grid1%xn, grid1%yn, grid1%zn, &
 				grid1%dx, grid1%dy, grid1%dz, &
 				grid1%dxn, grid1%dyn, grid1%dzn, &
+                grid1%ubar, grid1%vbar, grid1%wbar,grid1%thbar, grid1%qbar, &
+                grid1%dampfacn, grid1%dampfac, &				
 				grid1%u,grid1%v,grid1%w,&
 				grid1%zu,grid1%zv,grid1%zw,&
 				grid1%tu,grid1%tv,grid1%tw,&
@@ -177,8 +182,10 @@
 				io1%new_file, nm1%outputfile, nm1%output_interval, &
 				nm1%viscous_dissipation, &
 				nm1%advection_scheme, nm1%kord, nm1%monotone, &
-				nm1%moisture, nm1%nq, &
-				mp1%dims,mp1%id, world_process, mp1%rank, mp1%ring_comm)
+				nm1%moisture, nm1%damping_layer, &
+				nm1%nq, &
+				mp1%dims,mp1%id, world_process, mp1%rank, mp1%ring_comm, &
+				mp1%sub_horiz_comm)
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 

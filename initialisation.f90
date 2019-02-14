@@ -22,6 +22,8 @@
 	!>allocate arrays on each PE, and initialise them
 	!>@param[inout] dt,runtime,ntim - time variables
 	!>@param[inout] x,y,z,xn,yn,zn,u,v,w,p,th,rho - grid positions and prognostics
+	!>@param[inout] ubar,vbar,wbar,thbar,qbar,dampfacn,dampfac
+	!>@param[in] damping_layer, damping_thickness, damping_tau
 	!>@param[inout] sth,strain,vism,vist - more prognostics
 	!>@param[in] z0,z0th - roughness lengths 
 	!>@param[inout] q,sq,viss - q-variable
@@ -45,6 +47,10 @@
 	!>@param[in] comm3d - communicator for cartesian topology
 	subroutine allocate_and_set(dt,runtime,ntim,x, y, z, &
 			xn, yn, zn, &
+			ubar, vbar, wbar,thbar, qbar, &
+			dampfacn, dampfac, &
+			damping_layer, &
+			damping_thickness,damping_tau, &
 			u,v,w,&
 			zu,zv,zw,&
 			tu,tv,tw,&
@@ -85,17 +91,21 @@
 														q,sq,viss
 		real(sp), dimension(:), allocatable, intent(inout) :: x,y,z,xn,yn,zn,dx,dy,dz, &
 															dxn,dyn,dzn, theta,thetan, &
-															rhoa, rhoan, lamsq, lamsqn
+															rhoa, rhoan, lamsq, lamsqn, &
+															ubar, vbar, wbar,thbar, &
+															dampfac,dampfacn
+															
+		real(sp), dimension(:,:), allocatable, intent(inout) :: qbar
 
 		real(sp), intent(in) :: dx_nm, dy_nm, dz_nm, cvis,z0,z0th
 		real(sp), intent(in) :: dt, runtime
 		integer(i4b), intent(inout) :: ipp, jpp, kpp, ipstart, jpstart, kpstart
 		integer(i4b), intent(inout) :: ntim
 		integer(i4b), intent(in) :: ip, jp, kp, l_h, r_h, nq
-		logical :: moisture
+		logical :: moisture,damping_layer
 		integer(i4b), intent(in) :: n_levels
 		real(sp), dimension(n_levels), target, intent(in) :: z_read,theta_read
-		real(sp), intent(in) :: psurf, tsurf
+		real(sp), intent(in) :: psurf, tsurf,damping_thickness,damping_tau
 		integer(i4b), dimension(3), intent(inout) :: coords
 		integer(i4b), dimension(3), intent(in) :: dims
 		integer(i4b), intent(in) :: id, comm3d
@@ -105,7 +115,7 @@
 		integer(i4b) :: error, AllocateStatus,i,j,k
 		real(sp) :: rho_surf, htry, hmin, eps2=1.e-5_sp
 		real(sp), dimension(1) :: psolve
-		real(sp) :: var, dummy
+		real(sp) :: var, dummy,ztop
 		integer(i4b) :: iloc
 		! for random number:
 		real(sp) :: r
@@ -205,6 +215,8 @@
 		allocate( vist(1-r_h:kpp+r_h,1-r_h:jpp+r_h,1-r_h:ipp+r_h), STAT = AllocateStatus)
 		if (AllocateStatus /= 0) STOP "*** Not enough memory ***"
 		if (moisture) then
+            allocate( qbar(1-r_h:kpp+r_h,1:nq), &
+                STAT = AllocateStatus)
             allocate( q(1-r_h:kpp+r_h,1-r_h:jpp+r_h,1-r_h:ipp+r_h,1:nq), &
                 STAT = AllocateStatus)
             if (AllocateStatus /= 0) STOP "*** Not enough memory ***"
@@ -215,6 +227,22 @@
                 STAT = AllocateStatus)
             if (AllocateStatus /= 0) STOP "*** Not enough memory ***"
 		endif	
+		
+		allocate( ubar(1-l_h:kpp+r_h), STAT = AllocateStatus)
+		if (AllocateStatus /= 0) STOP "*** Not enough memory ***"
+		allocate( vbar(1-l_h:kpp+r_h), STAT = AllocateStatus)
+		if (AllocateStatus /= 0) STOP "*** Not enough memory ***"
+		allocate( wbar(1-l_h:kpp+r_h), STAT = AllocateStatus)
+		if (AllocateStatus /= 0) STOP "*** Not enough memory ***"
+		allocate( thbar(1-l_h:kpp+r_h), STAT = AllocateStatus)
+		if (AllocateStatus /= 0) STOP "*** Not enough memory ***"
+		
+		if(damping_layer) then
+            allocate( dampfacn(1-l_h:kpp+r_h), STAT = AllocateStatus)
+            if (AllocateStatus /= 0) STOP "*** Not enough memory ***"		
+            allocate( dampfac(1-l_h:kpp+r_h), STAT = AllocateStatus)
+            if (AllocateStatus /= 0) STOP "*** Not enough memory ***"		
+		endif
 
 
 		allocate( x(1-l_h:ipp+r_h), STAT = AllocateStatus)
@@ -288,11 +316,47 @@
 		lamsq=1._sp / (1._sp/(cvis*(dx_nm+dy_nm+dz)/3._sp)**2._sp + &
 				1._sp/(0.4_sp*(z + z0))**2._sp)
 		lamsqn=1._sp / (1._sp/(cvis*(dx_nm+dy_nm+dzn)/3._sp)**2._sp + &
-				1._sp/(0.4_sp*(zn + z0))**2._sp)		
+				1._sp/(0.4_sp*(zn + z0))**2._sp)	
+        ! zero some arrays
+		ubar=0._sp	
+		vbar=0._sp	
+		wbar=0._sp	
+		thbar=0._sp	
+		qbar=0._sp	
 		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
+		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+		! set up damping layer                                                           !
+		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        if(damping_layer) then
+            dampfacn=0._sp
+            dampfac=0._sp
+            !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+            ! find top of array                                                          !                                           
+            !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!              
+            call find_top(comm3d, id, kpp,l_h,r_h,zn,ztop, dims,coords)
+            !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!              
+            
+            
+            !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+            ! set damping factors above threshold height                                 !                                           
+            !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!              
+            do k=1-l_h,kpp+r_h
+                if(zn(k) .gt. (ztop-damping_thickness)) then
+                    dampfacn(k)=-1._sp/damping_tau*(&
+                        exp((zn(k)-(ztop-damping_thickness))/damping_thickness)-1._sp)
+                endif
+
+                if(z(k) .gt. (ztop-damping_thickness)) then
+                    dampfac(k)=-1._sp/damping_tau*(&
+                        exp((z(k)-(ztop-damping_thickness))/damping_thickness)-1._sp)
+                endif
+            enddo
+            !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!              
 
 
+        endif
+		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 
 		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!

@@ -31,6 +31,7 @@
 		implicit none
 		integer(i4b), intent(in) :: id, comm3d
 		integer(i4b), dimension(3), intent(in) :: dims,coords
+		integer(i4b), intent(in) :: ip,jp,kp, halo
 		real(sp), dimension(1-halo:ip+halo) :: dx,dxn
 		real(sp), dimension(1-halo:jp+halo) :: dy,dyn
 		real(sp), dimension(1-halo:kp+halo) :: dz,dzn
@@ -38,7 +39,6 @@
 			intent(inout) :: a_e,a_w,a_n,a_s,a_u,a_d,a_p, a_c
 		real(sp), dimension(-halo+1:kp+halo,-halo+1:jp+halo,-halo+1:ip+halo), &
 			intent(in) :: su,sv,sw
-		integer(i4b), intent(in) :: ip,jp,kp, halo
 		real(sp), intent(in) :: dt
 				
 		! local
@@ -142,11 +142,11 @@
 		implicit none
 		integer(i4b), intent(in) :: id, comm3d
 		integer(i4b), dimension(3), intent(in) :: dims,coords
+		integer(i4b), intent(in) :: ip,jp,kp, halo
 		real(sp), dimension(-halo+1:kp+halo,-halo+1:jp+halo,-halo+1:ip+halo), &
 			intent(in) :: a_e,a_w,a_n,a_s,a_u,a_d,a_p,a_c
 		real(sp), dimension(-halo+1:kp+halo,-halo+1:jp+halo,-halo+1:ip+halo), &
 			intent(inout) :: ax,x
-		integer(i4b), intent(in) :: ip,jp,kp, halo
 		
 		! local
 		integer(i4b) :: i,j,k
@@ -196,11 +196,11 @@
 		implicit none
 		integer(i4b), intent(in) :: id, comm3d
 		integer(i4b), dimension(3), intent(in) :: dims,coords
+		integer(i4b), intent(in) :: ip,jp,kp, halo, prit
 		real(sp), dimension(-halo+1:kp+halo,-halo+1:jp+halo,-halo+1:ip+halo), &
 			intent(in) :: r,a_e,a_w,a_n,a_s,a_u,a_d,a_p,a_c
 		real(sp), dimension(-halo+1:kp+halo,-halo+1:jp+halo,-halo+1:ip+halo), &
 			intent(inout) :: s
-		integer(i4b), intent(in) :: ip,jp,kp, halo, prit
 		
 		! local
 		integer(i4b) :: it
@@ -444,6 +444,7 @@
 	!>@param[in] z0,z0th: roughness lengths
 	!>@param[in] viscous: logical for applying viscosity
 	!>@param[in] moisture: if we have moisture
+	!>@param[in] damping_layer: flag for damping layer
 	subroutine sources(comm3d,id,rank, dims, coords, &
 			dt,xg,yg,zg,zng,dx,dy,dz,dxn,dyn,dzn,ip,jp,kp,l_h,r_h,&
 			nq, &
@@ -454,14 +455,14 @@
 			th,sth,strain,vism,vist,theta,thetan,rhoa,rhoan,lamsq,lamsqn,&
 			z0,z0th,&
 			viscous, &
-			moisture)
+			moisture,damping_layer)
 		use nrtype
 		use mpi_module, only : exchange_full, exchange_along_dim
 		use subgrid_3d, only : calculate_subgrid_3d
 		implicit none
 		integer(i4b), intent(in) :: id, comm3d, rank
 		integer(i4b), dimension(3), intent(in) :: dims, coords
-		logical, intent(in) :: viscous,moisture
+		logical, intent(in) :: viscous,moisture,damping_layer
 		
 		real(sp), intent(in) :: dt,z0,z0th
 		integer(i4b), intent(in) :: ip, jp, kp, l_h,r_h,nq

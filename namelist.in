@@ -3,6 +3,9 @@
 	nm1%outputfile = '/tmp/output.nc',
 	nm1%subgrid_model=2, ! 1 = constant viscosity, 2=smagorinsky
 	nm1%viscous_dissipation=.true.,
+	nm1%damping_layer=.true.,
+	nm1%damping_thickness=500.,
+	nm1%damping_tau=100.,
 	nm1%z0=1.e-4,
 	nm1%z0th=1.e-4,
 	nm1%restart=.false.,

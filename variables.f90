@@ -27,7 +27,10 @@
             real(sp), dimension(:,:,:,:), allocatable :: q, sq, viss
             real(sp), dimension(:), allocatable ::	dx, dy, dz, dxn,dyn,dzn, &
             										x, y, z, xn,yn,zn, theta, thetan, &
-            										rhoa, rhoan, lamsq, lamsqn
+            										rhoa, rhoan, lamsq, lamsqn, &
+            										ubar,vbar,wbar,thbar, &
+            										dampfacn,dampfac
+            real(sp), dimension(:,:), allocatable :: qbar
             real(sp) :: thbase, thtop
             										 
         end type grid
@@ -47,14 +50,16 @@
             			initially_geostrophic, &
             			viscous_dissipation, &
             			dissipate_h, nudge, restart, &
-            			monotone, moisture
+            			monotone, moisture, &
+            			damping_layer
             integer(i4b) :: nq,ip, jp, kp, subgrid_model, advection_scheme, kord
             real(sp) :: vis, &
             			runtime, dt, output_interval, &
             			rotation_period_hours, &
             			nudge_timescale, &
             			cvis,  &
-            			dx, dy, dz
+            			dx, dy, dz, &
+            			damping_thickness, damping_tau
             real(sp) :: psurf,tsurf,z0,z0th
             integer(i4b) :: n_levels
             real(sp), dimension(n_lev) :: theta_read, z_read
