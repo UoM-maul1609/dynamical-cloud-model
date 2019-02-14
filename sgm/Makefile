@@ -49,7 +49,7 @@ main_ser_2d.exe	:  main_ser_2d.$(OBJ) variables.$(OBJ) nrtype.$(OBJ) mpi_module.
 sg_model_lib.a	:   nrtype.$(OBJ) nr.$(OBJ) nrutil.$(OBJ) \
 				random.$(OBJ) subgrid_1d.$(OBJ) subgrid_2d.$(OBJ) \
 				subgrid_3d.$(OBJ)
-	$(AR) rc sg_model_lib.a nrutil.$(OBJ) \
+	$(AR) rc sg_model_lib.a nrtype.$(OBJ) nrutil.$(OBJ) \
 				random.$(OBJ) subgrid_1d.$(OBJ) subgrid_2d.$(OBJ) \
 				subgrid_3d.$(OBJ)
 nrtype.$(OBJ)	: nrtype.f90
