@@ -291,8 +291,8 @@
     subroutine monin_obukhov(z0,z0th,thetan,zn,th,u,vism,vist,ip,kp,l_h,r_h)
 	use nrtype
     
-    integer(i4b), intent(in) :: ip, kp, l_h, r_h
     implicit none
+    integer(i4b), intent(in) :: ip, kp, l_h, r_h
     real(sp), intent(in), dimension(-r_h+1:kp+r_h,-l_h+1:ip+r_h) :: &
             th, u
     real(sp), intent(inout), dimension(-r_h+1:kp+r_h,-l_h+1:ip+r_h) :: &
