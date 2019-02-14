@@ -237,12 +237,10 @@
 		allocate( thbar(1-l_h:kpp+r_h), STAT = AllocateStatus)
 		if (AllocateStatus /= 0) STOP "*** Not enough memory ***"
 		
-		if(damping_layer) then
-            allocate( dampfacn(1-l_h:kpp+r_h), STAT = AllocateStatus)
-            if (AllocateStatus /= 0) STOP "*** Not enough memory ***"		
-            allocate( dampfac(1-l_h:kpp+r_h), STAT = AllocateStatus)
-            if (AllocateStatus /= 0) STOP "*** Not enough memory ***"		
-		endif
+        allocate( dampfacn(1-l_h:kpp+r_h), STAT = AllocateStatus)
+        if (AllocateStatus /= 0) STOP "*** Not enough memory ***"		
+        allocate( dampfac(1-l_h:kpp+r_h), STAT = AllocateStatus)
+        if (AllocateStatus /= 0) STOP "*** Not enough memory ***"		
 
 
 		allocate( x(1-l_h:ipp+r_h), STAT = AllocateStatus)
@@ -328,9 +326,9 @@
 		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 		! set up damping layer                                                           !
 		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        dampfacn=0._sp
+        dampfac=0._sp
         if(damping_layer) then
-            dampfacn=0._sp
-            dampfac=0._sp
             !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
             ! find top of array                                                          !                                           
             !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!              

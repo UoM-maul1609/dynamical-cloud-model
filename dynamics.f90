@@ -504,6 +504,7 @@
 		real(sp), dimension(-r_h+1:kp+r_h,-r_h+1:jp+r_h,-r_h+1:ip+r_h) :: &
 			s,tau11,tau12,tau13,tau22,tau23,tau33
 		
+		sth=0._sp
 		! using current time-step
 		! sources for u:
 !$omp simd	
@@ -566,7 +567,44 @@
 
         ! damping layer for theta, u,v,w=0 here (need to calculate horizontal means
         ! total sum / MPI_reduce) - at start make sure we know ip and jp on each proc
-
+        if(damping_layer) then
+!$omp simd	
+            do i=2-l_h,ip
+                do j=1,jp
+                    do k=1,kp
+                        su(k,j,i)=su(k,j,i)
+                    enddo
+                enddo
+            enddo		
+!$omp end simd	
+!$omp simd	
+            do i=1,ip
+                do j=2-l_h,jp
+                    do k=1,kp
+                        sv(k,j,i)=sv(k,j,i)+rhoan(k)*dampfacn(k)*(v(k,j,i)-vbar(k))
+                    enddo
+                enddo
+            enddo		
+!$omp end simd	
+!$omp simd	
+            do i=1,ip
+                do j=1,jp
+                    do k=2-l_h,kp
+                        sw(k,j,i)=sw(k,j,i)+rhoa(k)*dampfac(k)*(w(k,j,i)-wbar(k))
+                    enddo
+                enddo
+            enddo		
+!$omp end simd	
+!$omp simd	
+            do i=1,ip
+                do j=1,jp
+                    do k=2-l_h,kp
+                        sth(k,j,i)=sth(k,j,i)+rhoan(k)*dampfacn(k)*(th(k,j,i)-thbar(k))
+                    enddo
+                enddo
+            enddo		
+!$omp end simd	
+        endif
 
         if(viscous) then
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
