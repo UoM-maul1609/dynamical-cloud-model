@@ -429,6 +429,7 @@
 	!>@param[in] dt
 	!>@param[in] xg,yg,zg,zng,dx,dy,dz,dxn,dyn,dzn
 	!>@param[in] ip,jp,kp,l_h,r_h,nq
+	!>@param[in] ubar,vbar,wbar,thbar,qbar, dampfacn,dampfac
 	!>@param[in] zu
 	!>@param[in] zv
 	!>@param[in] zw
@@ -448,6 +449,7 @@
 	subroutine sources(comm3d,id,rank, dims, coords, &
 			dt,xg,yg,zg,zng,dx,dy,dz,dxn,dyn,dzn,ip,jp,kp,l_h,r_h,&
 			nq, &
+			ubar,vbar,wbar,thbar,qbar, dampfacn,dampfac, &
 			zu,zv,zw, &
 			u,v,w,su,sv,sw,&
 			q,sq,viss, &
@@ -490,7 +492,10 @@
 		real(sp), dimension(-l_h+1:ip+r_h), intent(in) :: xg,dx, dxn
 		real(sp), dimension(-l_h+1:jp+r_h), intent(in) :: yg,dy, dyn
 		real(sp), dimension(-l_h+1:kp+r_h), intent(in) :: zg,zng,dz, dzn, theta,thetan, &
-															rhoa, rhoan,lamsq,lamsqn
+															rhoa, rhoan,lamsq,lamsqn, &
+															ubar,vbar,wbar,thbar, &
+															dampfacn,dampfac
+		real(sp), dimension(-l_h+1:kp+r_h,nq), intent(in) :: qbar
 		real(sp), dimension(-r_h+1:kp+r_h,-r_h+1:jp+r_h,-r_h+1:ip+r_h), &
 			intent(in) :: th
 	

@@ -197,6 +197,7 @@
 			call sources(ring_comm, id, rank2, dims,coords, &
 				dt,x,y,z,zn,dx,dy,dz,dxn,dyn,dzn,ipp,jpp,kpp,l_h,r_h,&
 				nq, &
+				ubar,vbar,wbar,thbar,qbar, dampfacn,dampfac, &
 				zu,zv,zw, &
 				u,v,w,su,sv,sw, &
 				q,sq,viss, &
