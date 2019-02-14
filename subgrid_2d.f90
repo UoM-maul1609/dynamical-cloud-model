@@ -291,13 +291,13 @@
     subroutine monin_obukhov(z0,z0th,thetan,zn,th,u,vism,vist,ip,kp,l_h,r_h)
 	use nrtype
     
+    integer(i4b), intent(in) :: ip, kp, l_h, r_h
     implicit none
     real(sp), intent(in), dimension(-r_h+1:kp+r_h,-l_h+1:ip+r_h) :: &
             th, u
     real(sp), intent(inout), dimension(-r_h+1:kp+r_h,-l_h+1:ip+r_h) :: &
             vism,vist
     real(sp), intent(in), dimension(-r_h+1:kp+r_h) :: thetan, zn
-    integer(i4b), intent(in) :: ip, kp, l_h, r_h
     real(sp), intent(in) :: z0, z0th
             
     ! locals
@@ -362,12 +362,12 @@
 	use nrtype
     
     implicit none
+    integer(i4b), intent(in) :: ip, kp, l_h, r_h
     real(sp), intent(in), dimension(-r_h+1:kp+r_h,-l_h+1:ip+r_h) :: &
             strain, th
     real(sp), intent(in), dimension(-r_h+1:kp+r_h) :: thetan, theta, dzn
     real(sp), intent(inout), dimension(-r_h+1:kp+r_h,-l_h+1:ip+r_h) :: &
             rip,fm, fh
-    integer(i4b), intent(in) :: ip, kp, l_h, r_h
             
     ! locals
     integer(i4b) :: i,j,k
@@ -416,6 +416,7 @@
 	use nrtype
     
     implicit none
+    integer(i4b), intent(in) :: ip, kp, nq, l_h, r_h
     real(sp), intent(in), dimension(-r_h+1:kp+r_h,-l_h+1:ip+r_h) :: &
         su,sw,sth
     real(sp), intent(in), dimension(-r_h+1:kp+r_h) :: &
@@ -424,7 +425,6 @@
         tu,tw,zu,zw,th
     real(sp), intent(in), dimension(-r_h+1:kp+r_h,-l_h+1:ip+r_h,nq) :: sq
     real(sp), intent(inout), dimension(-r_h+1:kp+r_h,-l_h+1:ip+r_h,nq) :: q
-    integer(i4b), intent(in) :: ip, kp, nq, l_h, r_h
     real(sp), intent(in) :: dt
     ! locals
     integer(i4b) :: i,j,k,n

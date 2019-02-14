@@ -376,12 +376,12 @@
 	use mpi
     
     implicit none
+    integer(i4b), intent(in) :: ip, jp, kp, l_h, r_h
     real(sp), intent(in), dimension(-r_h+1:kp+r_h,-r_h+1:jp+r_h,-l_h+1:ip+r_h) :: &
             th, u, v
     real(sp), intent(inout), dimension(-r_h+1:kp+r_h,-r_h+1:jp+r_h,-l_h+1:ip+r_h) :: &
             vism,vist
     real(sp), intent(in), dimension(-r_h+1:kp+r_h) :: thetan, zn
-    integer(i4b), intent(in) :: ip, jp, kp, l_h, r_h
     real(sp), intent(in) :: z0, z0th
             
     ! locals
@@ -451,12 +451,12 @@
 	use mpi
     
     implicit none
+    integer(i4b), intent(in) :: ip, jp, kp, l_h, r_h
     real(sp), intent(in), dimension(-r_h+1:kp+r_h,-r_h+1:jp+r_h,-l_h+1:ip+r_h) :: &
             strain, th
     real(sp), intent(in), dimension(-r_h+1:kp+r_h) :: thetan, theta, dzn
     real(sp), intent(inout), dimension(-r_h+1:kp+r_h,-r_h+1:jp+r_h,-l_h+1:ip+r_h) :: &
             rip,fm, fh
-    integer(i4b), intent(in) :: ip, jp, kp, l_h, r_h
             
     ! locals
     integer(i4b) :: i,j,k
@@ -511,6 +511,7 @@
 	use mpi
     
     implicit none
+    integer(i4b), intent(in) :: ip, jp, kp, nq, l_h, r_h
     real(sp), intent(in), dimension(-r_h+1:kp+r_h,-r_h+1:jp+r_h,-l_h+1:ip+r_h) :: &
         su,sv,sw,sth
     real(sp), intent(in), dimension(-r_h+1:kp+r_h) :: &
@@ -519,7 +520,6 @@
         tu,tv,tw,zu,zv,zw,th
     real(sp), intent(in), dimension(-r_h+1:kp+r_h,-r_h+1:jp+r_h,-l_h+1:ip+r_h,nq) :: sq
     real(sp), intent(inout), dimension(-r_h+1:kp+r_h,-r_h+1:jp+r_h,-l_h+1:ip+r_h,nq) :: q
-    integer(i4b), intent(in) :: ip, jp, kp, nq, l_h, r_h
     real(sp), intent(in) :: dt
     ! locals
     integer(i4b) :: i,j,k,n
@@ -585,6 +585,7 @@
 	use mpi
     
     implicit none
+    integer(i4b), intent(in) :: ip, jp, kp, nq, l_h, r_h
     real(sp), intent(in), dimension(-r_h+1:kp+r_h,-r_h+1:jp+r_h,-l_h+1:ip+r_h) :: &
         sth
     real(sp), intent(in), dimension(-r_h+1:kp+r_h) :: &
@@ -593,7 +594,6 @@
         th
     real(sp), intent(in), dimension(-r_h+1:kp+r_h,-r_h+1:jp+r_h,-l_h+1:ip+r_h,nq) :: sq
     real(sp), intent(inout), dimension(-r_h+1:kp+r_h,-r_h+1:jp+r_h,-l_h+1:ip+r_h,nq) :: q
-    integer(i4b), intent(in) :: ip, jp, kp, nq, l_h, r_h
     real(sp), intent(in) :: dt
     ! locals
     integer(i4b) :: i,j,k,n
