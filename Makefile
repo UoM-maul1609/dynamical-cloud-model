@@ -50,7 +50,7 @@ model_lib.a	:   nrtype.$(OBJ) nr.$(OBJ) nrutil.$(OBJ) locate.$(OBJ) polint.$(OBJ
 				rkqs.$(OBJ) rkck.$(OBJ) odeint.$(OBJ) zbrent.$(OBJ) \
 				hygfx.$(OBJ)  random.$(OBJ) advection_1d.$(OBJ) advection_2d.$(OBJ) \
 				advection_3d.$(OBJ)
-	$(AR) rc model_lib.a nrutil.$(OBJ) locate.$(OBJ) polint.$(OBJ) \
+	$(AR) rc model_lib.a nrtype.$(OBJ) nr.$(OBJ) nrutil.$(OBJ) locate.$(OBJ) polint.$(OBJ) \
 				rkqs.$(OBJ) rkck.$(OBJ) odeint.$(OBJ) zbrent.$(OBJ) \
 				hygfx.$(OBJ)  random.$(OBJ) advection_1d.$(OBJ) advection_2d.$(OBJ) \
 				advection_3d.$(OBJ)
