@@ -300,10 +300,12 @@
 		dyn(:)=dy_nm
 		dzn(:)=dz_nm
 		! set up horizontal level array
-		x=dx_nm*(/(i,i=-l_h+ipstart,ipp+r_h+ipstart-1)/) - real(ip+1,sp)/2._sp*dx_nm
+		x=dx_nm*(/(i,i=-l_h+ipstart,ipp+r_h+ipstart-1)/) - real(ip+1,sp)/2._sp*dx_nm &
+		    + 0.5_sp*dx_nm
 		xn=x-0.5_sp*dx_nm
 		! set up horizontal level array
-		y=dy_nm*(/(i,i=-l_h+jpstart,jpp+r_h+jpstart-1)/) - real(jp+1,sp)/2._sp*dy_nm
+		y=dy_nm*(/(i,i=-l_h+jpstart,jpp+r_h+jpstart-1)/) - real(jp+1,sp)/2._sp*dy_nm &
+		    + 0.5_sp*dy_nm
 		yn=y-0.5_sp*dy_nm
 
 		! set up vertical level array
@@ -493,7 +495,7 @@
 				do k=1-r_h,kpp+r_h
 					!th(k,j,i)=theta(k)
 				
-					rad = (z(k)-3000._sp)**2._sp
+					rad = (zn(k)-3000._sp)**2._sp
 						
 					if (ip > 1) rad=rad+xn(i)**2._sp
 					if (jp > 1) rad=rad+yn(j)**2._sp

@@ -270,7 +270,7 @@
 	
 		! locals
 		real(sp), parameter :: tiny=1.e-16 !epsilon(dt)
-		integer(i4b), parameter :: itmax=999	, prit=1	
+		integer(i4b), parameter :: itmax=9999	, prit=1	
 		real(sp) :: sc_err, err, rho, alf, omg, bet, nrm, tt, ts
 		real(sp), dimension(-r_h+1:kp+r_h,-r_h+1:jp+r_h,-r_h+1:ip+r_h) :: &
 							ax, r,cr,cs,p,v1,t,s
