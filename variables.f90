@@ -60,7 +60,7 @@
             			cvis,  &
             			dx, dy, dz, &
             			damping_thickness, damping_tau
-            real(sp) :: psurf,tsurf,z0,z0th
+            real(sp) :: psurf,tsurf,z0,z0th, ptol=1.e-8_sp
             integer(i4b) :: n_levels
             real(sp), dimension(n_lev) :: theta_read, z_read
             real(sp), dimension(n_q,n_lev) :: q_read

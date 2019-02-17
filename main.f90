@@ -172,7 +172,7 @@
 				grid1%th,grid1%sth,grid1%p, &
 				grid1%su,grid1%sv,grid1%sw,grid1%psrc, &
 				grid1%strain, grid1%vism, grid1%vist, &
-				nm1%z0,nm1%z0th, &
+				nm1%z0,nm1%z0th, nm1%ptol, &
 				grid1%q,grid1%sq,grid1%viss, &
 				grid1%theta,grid1%thetan, &
 				grid1%rhoa,grid1%rhoan, &

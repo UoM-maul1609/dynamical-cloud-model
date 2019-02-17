@@ -241,9 +241,11 @@
 	!>@param[in] sw
 	!>@param[inout] x
 	!>@param[inout] b
+	!>@param[in] ptol
 	!>@param[in] test_solver	
 	subroutine bicgstab(comm3d,id,rank, dims, coords, &
-			dt,xg,yg,zg,dx,dy,dz,dxn,dyn,dzn,ip,jp,kp,l_h,r_h,su,sv,sw,x,b,test_solver)
+			dt,xg,yg,zg,dx,dy,dz,dxn,dyn,dzn,ip,jp,kp,l_h,r_h,su,sv,sw,x,b,tol,&
+			test_solver)
 		use nrtype
 		implicit none
 		integer(i4b), intent(in) :: id, comm3d, rank
@@ -264,9 +266,10 @@
 		real(sp), dimension(-l_h+1:jp+r_h), intent(in) :: yg,dy, dyn
 		real(sp), dimension(-l_h+1:kp+r_h), intent(in) :: zg,dz, dzn
 		logical :: test_solver
+		real(sp), intent(in) :: tol
 	
 		! locals
-		real(sp), parameter :: tol=1.e-5_sp, tiny=1.e-16 !epsilon(dt)
+		real(sp), parameter :: tiny=1.e-16 !epsilon(dt)
 		integer(i4b), parameter :: itmax=999	, prit=1	
 		real(sp) :: sc_err, err, rho, alf, omg, bet, nrm, tt, ts
 		real(sp), dimension(-r_h+1:kp+r_h,-r_h+1:jp+r_h,-r_h+1:ip+r_h) :: &
@@ -357,17 +360,20 @@
 			ts  = inn_prod(comm3d,t,s,ip,jp,kp,r_h)
 			omg = ts/tt
 
-			x   = x + alf*p + omg*cs
-			r   = s - omg*t
-			nrm = rho
-			
 			if( abs(omg) < tiny ) then
 				print *,'convergence problem omega= ',omg,it
 				stop
 			endif
-			
+
+			x   = x + alf*p + omg*cs
+			r   = s - omg*t
+
 			! check residual for convergence
 			err = sqrt( inn_prod(comm3d,r,r,ip,jp,kp,r_h) )/sc_err
+
+			nrm = rho
+			
+			
 			if( err < tol ) exit
 			
 		enddo
@@ -559,7 +565,7 @@
 								w(k+1,j,i)*(w(k,j,i)+w(k+1,j,i)) ) / &
 								(2._sp*(dz(k)+dz(k-1))) ) + &
 								grav*(th(k,j,i)+th(k+1,j,i) ) / &
-									(2._sp*theta(k)) )
+									(2._sp*theta(k) +thbar(k)+thbar(K+1)) )
 				enddo
 			enddo
 		enddo		
@@ -572,7 +578,7 @@
             do i=2-l_h,ip
                 do j=1,jp
                     do k=1,kp
-                        su(k,j,i)=su(k,j,i)
+                        su(k,j,i)=su(k,j,i)+rhoan(k)*dampfacn(k)*(u(k,j,i)-ubar(k))
                     enddo
                 enddo
             enddo		
@@ -599,7 +605,7 @@
             do i=1,ip
                 do j=1,jp
                     do k=2-l_h,kp
-                        sth(k,j,i)=sth(k,j,i)+rhoan(k)*dampfacn(k)*(th(k,j,i)-thbar(k))
+                        sth(k,j,i)=sth(k,j,i)+dampfacn(k)*(th(k,j,i)-thbar(k))
                     enddo
                 enddo
             enddo		
@@ -710,12 +716,12 @@
 		do i=1,ip
 			do j=1,jp
 				do k=1,kp
-					u(k,j,i)=(rhoan(k)*zu(k,j,i)+( su(k,j,i) - &
+					u(k,j,i)=zu(k,j,i)+(( su(k,j,i) - &
 						( p(k,j,i+1)-p(k,j,i) ) / (dxn(i)) )*dt )/rhoan(k)
 				enddo
 				if(coords(3)==0) then
                     k=1
-                    u(k,j,i)=(rhoan(k)*zu(k,j,i)+( su(k,j,i) - &
+                    u(k,j,i)=zu(k,j,i)+(( su(k,j,i) - &
                         ( p(k,j,i)+dxn(i)*su(k,j,i)-p(k,j,i) ) / (dxn(i)) )*dt )/rhoan(k)
                 endif
 			enddo
@@ -727,12 +733,12 @@
 		do i=1,ip
 			do j=1,jp
 				do k=1,kp
-					v(k,j,i)=(rhoan(k)*zv(k,j,i)+( sv(k,j,i) - &
+					v(k,j,i)=zv(k,j,i)+(( sv(k,j,i) - &
 						( p(k,j+1,i)-p(k,j,i) ) / (dyn(j)) )*dt ) /rhoan(k)
 				enddo
 				if(coords(3)==0) then
                     k=1
-                    v(k,j,i)=(rhoan(k)*zv(k,j,i)+( sv(k,j,i) - &
+                    v(k,j,i)=zv(k,j,i)+(( sv(k,j,i) - &
                         ( p(k,j,i)+dyn(j)*sv(k,j,i)-p(k,j,i) ) / (dyn(j)) )*dt ) /rhoan(k)	
                 endif
 			enddo
@@ -744,7 +750,7 @@
 		do i=1,ip
 			do j=1,jp
 				do k=1,kp
-					w(k,j,i)=(rhoa(k)*zw(k,j,i)+( sw(k,j,i) - &
+					w(k,j,i)=zw(k,j,i)+(( sw(k,j,i) - &
 						( p(k+1,j,i)-p(k,j,i) ) / (dzn(k)) )*dt) / rhoa(k)
 				enddo
 			enddo

@@ -27,6 +27,7 @@
 	!>@param[inout] su,sv,sw,psrc: more prognostic variables
 	!>@param[inout] strain,vism,vist - viscosity subgrid 
 	!>@param[in] z0,z0th - roughness lengths 
+	!>@param[in] ptol - tolerance for pressure solver
 	!>@param[inout] q,sq,viss - for clouds and subgrid
 	!>@param[in] theta, thetan: reference variables
 	!>@param[in] rhoa, rhoan: reference variables
@@ -55,7 +56,7 @@
 				tut,tvt,twt,&
 				th,sth,p, &
 				su,sv,sw,psrc, &
-				strain, vism, vist, z0,z0th, &
+				strain, vism, vist, z0,z0th, ptol, &
 				q,sq,viss, &
 				theta,thetan, &
 				rhoa,rhoan, &
@@ -85,7 +86,7 @@
 		integer(i4b), intent(in) :: id, world_process, ring_comm, sub_horiz_comm,rank
 		integer(i4b), dimension(3), intent(in) :: coords, dims
 		character (len=*), intent(in) :: outputfile
-		real(sp), intent(in) :: output_interval, dt, z0,z0th
+		real(sp), intent(in) :: output_interval, dt, z0,z0th, ptol
 		real(sp), intent(inout) :: thbase, thtop
 		real(sp), dimension(1-l_h:ipp+r_h), intent(in) :: x,xn,dx, dxn
 		real(sp), dimension(1-l_h:jpp+r_h), intent(in) :: y,yn,dy,dyn
@@ -117,7 +118,7 @@
 					
 		! locals:		
 		integer(i4b) :: n,n2, cur=1, i,j,k, error, rank2
-		real(sp) :: time, time_last_output, output_time, a
+		real(sp) :: time, time_last_output, output_time, a,t1=0._sp,t2=0._sp
 		real(sp), dimension(:,:,:), pointer :: u,zu,tu
 		real(sp), dimension(:,:,:), pointer :: v,zv,tv
 		real(sp), dimension(:,:,:), pointer :: w,zw,tw
@@ -220,7 +221,8 @@
 			! find pressure perturbation                                                 !
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 			call bicgstab(ring_comm, id, rank2,dims,coords, &
-			 dt,x,y,z,dx,dy,dz,dxn,dyn,dzn,ipp,jpp,kpp,l_h,r_h,su,sv,sw,p,psrc,.false.)
+			 dt,x,y,z,dx,dy,dz,dxn,dyn,dzn,ipp,jpp,kpp,l_h,r_h,su,sv,sw,p,psrc,ptol, &
+			.false.)
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -238,6 +240,7 @@
                 call adv_ref_state(dt,dz,dzn,rhoa,rhoan,ipp,jpp,kpp,l_h,r_h,w,th,thetan, &
                                     dims,coords)
                 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+                
 
                 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
                 ! set halos																 !
@@ -258,7 +261,7 @@
 						ipp,jpp,kpp,l_h,r_h,u,v,w,th)
 				case (1)
 					call mpdata_3d(dt,dx,dy,dz,dxn,dyn,dzn,rhoa,rhoan, &
-						ipp,jpp,kpp,l_h,r_h,u,v,w,th,thbase,thtop, &
+						ipp,jpp,kpp,l_h,r_h,u,v,w,th,t1,t2, &
 						kord,monotone,ring_comm,id, &
 						dims,coords)						
 				case(2)
