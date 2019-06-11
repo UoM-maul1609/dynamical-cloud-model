@@ -24,7 +24,7 @@
 	!>@param[inout] zut,zvt,zwt: prognostics - previous time-step
 	!>@param[inout] tut,tvt,twt: prognostics - temp storage
 	!>@param[inout] th,sth,p: prognostic variables
-	!>@param[inout] su,sv,sw,psrc: more prognostic variables
+	!>@param[inout] su,sv,sw,psrc, div: more prognostic variables
 	!>@param[inout] strain,vism,vist - viscosity subgrid 
 	!>@param[in] z0,z0th - roughness lengths 
 	!>@param[in] ptol - tolerance for pressure solver
@@ -56,6 +56,7 @@
 				tut,tvt,twt,&
 				th,sth,p, &
 				su,sv,sw,psrc, &
+				div, &
 				strain, vism, vist, z0,z0th, ptol, &
 				q,sq,viss, &
 				theta,thetan, &
@@ -73,7 +74,7 @@
 		!use advection_3d, only : first_order_upstream_3d, mpdata_3d, adv_ref_state
         use advection_s_3d, only : first_order_upstream_3d, &
                     mpdata_3d, mpdata_vec_3d, adv_ref_state, mpdata_3d_add
-		use d_solver, only : bicgstab, bicgstab_a, sources, advance_momentum
+		use d_solver, only : bicgstab, sources, advance_momentum
 		use subgrid_3d, only : advance_scalar_fields_3d
         use diagnostics
 
@@ -96,7 +97,7 @@
 		real(sp), dimension(1-l_h:kpp+r_h), intent(in) :: dampfacn,dampfac
 		real(sp), &
 			dimension(1-r_h:kpp+r_h,1-r_h:jpp+r_h,1-r_h:ipp+r_h), &
-			intent(inout) :: th,p,su,sv,sw,psrc
+			intent(inout) :: th,p,su,sv,sw,psrc,div
 			
 		real(sp), &
 			dimension(1-r_h:kpp+r_h,1-r_h:jpp+r_h,1-l_h:ipp+r_h), target, &
@@ -158,7 +159,7 @@
 					print *,'output no ',cur,' at time (s) ', &
 						time,n,' steps of ',ntim
 
-				
+								
 				!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 				! Output to NetCDF                                                       !
 				!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -166,7 +167,7 @@
 							ip,ipp,ipstart,jp,jpp,jpstart,kp,kpp,kpstart, &
 							l_h,r_h, &
 							time, x,y,z,rhoa, thetan, &
-							u,v,w,th,p, &
+							u,v,w,th,p,div, &
 							id, world_process, rank2, ring_comm)
 				!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
@@ -177,9 +178,11 @@
 			endif
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-			if(coords(3) == 0) w(0,:,:)=-w(1,:,:)
-			!if((coords(3)+1) == dims(3)) w(kpp+1:kpp+r_h,:,:)=0._sp
-			!if((coords(3)+1) == dims(3)) w(kpp+1:kpp+r_h,:,:)=w(kpp-r_h+1:kpp,:,:)
+			!if(coords(3) == 0) w(0:1,:,:)=0._sp !-w(1,:,:)
+! 			if(coords(3) == 0) th(0,:,:)=th(1,:,:)
+! 			if((coords(3)+1) == dims(3)) th(kpp+1:kpp+r_h,:,:)=th(kpp:kpp,:,:)
+! 			if((coords(3)+1) == dims(3)) w(kpp+1:kpp+r_h,:,:)=-w(kpp:kpp,:,:)
+! 			if((coords(3)+1) == dims(3)) w(kpp+1:kpp+r_h,:,:)=w(kpp-r_h+1:kpp,:,:)
 			
 			
 			
@@ -189,6 +192,13 @@
 			call horizontal_means(sub_horiz_comm,id,dims,coords, moisture, &
 	                ip,jp,ipp,jpp,kpp,l_h,r_h, nq,&
 	                ubar,vbar,wbar,thbar,qbar,u,v,w,th,q)
+			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+			
+			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+			! calculate divergence - test                                                !
+			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+			call divergence_calc(ring_comm,id,dims,coords, &
+	            ipp,jpp,kpp,dx,dxn,dy,dyn,dz,dzn,l_h,r_h,u,v,w,div)
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 			
 				
@@ -221,7 +231,9 @@
 			! find pressure perturbation                                                 !
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 			call bicgstab(ring_comm, id, rank2,dims,coords, &
-			 dt,x,y,z,dx,dy,dz,dxn,dyn,dzn,ipp,jpp,kpp,l_h,r_h,su,sv,sw,p,psrc,ptol, &
+			 dt,x,y,z,dx,dy,dz,dxn,dyn,dzn, &
+			 rhoa,rhoan, &
+			 ipp,jpp,kpp,l_h,r_h,su,sv,sw,zu,zv,zw,p,psrc,ptol, &
 			.false.)
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
@@ -232,6 +244,7 @@
 								r_h,r_h,r_h,r_h,r_h,r_h, p,0._sp, 0._sp, dims,coords)
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!		
             
+!             if(coords(3)==(dims(3)-1)) p(kpp+1,:,:)=p(kpp,:,:)
             
             if((advection_scheme == 0) .or. (advection_scheme == 1)) then
                 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -249,8 +262,6 @@
                                     r_h,r_h,r_h,r_h,r_h,r_h,th,0._sp,0._sp,dims,coords)
                 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!	
             endif
-
-			
 
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 			! advect scalar fields using mid-point                                       !
@@ -277,7 +288,7 @@
 			
 
 
-			if(coords(3) == 0) th(0:1,:,:)=0._sp
+! 			if(coords(3) == 0) th(0:1,:,:)=0._sp
 
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 			! set halos																	 !
@@ -362,7 +373,18 @@
 			call exchange_full(ring_comm, id, kpp, jpp, ipp, l_h,r_h,r_h,r_h,r_h,r_h,w,&
 								0._sp,0._sp,dims,coords)
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-
+			if(coords(3)==0) then
+                w(0,:,:)=-w(1,:,:)
+                u(1,:,:)=0._sp
+                v(1,:,:)=0._sp
+            endif
+            
+            if(coords(3)==(dims(3)-1)) then
+                w(kpp,:,:)=-w(kpp-1,:,:)
+                w(kpp+1,:,:)=0._sp
+                u(kpp,:,:)=0._sp
+                v(kpp,:,:)=0._sp
+            endif
 		enddo
 		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
@@ -402,7 +424,7 @@
 	!>@param[in] l_h,r_h: halo
 	!>@param[in] time: time (s)
 	!>@param[in] x,y,z, rhoa, thetan: grids
-	!>@param[in] u,v,w,th,p: prognostic variables
+	!>@param[in] u,v,w,th,p,div: prognostic variables
 	!>@param[in] id: id
 	!>@param[in] world_process: world_process
 	!>@param[in] rank: rank
@@ -411,7 +433,7 @@
 					kp,kpp,kpstart,l_h,r_h, &
 					time, &
 					x,y,z,rhoa, thetan, &
-					u,v,w,th,p, &
+					u,v,w,th,p,div, &
 				    id, world_process, rank, ring_comm)
 	
 		use netcdf
@@ -430,7 +452,7 @@
 		real(sp), dimension(1-l_h:kpp+r_h), intent(in) :: z,rhoa, thetan
 		real(sp), &
 			dimension(1-r_h:kpp+r_h,1-r_h:jpp+r_h,1-r_h:ipp+r_h), &
-			intent(inout) :: th,p
+			intent(inout) :: th,p,div
 		real(sp), &
 			dimension(1-r_h:kpp+r_h,1-r_h:jpp+r_h,1-l_h:ipp+r_h), &
 			intent(inout) :: u
@@ -586,6 +608,15 @@
 			call check( nf90_put_att(ncid, a_dimid, &
 					   "units", "pa") )
 
+			! define variable: div
+			call check( nf90_def_var(ncid, "div", nf90_float, &
+						(/nz_dimid,ny_dimid,nx_dimid,x_dimid/), varid) )
+			! get id to a_dimid
+			call check( nf90_inq_varid(ncid, "div", a_dimid) )
+			! units
+			call check( nf90_put_att(ncid, a_dimid, &
+					   "units", "m/s**2") )
+
 
 
 			! exit define mode
@@ -699,6 +730,11 @@
 		! write variable: p
 		call check( nf90_inq_varid(ncid, "p", varid ) )
 		call check( nf90_put_var(ncid, varid, p(1:kpp,1:jpp,1:ipp), &
+					start = (/kpstart,jpstart,ipstart,n/)))	
+
+		! write variable: div
+		call check( nf90_inq_varid(ncid, "div", varid ) )
+		call check( nf90_put_var(ncid, varid, div(1:kpp,1:jpp,1:ipp), &
 					start = (/kpstart,jpstart,ipstart,n/)))	
 
 		call check( nf90_close(ncid) )
