@@ -22,7 +22,7 @@
             real(sp) :: f, re, g, dt
             real(sp), dimension(:,:,:), allocatable :: u,v, w, rho, th, p, &
             										su, sv, sw, psrc,zu,zv,zw,tu,tv,tw, &
-            										sth,strain,vism,vist
+            										sth,strain,vism,vist, div
 
             real(sp), dimension(:,:,:,:), allocatable :: q, sq, viss
             real(sp), dimension(:), allocatable ::	dx, dy, dz, dxn,dyn,dzn, &
