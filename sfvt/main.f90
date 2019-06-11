@@ -107,7 +107,7 @@
 			grid3%q, &
 			grid3%rhoa,grid3%rhoan, &
 			grid3%lamsq,grid3%lamsqn, &
-			grid3%lbc,grid3%lbc, &
+			grid3%lbc,grid3%ubc, &
 			nm1%cvis, &
 			grid3%dx, grid3%dy, grid3%dz, &
 			grid3%dxn, grid3%dyn, grid3%dzn, &
