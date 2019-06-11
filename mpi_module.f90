@@ -40,7 +40,12 @@
         	logical :: reorder=.true.
         	integer(i4b) :: ndim=3
         	integer(i4b), dimension(3) :: dims, coords
+        	logical, dimension(3) :: remain_dims=[.false.,.false.,.true.]
+        	logical, dimension(3) :: remain_dims_horiz=[.true.,.true.,.false.]
+        	integer(i4b) :: colour,height
         	integer(i4b) :: ring_comm
+        	integer(i4b) :: sub_comm
+        	integer(i4b) :: sub_horiz_comm
         	type(mpi_faces) :: face
         	type(mpi_edges) :: edge
         	type(mpi_corners) :: cnr
@@ -54,7 +59,8 @@
 
     private
     public :: mpi_define, block_ring, exchange_full, mpi_integer9, mp1, world_process, &
-    			mpi_cart_initialise, exchange_along_dim, find_base_top
+    			mpi_cart_initialise, exchange_along_dim, find_base_top, find_top, &
+    			exchange_fluxes
     
 
 	contains
@@ -157,6 +163,8 @@
 		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 		! coordinates of this PE:
 		call MPI_CART_COORDS(mp1%ring_comm, mp1%id, 3, mp1%coords, error)
+		mp1%colour=(mp1%coords(1)+1)*(mp1%dims(1))+(mp1%coords(2)+1)
+		mp1%height=mp1%coords(3)
 		
 		call mpi_find_rank(mp1%coords,mp1%dims,-1,-1,0,mp1%edge%s_ws_bt,mp1%edge%r_en_bt)
 		call mpi_find_rank(mp1%coords,mp1%dims,-1,+1,0, mp1%edge%s_wn_bt,mp1%edge%r_es_bt)
@@ -171,7 +179,7 @@
 		call mpi_find_rank(mp1%coords,mp1%dims,-1,0,-1,mp1%edge%s_bw_sn,mp1%edge%r_te_sn)
 		call mpi_find_rank(mp1%coords,mp1%dims,+1,0,-1,mp1%edge%s_be_sn,mp1%edge%r_tw_sn)
 		call mpi_find_rank(mp1%coords,mp1%dims,-1,0,+1,mp1%edge%s_tw_sn,mp1%edge%r_be_sn)
-		call mpi_find_rank(mp1%coords,mp1%dims,+1,0,+1,mp1%edge%s_te_sn,mp1%edge%r_bw_sn)		
+		call mpi_find_rank(mp1%coords,mp1%dims,+1,0,+1,mp1%edge%s_te_sn,mp1%edge%r_bw_sn)
 		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 
@@ -189,6 +197,23 @@
 		call mpi_find_rank(mp1%coords,mp1%dims,+1,+1,+1, mp1%cnr%s_ent,mp1%cnr%r_wsb)
 		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
+		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        ! create sub communicator for vertical comms                                     !
+		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+		if(mp1%id  < mp1%dx * mp1%dy * mp1%dz) then
+            call MPI_Cart_sub(mp1%ring_comm,mp1%remain_dims,&
+                mp1%sub_comm,mp1%error)
+        endif
+		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+		
+		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        ! create sub communicator for horizontal comms                                   !
+		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+		if(mp1%id  < mp1%dx * mp1%dy * mp1%dz) then
+            call MPI_Cart_sub(mp1%ring_comm,mp1%remain_dims_horiz,&
+                mp1%sub_horiz_comm,mp1%error)
+        endif
+		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 		
 
 		contains
@@ -276,6 +301,94 @@
     end subroutine find_base_top
 	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     
+
+	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+	! find base and top of array using bcast                                             !
+	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+	!>@author
+	!>Paul J. Connolly, The University of Manchester
+	!>@brief
+	!>define some types to be used in the model
+	!>@param[in] comm3d, id, kpp, d_h, u_h, array, dims, coords
+	!>@param[inout] top
+    subroutine find_top(comm3d, id, kpp,d_h,u_h,array,top, dims,coords)
+        implicit none
+		integer(i4b), intent(in) :: comm3d, id, kpp, d_h,u_h
+		real(sp), intent(in), dimension(1-d_h:u_h+kpp) :: array
+		real(sp), intent(inout) :: top
+		integer(i4b), dimension(3), intent(in) :: dims,coords
+		
+		! locals:
+		integer(i4b), dimension(12) :: request
+		integer(i4b), dimension(MPI_STATUS_SIZE, 12) :: status
+		integer(i4b) :: error, tag1,num_messages,imess, tag2, root, rankl,ranku
+		
+		
+		call MPI_CART_RANK( comm3d, [0,0,dims(3)-1], ranku,error)
+		
+		
+
+        top=array(kpp)
+        call MPI_Bcast(top,1,MPI_REAL8,ranku,comm3d,error)
+    
+    end subroutine find_top
+	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    
+
+
+
+	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+	! exchange along dim for a variable using Cartesian topology                         !
+	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+	!>@author
+	!>Paul J. Connolly, The University of Manchester
+	!>@brief
+	!>define some types to be used in the model
+	!>@param[in] comm3d, id, ipp, jpp, kpp, nbands,w_h,e_h,s_h,n_h,d_h,u_h
+	!>@param[inout] array: the array to exchange_halos on
+	!>@param[in] lbc, ubc, dims,coords
+	subroutine exchange_fluxes(comm3d, id, kpp, jpp, ipp, nbands,&
+							d_h,u_h,s_h,n_h,w_h, e_h,  array, dims,coords)
+		implicit none
+		
+		integer(i4b), intent(in) :: comm3d, id, ipp, jpp, kpp, nbands,&
+		     w_h, e_h, s_h,n_h,d_h,u_h
+		real(sp), intent(inout), &
+			 dimension(1-d_h:u_h+kpp,1-s_h:n_h+jpp,1-w_h:e_h+ipp,nbands) :: &
+			 array
+		integer(i4b), dimension(3), intent(in) :: dims,coords
+		
+		! locals:
+		integer(i4b), dimension(12) :: request
+		integer(i4b), dimension(MPI_STATUS_SIZE, 12) :: status
+		integer(i4b) :: error, tag1,num_messages,imess, tag2
+		
+		
+
+			
+		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+		! message passing for adjacent cells in up / down direction                      !
+		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+		tag1=11
+		! send to the bottom:
+		call MPI_Issend(array(0,1:jpp,1:ipp,1:nbands), &
+			(ipp*jpp*nbands)*u_h, MPI_REAL8, mp1%face%s_bottom, &
+			tag1, comm3d, request(1),error)
+
+		! receive from the bottom of upper cell:
+		call MPI_Recv(array(kpp,1:jpp,1:ipp,1:nbands), &
+			(ipp*jpp*nbands)*u_h, MPI_REAL8, mp1%face%r_bottom, &
+			tag1, comm3d, status(:,1),error)
+		call MPI_Wait(request(1), status(:,1), error)
+		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+
+
+
+
+
+	end subroutine exchange_fluxes
+	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 
 	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -649,8 +762,7 @@
 						tag1, MPI_COMM_WORLD, status,error)
 					call MPI_Wait(request, status, error)
 				endif	
-				!----	
-				
+				!----						
 			end subroutine exchange_corner
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
@@ -701,6 +813,7 @@
 				endif	
 				!----
 		
+									
                 if ( send == id) then
                     ! adjacent cells:
                     array(r_kl:r_ku,r_jl:r_ju,r_il:r_iu)= &
