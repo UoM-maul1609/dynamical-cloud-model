@@ -11,7 +11,7 @@
 	real(sp), parameter :: grav=9.81_sp ! gravity
 	
     private
-    public :: bicgstab, sources, advance_momentum
+    public :: bicgstab,sources, advance_momentum
     
 	contains
 	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -20,12 +20,13 @@
 	!>@brief
 	!>set-up matrix A so that Ax is equivalent to \f$\nabla ^2 x\f$ using finite-diff
 	!>@param[in] comm3d,id, dims, coords
-	!>@param[in] dt,dx,dy,dz,dxn,dyn,dzn
+	!>@param[in] dt,dx,dy,dz,dxn,dyn,dzn, rhoa,rhoan
 	!>@param[in] ip,jp,kp,halo
 	!>@param[inout] a_e,a_w,a_n,a_s,a_u,a_d,a_p: terms to make up 7-point stencil
-	!>@param[in] su,sv,sw
-	subroutine set_mat_a(comm3d,id,dims,coords, dt,dx,dy,dz,dxn,dyn,dzn,ip,jp,kp,halo, &
-						a_e,a_w,a_n,a_s,a_u,a_d,a_p,a_c,su,sv,sw)
+	!>@param[in] su,sv,sw,zu,zv,zw
+	subroutine set_mat_a(comm3d,id,dims,coords, dt,dx,dy,dz,dxn,dyn,dzn, &
+	                    rhoa,rhoan,ip,jp,kp,halo, &
+						a_e,a_w,a_n,a_s,a_u,a_d,a_p,a_c,su,sv,sw,zu,zv,zw)
 		use nrtype
 		use mpi_module
 		implicit none
@@ -34,11 +35,11 @@
 		integer(i4b), intent(in) :: ip,jp,kp, halo
 		real(sp), dimension(1-halo:ip+halo) :: dx,dxn
 		real(sp), dimension(1-halo:jp+halo) :: dy,dyn
-		real(sp), dimension(1-halo:kp+halo) :: dz,dzn
+		real(sp), dimension(1-halo:kp+halo) :: dz,dzn,rhoa,rhoan
 		real(sp), dimension(-halo+1:kp+halo,-halo+1:jp+halo,-halo+1:ip+halo), &
 			intent(inout) :: a_e,a_w,a_n,a_s,a_u,a_d,a_p, a_c
 		real(sp), dimension(-halo+1:kp+halo,-halo+1:jp+halo,-halo+1:ip+halo), &
-			intent(in) :: su,sv,sw
+			intent(in) :: su,sv,sw,zu,zv,zw
 		real(sp), intent(in) :: dt
 				
 		! local
@@ -68,60 +69,57 @@
 				enddo
 				if(coords(3)==0) then
 				    k=1
-                    a_e(k,j,i)=0._sp
-                    a_w(k,j,i)=0._sp
-                    a_n(k,j,i)=0._sp
-                    a_s(k,j,i)=0._sp
-                    a_u(k,j,i)=1._sp/( dz(k-1)*dzn(k) )
-                    a_d(k,j,i)=1._sp/( dz(k-1)*dzn(k-1) )
-                    a_p(k,j,i)=-1._sp/( dx(i-1)*dxn(i) ) -1._sp/( dx(i-1)*dxn(i-1) ) &
-                            -1._sp/( dy(j-1)*dyn(j) ) -1._sp/( dy(j-1)*dyn(j-1) )  &
-                            -1._sp/( dz(k-1)*dzn(k) ) -1._sp/( dz(k-1)*dzn(k-1) ) + &
-                            1._sp/( dx(i-1)*dxn(i) ) + & ! a_e
-                            1._sp/( dx(i-1)*dxn(i-1) ) + & ! a_w
-                            1._sp/( dy(j-1)*dyn(j) ) + & ! a_n
-                            1._sp/( dy(j-1)*dyn(j-1) )  ! a_s
-                    a_c(k,j,i)=1._sp/( dx(i-1)*dxn(i) )*dxn(i)*su(k,j,i)/(2._sp*dt) - &
-                            1._sp/( dx(i-1)*dxn(i-1) )*dxn(i-1)*su(k,j,i-1)/(2._sp*dt) + &
-                            1._sp/( dy(j-1)*dyn(j) )*dyn(j)*sv(k,j,i)/(2._sp*dt) - &
-                            1._sp/( dy(j-1)*dyn(j-1) )*dyn(j-1)*sv(k,j-1,i)/(2._sp*dt) 
+					a_e(k,j,i)=0._sp !1._sp/( dx(i-1)*dxn(i) )
+					a_w(k,j,i)=0._sp !1._sp/( dx(i-1)*dxn(i-1) )
+					a_n(k,j,i)=0._sp !1._sp/( dy(j-1)*dyn(j) )
+					a_s(k,j,i)=0._sp !1._sp/( dy(j-1)*dyn(j-1) )
+					a_u(k,j,i)=1._sp/( dz(k-1)*dzn(k) )
+					a_d(k,j,i)=0._sp !1._sp/( dz(k-1)*dzn(k-1) )
+					a_p(k,j,i)=-1._sp/( dz(k-1)*dzn(k) ) -1._sp/( dz(k-1)*dzn(k-1) ) 
+
+                    ! constant component of P-1
+                    a_c(k,j,i)=-(dzn(k-1)*sw(k-1,j,i)+ &
+                            dzn(k-1)*rhoa(k-1)/(2._sp*dt)*&
+                            (zw(k,j,i)+zw(k-1,j,i)+2._sp*dt/rhoa(k)*(sw(k,j,i))) ) / &
+                            ( dz(k-1)*dzn(k-1) )
+                    ! in derivative format
+                    a_p(k,j,i)=a_p(k,j,i)+(1._sp - &
+                        dzn(k-1)*rhoa(k-1)/rhoa(k)/dzn(k))  /( dz(k-1)*dzn(k-1) )
+                    ! in derivative format
+                    a_u(k,j,i)= a_u(k,j,i)+ &
+                        dzn(k-1)*rhoa(k-1)/rhoa(k)/dzn(k)  /( dz(k-1)*dzn(k-1) )
+                                
+                endif
+				if(coords(3)==(dims(3)-1)) then
+				    k=kp
+					a_e(k,j,i)=0._sp/( dx(i-1)*dxn(i) )
+					a_w(k,j,i)=0._sp/( dx(i-1)*dxn(i-1) )
+					a_n(k,j,i)=0._sp/( dy(j-1)*dyn(j) )
+					a_s(k,j,i)=0._sp/( dy(j-1)*dyn(j-1) )
+					a_u(k,j,i)=0._sp !1._sp/( dz(k-1)*dzn(k) )
+					a_d(k,j,i)=1._sp/( dz(k-1)*dzn(k-1) )
+					a_p(k,j,i)=-0._sp/( dx(i-1)*dxn(i) ) -0._sp/( dx(i-1)*dxn(i-1) ) &
+                            -0._sp/( dy(j-1)*dyn(j) ) -0._sp/( dy(j-1)*dyn(j-1) )  &
+                            -1._sp/( dz(k-1)*dzn(k) ) -1._sp/( dz(k-1)*dzn(k-1) ) 
+
+                    ! constant component of Pkp+1
+                    a_c(k,j,i)=(dzn(k)*sw(k,j,i)+ &
+                            dzn(k)*rhoa(k)/(2._sp*dt)*&
+                            (zw(k,j,i)+zw(k-1,j,i)+2._sp*dt/rhoa(k-1)*(sw(k-1,j,i))) ) / &
+                            ( dz(k-1)*dzn(k) )
+
+                    ! in derivative format
+                    a_p(k,j,i)=a_p(k,j,i)+(1._sp - &
+                        dzn(k)*rhoa(k)/rhoa(k-1)/dzn(k-1))  /( dz(k-1)*dzn(k) )
+                    ! in derivative format
+                    a_d(k,j,i)= a_d(k,j,i)+ &
+                        dzn(k)*rhoa(k)/rhoa(k-1)/dzn(k-1)  /( dz(k-1)*dzn(k) )                         
                 endif
 			enddo
 		enddo
 !$omp end simd
 
-!     if(coords(3)==0) then
-! 		do i=1,ip
-! 			do j=1,jp
-!                 a_u(1,j,i)=a_u(1,j,i)+a_d(1,j,i)
-!                 a_d(1,j,i)=0._sp    
-!             enddo
-!         enddo
-!     endif
-		
-!     if(coords(3)==dims(3)-1) then
-! 		do i=1,ip
-! 			do j=1,jp
-!                 a_u(kp,j,i)=a_u(kp,j,i)+a_d(kp,j,i)
-!                 a_d(kp,j,i)=0._sp    
-!             enddo
-!         enddo
-!     endif
-		
-! 	call exchange_halos(comm3d, id, kp, jp, ip, &
-! 		halo,halo,halo,halo,halo,halo, a_p,dims,coords)
-! 	call exchange_halos(comm3d, id, kp, jp, ip, &
-! 		halo,halo,halo,halo,halo,halo, a_n,dims,coords)
-! 	call exchange_halos(comm3d, id, kp, jp, ip, &
-! 		halo,halo,halo,halo,halo,halo, a_s,dims,coords)
-! 	call exchange_halos(comm3d, id, kp, jp, ip, &
-! 		halo,halo,halo,halo,halo,halo, a_e,dims,coords)
-! 	call exchange_halos(comm3d, id, kp, jp, ip, &
-! 		halo,halo,halo,halo,halo,halo, a_w,dims,coords)
-! 	call exchange_halos(comm3d, id, kp, jp, ip, &
-! 		halo,halo,halo,halo,halo,halo, a_u,dims,coords)
-! 	call exchange_halos(comm3d, id, kp, jp, ip, &
-! 		halo,halo,halo,halo,halo,halo, a_d,dims,coords)
+
 
 	end subroutine set_mat_a	
 	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -162,19 +160,12 @@
                     ax(k,j,i) = a_w(k,j,i)*x(k,j,i-1) + a_e(k,j,i)*x(k,j,i+1) + &
                                 a_s(k,j,i)*x(k,j-1,i) + a_n(k,j,i)*x(k,j+1,i) + &
                                 a_d(k,j,i)*x(k-1,j,i) + a_u(k,j,i)*x(k+1,j,i) + &
-                                a_p(k,j,i)*x(k,j,i) +a_c(k,j,i)
+                                a_p(k,j,i)*x(k,j,i) + a_c(k,j,i)
 				enddo
 			enddo
 		enddo
 !$omp end simd
 
-! 		call exchange_full(comm3d, id, kp, jp, ip, &
-! 			halo,halo,halo,halo,halo,halo, ax,dims,coords)
-
-! 		ax(0,:,:)=ax(ip,:,:)
-! 		ax(ip+1,:,:)=ax(1,:,:)
-! 		ax(:,0,:)=ax(:,jp,:)
-! 		ax(:,jp+1,:)=ax(:,1,:)
 
 	end subroutine mat_ax
 	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -213,9 +204,6 @@
 						a_e,a_w,a_n,a_s,a_u,a_d,a_p,a_c,t,s)
 			s = s + (r-t)/(a_p)
 			
-			! MPI:
-! 			call exchange_halos(comm3d, id, kp, jp, ip, &
-! 				halo,halo,halo,halo,halo,halo, s,dims,coords)
 
 		enddo
 
@@ -234,17 +222,18 @@
 	!>  using bi-conjugate gradient stabilised method (bicgstab)
 	!>@param[in] comm3d,id, rank, dims, coords
 	!>@param[in] dt
-	!>@param[in] xg,yg,zg,dx,dy,dz,dxn,dyn,dzn
+	!>@param[in] xg,yg,zg,dx,dy,dz,dxn,dyn,dzn,rhoa,rhoan
 	!>@param[in] ip,jp,kp,l_h,r_h
-	!>@param[in] su
-	!>@param[in] sv
-	!>@param[in] sw
+	!>@param[in] su,zu
+	!>@param[in] sv,zv
+	!>@param[in] sw,zw
 	!>@param[inout] x
 	!>@param[inout] b
 	!>@param[in] ptol
 	!>@param[in] test_solver	
 	subroutine bicgstab(comm3d,id,rank, dims, coords, &
-			dt,xg,yg,zg,dx,dy,dz,dxn,dyn,dzn,ip,jp,kp,l_h,r_h,su,sv,sw,x,b,tol,&
+			dt,xg,yg,zg,dx,dy,dz,dxn,dyn,dzn,rhoa,rhoan, &
+			ip,jp,kp,l_h,r_h,su,sv,sw,zu,zv,zw,x,b,tol,&
 			test_solver)
 		use nrtype
 		implicit none
@@ -253,18 +242,18 @@
 		real(sp), intent(in) :: dt
 		integer(i4b), intent(in) :: ip, jp, kp, l_h,r_h
 		real(sp), dimension(-r_h+1:kp+r_h,-r_h+1:jp+r_h,-l_h+1:ip+r_h), &
-			intent(in) :: su
+			intent(in) :: su,zu
 		real(sp), dimension(-r_h+1:kp+r_h,-l_h+1:jp+r_h,-r_h+1:ip+r_h), &
-			intent(in) :: sv
+			intent(in) :: sv,zv
 		real(sp), dimension(-l_h+1:kp+r_h,-r_h+1:jp+r_h,-r_h+1:ip+r_h), &
-			intent(in) :: sw
+			intent(in) :: sw,zw
 		real(sp), dimension(-r_h+1:kp+r_h,-r_h+1:jp+r_h,-r_h+1:ip+r_h), &
 			intent(inout) :: x
 		real(sp), dimension(-r_h+1:kp+r_h,-r_h+1:jp+r_h,-r_h+1:ip+r_h), &
 			intent(inout) :: b
 		real(sp), dimension(-l_h+1:ip+r_h), intent(in) :: xg,dx, dxn
 		real(sp), dimension(-l_h+1:jp+r_h), intent(in) :: yg,dy, dyn
-		real(sp), dimension(-l_h+1:kp+r_h), intent(in) :: zg,dz, dzn
+		real(sp), dimension(-l_h+1:kp+r_h), intent(in) :: zg,dz, dzn,rhoa,rhoan
 		logical :: test_solver
 		real(sp), intent(in) :: tol
 	
@@ -297,8 +286,10 @@
 			allocate( a_c(1-r_h:kp+r_h,1-r_h:jp+r_h,1-r_h:ip+r_h), STAT = status)
 			if (status /= 0) STOP "*** Not enough memory ***"
 			
-			call set_mat_a(comm3d,id,dims,coords,dt,dx,dy,dz,dxn,dyn,dzn,ip,jp,kp,r_h, &
-						a_e,a_w,a_n,a_s,a_u,a_d,a_p,a_c,su,sv,sw)
+			call set_mat_a(comm3d,id,dims,coords,dt,dx,dy,dz,dxn,dyn,dzn, &
+			            rhoa,rhoan,ip,jp,kp,r_h, &
+						a_e,a_w,a_n,a_s,a_u,a_d,a_p,a_c,su,sv,sw, &
+						zu,zv,zw)
 		
 			if(test_solver) then
 				do i=1,ip
@@ -382,10 +373,15 @@
 			stop
 		endif
 		
-		
+! 		if(coords(3)==(dims(3)-1)) then
+! 		    x(kp+1,:,:)=x(kp,:,:)+dzn(kp)*sw(kp,:,:)+dzn(kp)*rhoa(kp)/(2._sp*dt) * &
+! 		        (zw(kp,:,:)+zw(kp-1,:,:)+&
+! 		        2._sp*dt/rhoa(kp-1)*(sw(kp-1,:,:)+(x(kp-1,:,:)-x(kp,:,:))/dzn(kp-1)))
+! 		endif
 
 	end subroutine bicgstab
 	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+	
 	
 	
 	
@@ -641,24 +637,32 @@
         
 
 		! su, sv, and su are now centred on i+1/2        
-
+        if(coords(3)==0) sw(0,:,:)=-sw(1,:,:)/rhoa(1)*rhoa(0)
+        if(coords(3)==(dims(3)-1)) then 
+            sw(kp,:,:)=-sw(kp-1,:,:)/rhoa(kp-1)*rhoa(kp)
+            sw(kp+1,:,:)=0._sp
+        endif
+!         if(coords(3)==(dims(3)-1)) su(kp:kp+1,:,:)=0._sp
+!         if(coords(3)==(dims(3)-1)) sv(kp:kp+1,:,:)=0._sp
+        
 		! rhs of poisson (centred difference):
 !$omp simd	
 		do i=1,ip
 			do j=1,jp
-				do k=1,kp
+				do k=1,kp+1
 					rhs(k,j,i)=( ( su(k,j,i)-su(k,j,i-1) )/ dx(i-1) + &
 							 ( sv(k,j,i)-sv(k,j-1,i) )/ dy(j-1) + &
 							 ( sw(k,j,i)-sw(k-1,j,i) )/ dz(k-1) )
 				enddo
+! 				if(coords(3)==0) then
+!                     rhs(1,j,i)=( ( su(1,j,i)-su(1,j,i-1) )/ dx(i-1) + &
+!                                  ( sv(1,j,i)-sv(1,j-1,i) )/ dy(j-1) + &
+!                                  ( 2._sp*sw(1,j,i) )/ dz(0) )
+!                 endif
 			enddo
 		enddo
 !$omp end simd	
-		!rhs(:,:,0:1)=0._sp
-		!sw(:,:,0:1)=0._sp
-		
-! 	call exchange_halos(comm3d, id, ip, jp, kp, &
-! 			r_h,r_h,r_h,r_h,r_h,r_h, rhs,dims,coords)
+
 
 	end subroutine sources	
 	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -715,15 +719,15 @@
 !$omp simd	
 		do i=1,ip
 			do j=1,jp
-				do k=1,kp
+				do k=0,kp
 					u(k,j,i)=zu(k,j,i)+(( su(k,j,i) - &
 						( p(k,j,i+1)-p(k,j,i) ) / (dxn(i)) )*dt )/rhoan(k)
 				enddo
-				if(coords(3)==0) then
-                    k=1
-                    u(k,j,i)=zu(k,j,i)+(( su(k,j,i) - &
-                        ( p(k,j,i)+dxn(i)*su(k,j,i)-p(k,j,i) ) / (dxn(i)) )*dt )/rhoan(k)
-                endif
+! 				if(coords(3)==0) then
+!                     k=1
+!                     u(k,j,i)=zu(k,j,i)+(( su(k,j,i) - &
+!                         ( p(k,j,i)+dxn(i)*su(k,j,i)-p(k,j,i) ) / (dxn(i)) )*dt )/rhoan(k)
+!                 endif
 			enddo
 		enddo
 !$omp end simd	
@@ -732,15 +736,15 @@
 !$omp simd	
 		do i=1,ip
 			do j=1,jp
-				do k=1,kp
+				do k=0,kp
 					v(k,j,i)=zv(k,j,i)+(( sv(k,j,i) - &
 						( p(k,j+1,i)-p(k,j,i) ) / (dyn(j)) )*dt ) /rhoan(k)
 				enddo
-				if(coords(3)==0) then
-                    k=1
-                    v(k,j,i)=zv(k,j,i)+(( sv(k,j,i) - &
-                        ( p(k,j,i)+dyn(j)*sv(k,j,i)-p(k,j,i) ) / (dyn(j)) )*dt ) /rhoan(k)	
-                endif
+! 				if(coords(3)==0) then
+!                     k=1
+!                     v(k,j,i)=zv(k,j,i)+(( sv(k,j,i) - &
+!                         ( p(k,j,i)+dyn(j)*sv(k,j,i)-p(k,j,i) ) / (dyn(j)) )*dt ) /rhoan(k)	
+!                 endif
 			enddo
 		enddo
 !$omp end simd	
@@ -749,7 +753,7 @@
 !$omp simd	
 		do i=1,ip
 			do j=1,jp
-				do k=1,kp
+				do k=0,kp
 					w(k,j,i)=zw(k,j,i)+(( sw(k,j,i) - &
 						( p(k+1,j,i)-p(k,j,i) ) / (dzn(k)) )*dt) / rhoa(k)
 				enddo

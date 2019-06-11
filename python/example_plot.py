@@ -12,11 +12,15 @@ nc = Dataset('/tmp/output.nc')
 y = nc['y'][:]
 z = nc['z'][:]
 th = nc['th'][-1,:,:,:]
+time=nc['time'][:]
 
 
 # plot out
-plt.pcolor(y,z,th[0].transpose())
+plt.pcolormesh(y,z,th[0].transpose(),cmap='RdBu_r',shading='gouraud')
+plt.title('time: ' + str(time[-1]) + 's')
+
 plt.clim((-0.05,0.05))
+plt.colorbar()
 
 plt.gca().set_aspect('equal')
 plt.gca().autoscale(tight=True)

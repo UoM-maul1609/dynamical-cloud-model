@@ -114,7 +114,7 @@
 			grid1%u,grid1%v,grid1%w,&
 			grid1%zu,grid1%zv,grid1%zw,&
 			grid1%tu,grid1%tv,grid1%tw,&
-			grid1%p,grid1%th,grid1%rho, &
+			grid1%p,grid1%th,grid1%div, &
 			grid1%sth,grid1%strain,grid1%vism,grid1%vist, &
 			nm1%z0,nm1%z0th, &
 			grid1%q, grid1%sq, grid1%viss, &
@@ -171,6 +171,7 @@
 				grid1%tu,grid1%tv,grid1%tw,&
 				grid1%th,grid1%sth,grid1%p, &
 				grid1%su,grid1%sv,grid1%sw,grid1%psrc, &
+				grid1%div, &
 				grid1%strain, grid1%vism, grid1%vist, &
 				nm1%z0,nm1%z0th, nm1%ptol, &
 				grid1%q,grid1%sq,grid1%viss, &

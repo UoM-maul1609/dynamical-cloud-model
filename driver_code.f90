@@ -73,7 +73,7 @@
 		!use advection_3d, only : first_order_upstream_3d, mpdata_3d, adv_ref_state
         use advection_s_3d, only : first_order_upstream_3d, &
                     mpdata_3d, mpdata_vec_3d, adv_ref_state, mpdata_3d_add
-		use d_solver, only : bicgstab, sources, advance_momentum
+		use d_solver, only : bicgstab, bicgstab_a, sources, advance_momentum
 		use subgrid_3d, only : advance_scalar_fields_3d
         use diagnostics
 

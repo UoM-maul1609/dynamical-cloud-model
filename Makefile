@@ -27,7 +27,7 @@ AR = ar
 RANLIB = ranlib 
 OBJ = o
 FFLAGS = $(OPT)  $(DEBUG)  -o 
-FFLAGSOMP = -fopenmp-simd $(FFLAGS)
+FFLAGSOMP = -fopenmp $(FFLAGS) #-fopenmp-simd
 FFLAGS2 =  $(DEBUG) -O3 -o 
 
 

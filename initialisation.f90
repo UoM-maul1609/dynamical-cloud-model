@@ -21,7 +21,7 @@
 	!>@brief
 	!>allocate arrays on each PE, and initialise them
 	!>@param[inout] dt,runtime,ntim - time variables
-	!>@param[inout] x,y,z,xn,yn,zn,u,v,w,p,th,rho - grid positions and prognostics
+	!>@param[inout] x,y,z,xn,yn,zn,u,v,w,p,th,div - grid positions and prognostics
 	!>@param[inout] ubar,vbar,wbar,thbar,qbar,dampfacn,dampfac
 	!>@param[in] damping_layer, damping_thickness, damping_tau
 	!>@param[inout] sth,strain,vism,vist - more prognostics
@@ -54,7 +54,7 @@
 			u,v,w,&
 			zu,zv,zw,&
 			tu,tv,tw,&
-			p,th,rho, &
+			p,th,div, &
 			sth,strain,vism,vist,z0,z0th, &
 			q, sq, viss, &
 			su,sv,sw,psrc, &
@@ -84,7 +84,7 @@
 		implicit none
 		real(sp), dimension(:,:,:), allocatable, intent(inout) :: &
 														u,v,w,zu,zv,zw,tu,tv,tw,&
-														p,th,rho, &
+														p,th,div, &
 														su,sv,sw,psrc, &
 														sth,strain,vism,vist
 		real(sp), dimension(:,:,:,:), allocatable, intent(inout) :: &
@@ -194,7 +194,7 @@
 		if (AllocateStatus /= 0) STOP "*** Not enough memory ***"
 		allocate( th(1-r_h:kpp+r_h,1-r_h:jpp+r_h,1-r_h:ipp+r_h), STAT = AllocateStatus)
 		if (AllocateStatus /= 0) STOP "*** Not enough memory ***"
-		allocate( rho(1-r_h:kpp+r_h,1-r_h:jpp+r_h,1-r_h:ipp+r_h), STAT = AllocateStatus)
+		allocate( div(1-r_h:kpp+r_h,1-r_h:jpp+r_h,1-r_h:ipp+r_h), STAT = AllocateStatus)
 		if (AllocateStatus /= 0) STOP "*** Not enough memory ***"
 		
 		allocate( su(1-r_h:kpp+r_h,1-r_h:jpp+r_h,1-r_h:ipp+r_h), STAT = AllocateStatus)
@@ -353,7 +353,10 @@
                 endif
             enddo
             !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!              
-
+            if(coords(3)==(dims(3)-1)) then
+                dampfac(kpp-1:kpp+1)=0._sp
+                dampfacn(kpp-1:kpp+1)=0._sp
+            endif
 
         endif
 		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -432,6 +435,18 @@
 		p(:,:,:)=0._sp
 ! 		rhoa=1._sp
 ! 		rhoan=1._sp
+!         if(coords(3)==0) then
+!             rhoa(0)=rhoa(1)
+!             rhoan(0)=rhoan(1)
+!             theta(0)=theta(1)
+!             thetan(0)=thetan(1)
+!         endif
+!         if((coords(3)+1)==dims(3)) then
+!             rhoa(kpp+1)=rhoa(kpp)
+!             rhoan(kpp+1)=rhoan(kpp)
+!             theta(kpp+1)=theta(kpp)
+!             thetan(kpp+1)=thetan(kpp)
+!         endif
 		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -474,19 +489,26 @@
 						.and. (j >= jpstart) .and. (j <= jpstart+jpp+1) &
 						.and. (k >= kpstart) .and. (k <= kpstart+kpp+1) ) then
 					
-						if ( (z(k-kpstart)>3000._sp) .and. (z(k-kpstart)<6000._sp) ) &
+						if ( (z(k-kpstart)>5000._sp) .and. (z(k-kpstart)<6000._sp) ) &
 							th(k-kpstart,j-jpstart,i-ipstart) = + r / 30._sp
 						
 
 					endif
-					
-					
-					
+										
 
 				enddo
 			enddo
 		enddo
-
+		
+ 		do i=1-r_h,ipp+r_h
+ 			do j=1-r_h,jpp+r_h
+                do k=0,kpp+1
+                    v(k,j,i)=zn(k)/2000._sp
+                    zv(k,j,i)=v(k,j,i)
+                    tv(k,j,i)=v(k,j,i)
+                enddo
+            enddo
+        enddo
  		th=0._sp
 		
 		

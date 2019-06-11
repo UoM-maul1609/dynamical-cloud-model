@@ -7,7 +7,7 @@
     implicit none
 
     private
-    public :: horizontal_means
+    public :: horizontal_means, divergence_calc
     
 	contains
 	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -103,6 +103,52 @@
         
         
 	end subroutine horizontal_means	
+	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+
+	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+	!>@author
+	!>Paul J. Connolly, The University of Manchester
+	!>@brief
+	!>divergence calculation
+	!>@param[in] comm3d,id, dims, coords
+	!>@param[in] dx,dy,dz,dxn,dyn,dzn
+	!>@param[in] ipp,jpp,kpp,halo
+	!>@param[inout] div
+	subroutine divergence_calc(comm3d,id,dims,coords, &
+	    ipp,jpp,kpp,dx,dxn,dy,dyn,dz,dzn,l_h,r_h,u,v,w,div)
+		use nrtype
+		use mpi
+		use mpi_module
+		implicit none
+		integer(i4b), intent(in) :: id, comm3d
+		integer(i4b), dimension(3), intent(in) :: dims,coords
+		integer(i4b), intent(in) :: ipp,jpp,kpp, l_h,r_h
+		real(sp), dimension(-l_h+1:ipp+r_h), intent(in) :: dx,dxn
+		real(sp), dimension(-l_h+1:jpp+r_h), intent(in) :: dy,dyn
+		real(sp), dimension(-l_h+1:kpp+r_h), intent(in) :: dz,dzn
+		real(sp), dimension(-l_h+1:kpp+r_h,-l_h+1:jpp+r_h,-l_h+1:ipp+r_h), &
+			intent(in) :: u,v,w
+		real(sp), dimension(-l_h+1:kpp+r_h,-l_h+1:jpp+r_h,-l_h+1:ipp+r_h), &
+			intent(inout) :: div
+				
+		! local
+		integer(i4b) :: i,j,k,error
+
+
+		do i=1,ipp
+			do j=1,jpp	    
+				do k=1,kpp
+					div(k,j,i)=(u(k,j,i)-u(k,j,i-1))/dx(i-1) + &
+					    (v(k,j,i)-v(k,j-1,i))/dy(j-1) + &
+					    (w(k,j,i)-w(k-1,j,i))/dz(k-1) 
+				enddo
+			enddo
+		enddo
+
+        
+        
+	end subroutine divergence_calc	
 	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 
