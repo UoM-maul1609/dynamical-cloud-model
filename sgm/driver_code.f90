@@ -151,7 +151,7 @@
             enddo
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!	
 
-
+            
 
 			
 
@@ -163,6 +163,7 @@
                     su=0._sp
                     sv=0._sp
                     sw=0._sp
+                    sth=0._sp
                     call calculate_subgrid_3d(dt,z,zn,dx,dy,dz,rhoa,theta,&
                         dxn,dyn,dzn,rhoan,thetan,&
                         ipp,jpp,kpp,nq,l_h,r_h,u,v,w,&
@@ -206,7 +207,7 @@
 							ip,ipp,ipstart,jp,jpp,jpstart,kp,kpp,kpstart, &
 							l_h,r_h, &
 							time, x,y,z,rhoa, &
-							u,v,w,q(:,:,:,1:nq), vism, strain, &
+							u,v,w,th,q(:,:,:,1:nq), vism, strain, &
 							id, world_process, rank2, ring_comm)
 				!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
@@ -338,7 +339,7 @@
 	!>@param[in] l_h,r_h: halo
 	!>@param[in] time: time (s)
 	!>@param[in] x,y,z, rhoa: grids
-	!>@param[in] u,v,w,q: prognostic variables
+	!>@param[in] u,v,w,th, q: prognostic variables
 	!>@param[in] vism,strain: subgrid
 	!>@param[in] id: id
 	!>@param[in] world_process: world_process
@@ -348,7 +349,7 @@
 					kp,kpp,kpstart,l_h,r_h, &
 					time, &
 					x,y,z,rhoa, &
-					u,v,w,q, vism, strain, &
+					u,v,w,th,q, vism, strain, &
 				    id, world_process, rank, ring_comm)
 	
 		use netcdf
@@ -376,7 +377,7 @@
 			intent(inout) :: v
 		real(sp), &
 			dimension(1-l_h:kpp+r_h,1-r_h:jpp+r_h,1-r_h:ipp+r_h), &
-			intent(inout) :: w, vism,strain
+			intent(inout) :: w, th,vism,strain
 		
 		integer(i4b), intent(in) :: id ,world_process, rank, ring_comm
 	
@@ -507,6 +508,15 @@
 			call check( nf90_put_att(ncid, a_dimid, &
 					   "units", "m/s") )
 
+			! define variable: w
+			call check( nf90_def_var(ncid, "th", nf90_float, &
+						(/nz_dimid,ny_dimid,nx_dimid,x_dimid/), varid) )
+			! get id to a_dimid
+			call check( nf90_inq_varid(ncid, "th", a_dimid) )
+			! units
+			call check( nf90_put_att(ncid, a_dimid, &
+					   "units", "K") )
+
 			! define variable: vism
 			call check( nf90_def_var(ncid, "vism", nf90_float, &
 						(/nz_dimid,ny_dimid,nx_dimid,x_dimid/), varid) )
@@ -630,6 +640,11 @@
 		! write variable: w
 		call check( nf90_inq_varid(ncid, "w", varid ) )
 		call check( nf90_put_var(ncid, varid, w(1:kpp,1:jpp,1:ipp), &
+					start = (/kpstart,jpstart,ipstart,n/)))	
+
+		! write variable: th
+		call check( nf90_inq_varid(ncid, "th", varid ) )
+		call check( nf90_put_var(ncid, varid, th(1:kpp,1:jpp,1:ipp), &
 					start = (/kpstart,jpstart,ipstart,n/)))	
 
 

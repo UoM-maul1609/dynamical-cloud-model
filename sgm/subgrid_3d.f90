@@ -285,7 +285,7 @@
     
     ! calculate th sources due to viscosity
     ! diffusion along i calculated via i+1/2 and i-1/2 terms
-    sth=0._sp
+!     sth=0._sp
     do i=1,ip
         do j=1,jp
             do k=1,kp
