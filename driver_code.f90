@@ -178,11 +178,6 @@
 			endif
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-			!if(coords(3) == 0) w(0:1,:,:)=0._sp !-w(1,:,:)
-! 			if(coords(3) == 0) th(0,:,:)=th(1,:,:)
-! 			if((coords(3)+1) == dims(3)) th(kpp+1:kpp+r_h,:,:)=th(kpp:kpp,:,:)
-! 			if((coords(3)+1) == dims(3)) w(kpp+1:kpp+r_h,:,:)=-w(kpp:kpp,:,:)
-! 			if((coords(3)+1) == dims(3)) w(kpp+1:kpp+r_h,:,:)=w(kpp-r_h+1:kpp,:,:)
 			
 			
 			
@@ -198,7 +193,7 @@
 			! calculate divergence - test                                                !
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 			call divergence_calc(ring_comm,id,dims,coords, &
-	            ipp,jpp,kpp,dx,dxn,dy,dyn,dz,dzn,l_h,r_h,u,v,w,div)
+	            ipp,jpp,kpp,dx,dxn,dy,dyn,dz,dzn,rhoa,rhoan,l_h,r_h,u,v,w,div)
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 			
 				
@@ -246,6 +241,39 @@
             
 !             if(coords(3)==(dims(3)-1)) p(kpp+1,:,:)=p(kpp,:,:)
             
+			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+			! advect scalar fields using mid-point                                       !
+			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+			select case (advection_scheme)
+				case (0)
+					call first_order_upstream_3d(dt,dxn,dyn,dzn,rhoa,rhoan, &
+						ipp,jpp,kpp,l_h,r_h,u,v,w,th,.true.,dims,coords)
+				case (1)
+					call mpdata_3d(dt,dx,dy,dz,dxn,dyn,dzn,rhoa,rhoan, &
+						ipp,jpp,kpp,l_h,r_h,u,v,w,th,t1,t2, &
+						kord,monotone,.true.,ring_comm,id, &
+						dims,coords)						
+				case(2)
+					call mpdata_3d_add(dt,dx,dy,dz,dxn,dyn,dzn,rhoa,rhoan, &
+						ipp,jpp,kpp,l_h,r_h,u,v,w,th,thetan,thbase,thtop, &
+						kord,monotone,.true.,ring_comm,id, &
+						dims,coords)
+				case default
+					print *,'not coded'
+					stop
+			end select
+			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+			
+
+
+			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+			! set halos																	 !
+			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!		
+			call exchange_full(ring_comm, id, kpp, jpp, ipp, &
+								r_h,r_h,r_h,r_h,r_h,r_h,th,t1,t2,dims,coords)
+			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!	
+
+			
             if((advection_scheme == 0) .or. (advection_scheme == 1)) then
                 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
                 ! advect the reference state	     									 !
@@ -263,41 +291,6 @@
                 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!	
             endif
 
-			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-			! advect scalar fields using mid-point                                       !
-			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-			select case (advection_scheme)
-				case (0)
-					call first_order_upstream_3d(dt,dxn,dyn,dzn,rhoa,rhoan, &
-						ipp,jpp,kpp,l_h,r_h,u,v,w,th)
-				case (1)
-					call mpdata_3d(dt,dx,dy,dz,dxn,dyn,dzn,rhoa,rhoan, &
-						ipp,jpp,kpp,l_h,r_h,u,v,w,th,t1,t2, &
-						kord,monotone,ring_comm,id, &
-						dims,coords)						
-				case(2)
-					call mpdata_3d_add(dt,dx,dy,dz,dxn,dyn,dzn,rhoa,rhoan, &
-						ipp,jpp,kpp,l_h,r_h,u,v,w,th,thetan,thbase,thtop, &
-						kord,monotone,ring_comm,id, &
-						dims,coords)
-				case default
-					print *,'not coded'
-					stop
-			end select
-			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-			
-
-
-! 			if(coords(3) == 0) th(0:1,:,:)=0._sp
-
-			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-			! set halos																	 !
-			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!		
-			call exchange_full(ring_comm, id, kpp, jpp, ipp, &
-								r_h,r_h,r_h,r_h,r_h,r_h,th,0._sp,0._sp,dims,coords)
-			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!	
-
-			
 
 			
 

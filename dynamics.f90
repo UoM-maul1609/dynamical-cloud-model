@@ -53,6 +53,26 @@
 		a_u=0._sp
 		a_d=0._sp
 		a_c=0._sp
+        !> <b>Del^2 P </b>: <br>
+        !>\f$	\frac{\frac{P_{i+1}-P_i}{\Delta x_{n,i}} 
+        !> -\frac{P_{i}-P_{i-1}}{\Delta x_{n,i-1}}}{\Delta x_{i-1}} 
+        !> +	\frac{\frac{P_{j+1}-P_j}{\Delta y_{n,j}} 
+        !> -\frac{P_{j}-P_{j-1}}{\Delta y_{n,j-1}}}{\Delta y_{j-1}} 
+        !> +	\frac{\frac{P_{k+1}-P_k}{\Delta z_{n,k}} 
+        !> -\frac{P_{k}-P_{k-1}}{\Delta z_{n,k-1}}}{\Delta z_{k-1}} 
+        !>\f$
+		!> <br><br> for the upper and lower boundary assume w's are equal and opposite
+		!> as w is staggered on z
+		!> <br><br> From the vertical equation of motion we have:<br>
+		!>\f$ w_{k+1/2}=zw_{k+1/2}+\frac{1}{\rho _{k+1/2}}\left( sw_{k+1/2} + 
+		!> \frac{P_k-P_{k+1}}{\Delta z_k}\right)\times 2\Delta t
+		!>\f$
+		!<br> and <br>
+		!>\f$ w_{k-1/2}=zw_{k-1/2}+\frac{1}{\rho _{k-1/2}}\left( sw_{k-1/2} + 
+		!> \frac{P_{k-1}-P_{k}}{\Delta z_{k-1}}\right )\times 2\Delta t
+		!>\f$
+		!> <br> set the sum of the two equations to be equal and opposite<br>
+		
 !$omp simd	
 		do i=1,ip
 			do j=1,jp			    
@@ -67,6 +87,18 @@
                             -1._sp/( dy(j-1)*dyn(j) ) -1._sp/( dy(j-1)*dyn(j-1) )  &
                             -1._sp/( dz(k-1)*dzn(k) ) -1._sp/( dz(k-1)*dzn(k-1) ) 
 				enddo
+                !> <br><br>
+                !> For the bottom b.c. we have:<br>
+                !> \f$ P_{-1}=P_0-\Delta z_{-1} sw_{-1/2}-
+                !> \frac{\Delta z_{-1}\rho_{-1/2}}{2\Delta t}\left(zw_{1/2}+zw_{-1/2}+ 
+                !> \frac{2\Delta t}{\rho _{1/2}}\left(sw_{1/2}+
+                !>  \frac{P_0-P_1}{\Delta z_0}\right)\right)
+                !> \f$
+                !> <br>
+                !> so to compute \f$P_{-1}\f$
+                !> the a_c (constant term is the part that doesn't depend on P)<br>
+                !> there are an additional two a_p terms (the \f$P_0\f$) terms <br>
+                !> and there is an additional a_u term (the \f$P_1\f$) term
 				if(coords(3)==0) then
 				    k=1
 					a_e(k,j,i)=0._sp !1._sp/( dx(i-1)*dxn(i) )
@@ -90,6 +122,18 @@
                         dzn(k-1)*rhoa(k-1)/rhoa(k)/dzn(k)  /( dz(k-1)*dzn(k-1) )
                                 
                 endif
+                !> <br><br>
+                !> For the top b.c. we have:<br>
+                !> \f$ P_{kp+1}=P_{kp}+\Delta z_{kp} sw_{kp+1/2}-
+                !> \frac{\Delta z_{kp}\rho_{kp+1/2}}{2\Delta t}\left(zw_{kp+1/2}+zw_{kp-1/2}+ 
+                !> \frac{2\Delta t}{\rho _{kp-1/2}}\left(sw_{kp-1/2}+
+                !>  \frac{P_{kp-1}-P_{kp}}{\Delta z_{kp-1}}\right)\right)
+                !> \f$
+                !> <br>
+                !> so to compute \f$P_{kp+1}\f$
+                !> the a_c (constant term is the part that doesn't depend on P)<br>
+                !> there are an additional two a_p terms (the \f$P_{kp}\f$) terms <br>
+                !> and there is an additional a_d term (the \f$P_{kp-1}\f$) term
 				if(coords(3)==(dims(3)-1)) then
 				    k=kp
 					a_e(k,j,i)=0._sp/( dx(i-1)*dxn(i) )
@@ -574,7 +618,7 @@
             do i=2-l_h,ip
                 do j=1,jp
                     do k=1,kp
-                        su(k,j,i)=su(k,j,i)+rhoan(k)*dampfacn(k)*(u(k,j,i)-ubar(k))
+                        su(k,j,i)=su(k,j,i)+rhoan(k)*dampfacn(k)*(zu(k,j,i)-ubar(k))
                     enddo
                 enddo
             enddo		
@@ -583,7 +627,7 @@
             do i=1,ip
                 do j=2-l_h,jp
                     do k=1,kp
-                        sv(k,j,i)=sv(k,j,i)+rhoan(k)*dampfacn(k)*(v(k,j,i)-vbar(k))
+                        sv(k,j,i)=sv(k,j,i)+rhoan(k)*dampfacn(k)*(zv(k,j,i)-vbar(k))
                     enddo
                 enddo
             enddo		
@@ -592,7 +636,7 @@
             do i=1,ip
                 do j=1,jp
                     do k=2-l_h,kp
-                        sw(k,j,i)=sw(k,j,i)+rhoa(k)*dampfac(k)*(w(k,j,i)-wbar(k))
+                        sw(k,j,i)=sw(k,j,i)+rhoa(k)*dampfac(k)*(zw(k,j,i)-0._sp)
                     enddo
                 enddo
             enddo		
@@ -601,7 +645,7 @@
             do i=1,ip
                 do j=1,jp
                     do k=2-l_h,kp
-                        sth(k,j,i)=sth(k,j,i)+dampfacn(k)*(th(k,j,i)-thbar(k))
+                        sth(k,j,i)=sth(k,j,i)+dampfacn(k)*(th(k,j,i)-0._sp)
                     enddo
                 enddo
             enddo		

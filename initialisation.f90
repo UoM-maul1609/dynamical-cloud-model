@@ -343,20 +343,20 @@
             !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!              
             do k=1-l_h,kpp+r_h
                 if(zn(k) .gt. (ztop-damping_thickness)) then
-                    dampfacn(k)=-1._sp/damping_tau*(&
-                        exp((zn(k)-(ztop-damping_thickness))/damping_thickness)-1._sp)
+                    dampfacn(k)=-1._sp/damping_tau !*(&
+                        !exp((zn(k)-(ztop-damping_thickness))/damping_thickness)-1._sp)
                 endif
 
                 if(z(k) .gt. (ztop-damping_thickness)) then
-                    dampfac(k)=-1._sp/damping_tau*(&
-                        exp((z(k)-(ztop-damping_thickness))/damping_thickness)-1._sp)
+                    dampfac(k)=-1._sp/damping_tau !*(&
+                        !exp((z(k)-(ztop-damping_thickness))/damping_thickness)-1._sp)
                 endif
             enddo
             !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!              
-            if(coords(3)==(dims(3)-1)) then
-                dampfac(kpp-1:kpp+1)=0._sp
-                dampfacn(kpp-1:kpp+1)=0._sp
-            endif
+!             if(coords(3)==(dims(3)-1)) then
+!                 dampfac(kpp-1:kpp+1)=0._sp
+!                 dampfacn(kpp-1:kpp+1)=0._sp
+!             endif
 
         endif
 		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -481,16 +481,57 @@
 		seed(:)=2
 		call random_seed(put=seed)
 		
+! 		do i=0,ip+1
+! 			do j=0,jp+1
+! 				do k=0,kp+1
+! 					r=random_normal() ! from the Netlib
+! 					if((i >= ipstart) .and. (i <=ipstart+ipp+1) &
+! 						.and. (j >= jpstart) .and. (j <= jpstart+jpp+1) &
+! 						.and. (k >= kpstart) .and. (k <= kpstart+kpp+1) ) then
+! 					
+! 						if ( (z(k-kpstart)>4900._sp) .and. (z(k-kpstart)<5100._sp) ) &
+! 							th(k-kpstart,j-jpstart,i-ipstart) = + r / 30._sp/10._sp
+! 						
+! 
+! 					endif
+! 										
+! 
+! 				enddo
+! 			enddo
+! 		enddo
+		
+! 		do i=0,ip+1
+! 			do j=0,jp+1
+! 				do k=0,kp+1
+! 					call random_number(r)
+! 					if((i >= ipstart) .and. (i <=ipstart+ipp+1) &
+! 						.and. (j >= jpstart) .and. (j <= jpstart+jpp+1) &
+! 						.and. (k >= kpstart) .and. (k <= kpstart+kpp+1) ) then
+! 					
+! 						if ( (z(k-kpstart)>900._sp) .and. (z(k-kpstart)<1100._sp) ) &
+! 							th(k-kpstart,j-jpstart,i-ipstart) = (r-0.5_sp)/100._sp
+! 						
+! 
+! 					endif
+! 										
+! 
+! 				enddo
+! 			enddo
+! 		enddo
+
 		do i=0,ip+1
 			do j=0,jp+1
 				do k=0,kp+1
-					r=random_normal() ! from the Netlib
+				    call random_number(r)
 					if((i >= ipstart) .and. (i <=ipstart+ipp+1) &
 						.and. (j >= jpstart) .and. (j <= jpstart+jpp+1) &
 						.and. (k >= kpstart) .and. (k <= kpstart+kpp+1) ) then
 					
-						if ( (z(k-kpstart)>5000._sp) .and. (z(k-kpstart)<6000._sp) ) &
-							th(k-kpstart,j-jpstart,i-ipstart) = + r / 30._sp
+						if ( (z(k-kpstart)>1500._sp) .and. (z(k-kpstart)<1600._sp) ) &
+							th(k-kpstart,j-jpstart,i-ipstart) = -0.001_sp+(r-0.5_sp)/10._sp
+
+						if ( (z(k-kpstart)>1400._sp) .and. (z(k-kpstart)<1500._sp) ) &
+							th(k-kpstart,j-jpstart,i-ipstart) = 0.001_sp-(r-0.5_sp)/10._sp
 						
 
 					endif
@@ -500,37 +541,52 @@
 			enddo
 		enddo
 		
+!  		do i=1-r_h,ipp+r_h
+!  			do j=1-r_h,jpp+r_h
+!                 do k=0,kpp+1
+!                     v(k,j,i)=1._sp*exp(-((zn(k)-5000._sp)/300._sp)**2)
+!                     if((coords(3)==(dims(3)-1)).and.(k==kpp)) v(k,j,i)=0._sp
+!                     if((coords(3)==0).and.(k<=1)) v(k,j,i)=0._sp
+!                     zv(k,j,i)=v(k,j,i)
+!                     tv(k,j,i)=v(k,j,i)
+!                 enddo
+!             enddo
+!         enddo
+
  		do i=1-r_h,ipp+r_h
  			do j=1-r_h,jpp+r_h
                 do k=0,kpp+1
-                    v(k,j,i)=zn(k)/2000._sp
+                    v(k,j,i)=(0.5_sp*erf((zn(k)-1500._sp)/200._sp)+0.5_sp)*5._sp
+                    if((coords(3)==(dims(3)-1)).and.(k==kpp)) v(k,j,i)=0._sp
+                    if((coords(3)==0).and.(k<=1)) v(k,j,i)=0._sp
                     zv(k,j,i)=v(k,j,i)
                     tv(k,j,i)=v(k,j,i)
                 enddo
             enddo
         enddo
- 		th=0._sp
-		
-		
-		do i=1-r_h,ipp+r_h
-			do j=1-r_h,jpp+r_h
-				do k=1-r_h,kpp+r_h
-					!th(k,j,i)=theta(k)
-				
-					rad = (zn(k)-3000._sp)**2._sp
-						
-					if (ip > 1) rad=rad+xn(i)**2._sp
-					if (jp > 1) rad=rad+yn(j)**2._sp
-					
-					rad=sqrt(rad)
-					if(rad<=1000._sp) then
-						th(k,j,i)=th(k,j,i)+0.1_sp
-					else
-						!th(k,j,i)=0._sp
-					endif
-				enddo
-			enddo
-		enddo
+
+!  		th=0._sp
+! 		
+! 		
+! 		do i=1-r_h,ipp+r_h
+! 			do j=1-r_h,jpp+r_h
+! 				do k=1-r_h,kpp+r_h
+! 					!th(k,j,i)=theta(k)
+! 				
+! 					rad = (zn(k)-3000._sp)**2._sp
+! 						
+! 					if (ip > 1) rad=rad+xn(i)**2._sp
+! 					if (jp > 1) rad=rad+yn(j)**2._sp
+! 					
+! 					rad=sqrt(rad)
+! 					if(rad<=1000._sp) then
+! 						th(k,j,i)=th(k,j,i)-0.1_sp
+! 					else
+! 						!th(k,j,i)=0._sp
+! 					endif
+! 				enddo
+! 			enddo
+! 		enddo
 		deallocate(seed)
 		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!		
 

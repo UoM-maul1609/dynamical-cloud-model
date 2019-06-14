@@ -14,12 +14,13 @@
 	!>@author
 	!>Paul J. Connolly, The University of Manchester
 	!>@brief
-	!>set-up matrix A so that Ax is equivalent to \f$\nabla ^2 x\f$ using finite-diff
+	!>calculate the horizontal averages by doing local sums and a reduction 
+	!> (and a divide by number of grid points)
 	!>@param[in] comm3d,id, dims, coords
-	!>@param[in] dt,dx,dy,dz,dxn,dyn,dzn
-	!>@param[in] ip,jp,kp,halo
-	!>@param[inout] a_e,a_w,a_n,a_s,a_u,a_d,a_p: terms to make up 7-point stencil
-	!>@param[in] su,sv,sw
+	!>@param[in] moisture
+	!>@param[in] ip,jp,ipp,jpp,kpp,l_h,r_h, nq
+	!>@param[inout] ubar,vbar,wbat,thbar,qbar: averages
+	!>@param[in] u,v,w,th,q: full 3d fields
 	subroutine horizontal_means(comm3d,id,dims,coords, moisture, &
 	    ip,jp,ipp,jpp,kpp,l_h,r_h, nq,&
 	    ubar,vbar,wbar,thbar,qbar,u,v,w,th,q)
@@ -112,11 +113,11 @@
 	!>@brief
 	!>divergence calculation
 	!>@param[in] comm3d,id, dims, coords
-	!>@param[in] dx,dy,dz,dxn,dyn,dzn
-	!>@param[in] ipp,jpp,kpp,halo
-	!>@param[inout] div
+	!>@param[in] ipp,jpp,kpp,dx,dxn,dy,dyn,dz,dzn,rhoa,rhoan,l_h,r_h
+	!>@param[in] u,v,w: velocities
+	!>@param[inout] div: divergence
 	subroutine divergence_calc(comm3d,id,dims,coords, &
-	    ipp,jpp,kpp,dx,dxn,dy,dyn,dz,dzn,l_h,r_h,u,v,w,div)
+	    ipp,jpp,kpp,dx,dxn,dy,dyn,dz,dzn,rhoa,rhoan,l_h,r_h,u,v,w,div)
 		use nrtype
 		use mpi
 		use mpi_module
@@ -126,7 +127,7 @@
 		integer(i4b), intent(in) :: ipp,jpp,kpp, l_h,r_h
 		real(sp), dimension(-l_h+1:ipp+r_h), intent(in) :: dx,dxn
 		real(sp), dimension(-l_h+1:jpp+r_h), intent(in) :: dy,dyn
-		real(sp), dimension(-l_h+1:kpp+r_h), intent(in) :: dz,dzn
+		real(sp), dimension(-l_h+1:kpp+r_h), intent(in) :: dz,dzn,rhoa,rhoan
 		real(sp), dimension(-l_h+1:kpp+r_h,-l_h+1:jpp+r_h,-l_h+1:ipp+r_h), &
 			intent(in) :: u,v,w
 		real(sp), dimension(-l_h+1:kpp+r_h,-l_h+1:jpp+r_h,-l_h+1:ipp+r_h), &
@@ -139,9 +140,9 @@
 		do i=1,ipp
 			do j=1,jpp	    
 				do k=1,kpp
-					div(k,j,i)=(u(k,j,i)-u(k,j,i-1))/dx(i-1) + &
-					    (v(k,j,i)-v(k,j-1,i))/dy(j-1) + &
-					    (w(k,j,i)-w(k-1,j,i))/dz(k-1) 
+					div(k,j,i)=rhoan(k)*(u(k,j,i)-u(k,j,i-1))/dx(i-1) + &
+					    rhoan(k)*(v(k,j,i)-v(k,j-1,i))/dy(j-1) + &
+					    (rhoa(k)*w(k,j,i)-rhoa(k-1)*w(k-1,j,i))/dz(k-1) 
 				enddo
 			enddo
 		enddo

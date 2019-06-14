@@ -4,15 +4,17 @@
 	nm1%subgrid_model=2, ! 1 = constant viscosity, 2=smagorinsky
 	nm1%viscous_dissipation=.true.,
 	nm1%damping_layer=.true.,
-	nm1%ptol=1.e-5,         ! tolerance for pressure solver
-	nm1%damping_thickness=2000.,
+	nm1%ptol=1.e-8,         ! tolerance for pressure solver
+	                        ! please note for mass conservation 1.e-8 required
+	                        ! for simulations with dy=200, dz=100, dt=5s
+	nm1%damping_thickness=6000.,
 	nm1%damping_tau=1000.,
 	nm1%z0=1.e-4,
 	nm1%z0th=1.e-4,
 	nm1%restart=.false.,
-	nm1%cvis=0.23, ! 0.23 desireable
-	nm1%runtime= 7200.,
-	nm1%dt=5.,
+	nm1%cvis=0.23, ! 0.23 desirable
+	nm1%runtime= 28800.,
+	nm1%dt=2.5,
 	nm1%advection_scheme=1, ! 0=upstream, 1=mpdata (for scalars with separate ref state),
 	                        ! 2=mpdata (for scalars with ref state added)
 	nm1%monotone=.true.,    ! monotone advection   (for scalars)
@@ -31,6 +33,6 @@
  	nm1%tsurf=297.9,
     nm1%n_levels = 4,
 	nm1%q_read(1,1:4)   = 0.015, 0.0138, 0.0138, 0.0024,
-	nm1%theta_read(1:4) = 297.9, 297.9, 297.9, 312.95, !312.95,
-	nm1%z_read(1:4)     = 0.,740,6260, 6261/ ! 3260
+	nm1%theta_read(1:4) = 297.9, 297.9, 297.9, 307.9, !312.95,
+	nm1%z_read(1:4)     = 0.,740,3260, 3561/ ! 3260
 	
