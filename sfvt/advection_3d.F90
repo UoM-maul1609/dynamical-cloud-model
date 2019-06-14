@@ -7,7 +7,7 @@
     
     private
     public :: mpdata_3d, mpdata_vec_3d, first_order_upstream_3d, adv_ref_state, &
-            mpdata_3d_add
+            mpdata_3d_add,mpdata_vert_3d
     real(sp), parameter :: small=1e-60_sp
     
 	contains
@@ -678,6 +678,385 @@
 	ubc=ubc+minglobal
 	end subroutine mpdata_3d
 	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+
+	
+	
+	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+	! Simple first order upstream scheme -vertical only                                  !
+	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+	!>@author
+	!>Paul J. Connolly, The University of Manchester
+	!>@brief
+	!>perform 1 time-step of 3-d first order upstream method 
+	!>\f$ \frac{\partial \psi}{\partial t} + \nabla \cdot \bar{v} \psi = 0 \f$
+	!>@param[in] dt
+	!>@param[in] dxn,dyn,dzn, rhoa, rhoan
+	!>@param[in] ip,jp,kp,l_h,r_h
+	!>@param[in] u
+	!>@param[in] v
+	!>@param[in] w
+	!>@param[inout] psi
+	!>@param[in] neumann - flag for having neumann condition top and bottom
+	!>@param[in] dims, coords: mpi variables
+	subroutine first_order_upstream_vert_3d(dt,dzn,&
+	                    rhoa,rhoan,ip,jp,kp,l_h,r_h,w,psi,neumann, &
+	                    dims,coords)
+	use nrtype
+	implicit none
+	real(sp), intent(in) :: dt
+	integer(i4b), intent(in) :: ip, jp, kp, l_h, r_h
+	real(sp), dimension(-l_h+1:kp+r_h,-r_h+1:jp+r_h,-r_h+1:ip+r_h), &
+		intent(in) :: w
+	real(sp), dimension(-r_h+1:kp+r_h,-r_h+1:jp+r_h,-r_h+1:ip+r_h), &
+		intent(inout) :: psi
+	real(sp), dimension(-l_h+1:kp+r_h), intent(in) :: dzn, rhoa, rhoan
+	integer(i4b), dimension(3), intent(in) :: dims, coords
+	logical, intent(in) :: neumann
+	
+	! locals
+	real(sp), dimension(kp,jp,ip) :: fz_r, fz_l
+	integer(i4b) :: i,j,k
+
+!$omp simd	
+	do i=1,ip
+		do j=1,jp
+			do k=1,kp
+				fz_r(k,j,i)=( (w(k,j,i)+abs(w(k,j,i)))*rhoan(k)*psi(k,j,i)+ &
+					(w(k,j,i)-abs(w(k,j,i)))*rhoan(k+1)*psi(k+1,j,i) )*dt/ &
+					(2._sp*dzn(k)*rhoa(k))
+		
+				fz_l(k,j,i)=( (w(k-1,j,i)+abs(w(k-1,j,i)))*rhoan(k-1)*psi(k-1,j,i)+ &
+					(w(k-1,j,i)-abs(w(k-1,j,i)))*rhoan(k)*psi(k,j,i) )*dt/ &
+					(2._sp*dzn(k-1)*rhoa(k))
+			enddo
+		enddo
+	enddo
+!$omp end simd
+
+    ! neumann boundary condition top and bottom
+    if(neumann) then
+        if(coords(3)==0) then
+            fz_l(1,:,:)=fz_r(1,:,:)
+        endif
+        if(coords(3)==(dims(3)-1)) then
+            fz_r(kp,:,:)=fz_l(kp,:,:)    
+        endif
+    endif
+    	
+	! could do a loop here and transport
+	psi(1:kp,1:jp,1:ip)=psi(1:kp,1:jp,1:ip)-(fz_r-fz_l)
+	end subroutine first_order_upstream_vert_3d
+	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+	
+
+	
+	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+	! multi-dimensional advection using the smolarkiewicz scheme - vertical only         !
+	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+	!>@author
+	!>Paul J. Connolly, The University of Manchester
+	!>@brief
+	!>advect using 1st order upstream
+	!>then re-advect using 1st order upstream with antidiffusive velocities to
+	!>correct diffusiveness of the 1st order upstream and iterate
+	!>nft option is also coded
+	!>solves the 3-d advection equation:
+	!>\f$ \frac{\partial \psi}{\partial t} + \nabla \cdot \bar{v} \psi = 0 \f$
+	!>@param[in] dt
+	!>@param[in] dz, dzn, rhoa, rhoan
+	!>@param[in] ip,jp,kp,l_h,r_h
+	!>@param[in] u
+	!>@param[in] v
+	!>@param[in] w
+	!>@param[inout] psi
+	!>@param[in] lbc,ubc
+	!>@param[in] kord, monotone: order of MPDATA and whether it is monotone
+	!>@param[in] neumann - flag for having neumann condition top and bottom
+	!>@param[in] comm3d, id, dims, coords: mpi variables
+	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+	subroutine mpdata_vert_3d(dt,dz,dzn,&
+						rhoa,rhoan, &
+						ip,jp,kp,l_h,r_h,w,psi_in,lbc,ubc, &
+						kord,monotone, neumann, comm3d, id, &
+						dims,coords)
+	use nrtype
+	use mpi_module
+	use mpi
+	
+	implicit none
+	
+	
+	integer(i4b), intent(in) :: id, comm3d
+	integer(i4b), dimension(3), intent(in) :: dims, coords
+	real(sp), intent(in) :: dt
+	integer(i4b), intent(in) :: ip, jp, kp, l_h, r_h,kord
+	real(sp), dimension(-l_h+1:kp+r_h,-r_h+1:jp+r_h,-r_h+1:ip+r_h), &
+		intent(in), target :: w
+	real(sp), dimension(-r_h+1:kp+r_h,-r_h+1:jp+r_h,-r_h+1:ip+r_h), &
+		intent(inout), target :: psi_in
+	real(sp), intent(inout) :: lbc, ubc
+	real(sp), dimension(-l_h+1:kp+r_h), intent(in) :: dz, dzn, rhoa, rhoan
+	logical, intent(in) :: monotone, neumann
+	
+	! locals
+	real(sp) :: u_div3, u_j_bar3, &
+			denom1, denom2, minlocal, minglobal, psi_local_sum, psi_sum
+	integer(i4b) :: i,j,k, it, it2, error
+	real(sp), dimension(:,:,:), pointer :: wt
+	real(sp), dimension(:,:,:), pointer :: wt_sav
+	real(sp), dimension(:,:,:), pointer :: psi, psi_old
+	real(sp), dimension(-l_h+1:kp+r_h,-r_h+1:jp+r_h,-r_h+1:ip+r_h), target :: &
+		w_store1, w_store2
+	real(sp), dimension(-r_h+1:kp+r_h,-r_h+1:jp+r_h,-r_h+1:ip+r_h), target :: psi_store
+	real(sp), dimension(-r_h+1:kp+r_h,-r_h+1:jp+r_h,-r_h+1:ip+r_h) :: &
+						psi_k_max,psi_k_min, &
+						beta_k_up, beta_k_down
+	
+
+	! has to be positive definite
+	minlocal=min(minval(psi_in(:,:,:)),lbc,ubc)
+	call mpi_allreduce(minlocal,minglobal,1,MPI_REAL8,MPI_MIN, comm3d,error)
+
+	psi_in=psi_in-minglobal
+	lbc=lbc-minglobal
+	ubc=ubc-minglobal
+	
+	psi_local_sum=sum(psi_in(1:kp,1:jp,1:ip))
+	call MPI_Allreduce(psi_local_sum, psi_sum, 1, MPI_REAL8, MPI_SUM, comm3d, error)
+ 	if(psi_sum.lt.small) then
+ 	    psi_in(:,:,:)=psi_in(:,:,:)+minglobal
+ 	    lbc=lbc+minglobal
+ 	    ubc=ubc+minglobal
+ 	    return
+	endif
+	w_store2=0._sp
+	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+	! associate pointers to targets                                                      !
+	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+	wt => w	
+	wt_sav => w_store1
+	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+	
+
+	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+	! if kord > 1 we need a copy of the scalar field                                     !
+	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+	if (kord > 1) then
+		psi_store = psi_in   ! array copy
+		psi => psi_store	
+	endif
+	psi_old     => psi_in	
+	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+	
+	it2=0
+	do it=1,kord
+		
+		if(it > 1) then
+			it2=it2+1
+!$omp simd	
+			do i=1,ip
+				do j=1,jp
+					do k=1,kp
+						!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+						! calculate the anti-diffusive velocities                        !
+						!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+
+
+
+
+						!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+						! for divergent flow: eq 38 smolarkiewicz 1984 
+						! last part of w wind:
+						u_div3=0._sp
+						!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+
+
+	
+						!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+						! equation 13 page 330 of smolarkiewicz (1984) 
+						! journal of computational physics
+						! second term of w wind:
+						u_j_bar3 = 0._sp
+						!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+
+
+
+						!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+						! last update of equation 13
+						!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+						! w wind:
+						wt_sav(k,j,i)=(abs(wt(k,j,i))*dz(k)-dt*wt(k,j,i)*wt(k,j,i) ) * &
+							(psi_old(k+1,j,i)-psi_old(k,j,i) ) / &
+							(psi_old(k+1,j,i)+psi_old(k,j,i)+small) /dzn(k) - u_j_bar3
+						!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+							
+						!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+						! last update of eq 38 smolarkiewicz 1984
+						!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+						wt_sav(k,j,i)=wt_sav(k,j,i) - 0.25_sp*dt*wt(k,j,i) * &
+						 ( (wt(k+1,j,i)-wt(k-1,j,i))/(dz(k-1))+u_div3 )
+						!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+
+					enddo
+				enddo
+			enddo
+!$omp end simd
+
+			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+			! associate pointers to targets                                              !
+			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+			if(modulo(it2,2).eq.1) then  
+										 
+				wt => w_store1
+				wt_sav => w_store2
+			else if(modulo(it2,2).eq.0) then			
+				wt => w_store2
+				wt_sav => w_store1
+			endif
+			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+			call exchange_along_dim(comm3d, id, kp, jp, ip, l_h,r_h,r_h,r_h,r_h,r_h, &
+														wt,0._sp,0._sp,dims,coords)
+		endif
+		
+		
+		
+        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        ! Non oscillatory forward in time (NFT) flux limiter -                           !
+        ! Smolarkiewicz and Grabowski (1990)                                             !
+        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+		if( (it > 1) .and. monotone) then
+			it2=it2+1
+		
+		
+			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+			! equations 20a and b of Smolarkiewicz and Grabowski (1990, JCP, 86)         !
+			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!$omp simd	
+			do i=1,ip
+				do j=1,jp
+					do k=1,kp			
+						! z direction - note: should the last q in the max/min be q+1?
+						psi_k_max(k,j,i)=max(psi(k-1,j,i),psi(k,j,i),psi(k+1,j,i), &
+									psi_old(k-1,j,i),psi_old(k,j,i),psi_old(k+1,j,i))
+					
+						psi_k_min(k,j,i)=min(psi(k-1,j,i),psi(k,j,i),psi(k+1,j,i), &
+									psi_old(k-1,j,i),psi_old(k,j,i),psi_old(k+1,j,i))
+					enddo
+				enddo
+			enddo
+!$omp end simd
+			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+
+
+
+
+			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+			! Equations 19a and b of Smolarkiewicz and Grabowski (1990, JCP)             !
+			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!$omp simd	
+			do i=1,ip
+				do j=1,jp
+					do k=1,kp		
+						denom1=(dt*((max(wt(k-1,j,i),0._sp)*psi_old(k-1,j,i)-&
+								  min(wt(k,j,i),0._sp)*psi_old(k+1,j,i))/dz(k-1) &
+								  +small))
+								  
+						denom2=(dt*((max(wt(k,j,i),0._sp)*psi_old(k,j,i)-&
+								  min(wt(k-1,j,i),0._sp)*psi_old(k,j,i))/dz(k-1) &
+								  +small))
+								  
+						beta_k_up(k,j,i)=(psi_k_max(k,j,i)-psi_old(k,j,i)) / denom1
+								  
+						beta_k_down(k,j,i)=(psi_old(k,j,i)-psi_k_min(k,j,i)) / denom2
+					enddo
+				enddo
+			enddo 
+!$omp end simd
+			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+
+
+			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+			! exchange halos for beta_i_up, down
+			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+			call exchange_along_dim(comm3d, id, kp, jp, ip, r_h,r_h,r_h,r_h,r_h,r_h, &
+													beta_k_up,0._sp,0._sp,dims,coords)
+			call exchange_along_dim(comm3d, id, kp, jp, ip, r_h,r_h,r_h,r_h,r_h,r_h, &
+													beta_k_down,0._sp,0._sp,dims,coords)
+			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+								
+			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+			! equation 18 of Smolarkiewicz and Grabowski (1990, JCP, 86)                 !
+			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!$omp simd	
+			do i=1,ip
+				do j=1,jp
+					do k=1,kp			
+						wt_sav(k,j,i)=min(1._sp,beta_k_down(k,j,i), &
+										 beta_k_up(k+1,j,i))*max(wt(k,j,i),0._sp) + &
+									  min(1._sp,beta_k_up(k,j,i), &
+									     beta_k_down(k+1,j,i))*min(wt(k,j,i),0._sp)
+					enddo
+				enddo
+			enddo 
+!$omp end simd
+			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+			! associate pointers to targets                                              !
+			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+			wt => w_store2
+			wt_sav => w_store1
+			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+			call exchange_along_dim(comm3d, id, kp, jp, ip, l_h,r_h,r_h,r_h,r_h,r_h, &
+														wt,0._sp,0._sp,dims,coords)
+		endif
+        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+
+
+
+		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+		! advect using first order upwind                                                !
+		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+		call first_order_upstream_vert_3d(dt,dzn,rhoa,rhoan, &
+				ip,jp,kp,l_h,r_h,wt,psi_old,neumann,dims,coords)
+		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+
+		
+		if((it <= kord) .and. (kord >= 1)) then
+			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+			! set halos																	 !
+			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!		
+			call exchange_along_dim(comm3d, id, kp, jp, ip, r_h,r_h,r_h,r_h,r_h,r_h, &
+									psi_old,lbc,ubc,dims,coords)
+			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!			
+		endif		
+ 	enddo
+ 
+
+	! no dangling pointers
+	if (associated(wt) ) nullify(wt)
+	if (associated(wt_sav) ) nullify(wt_sav)
+	if (associated(psi) ) nullify(psi)
+	if (associated(psi_old) ) nullify(psi_old)
+
+	psi_in=psi_in+minglobal
+	lbc=lbc+minglobal
+	ubc=ubc+minglobal
+	end subroutine mpdata_vert_3d
+	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+	
+
+
 	
 	
 	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -690,27 +1069,33 @@
 	!>@param[in] dt
 	!>@param[in] dz, dzn
 	!>@param[in] ip,jp,kp,l_h,r_h
-	!>@param[in] w
+	!>@param[in] u,v,w
 	!>@param[inout] psi_3d
 	!>@param[in] psi_ref
 	!>@param[in] dims, coords: (for the cartesian topology)
 	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-	subroutine adv_ref_state(dt,dz,dzn,&
-						rhoa,rhoan,ip,jp,kp,l_h,r_h,w,psi_3d,psi_ref,dims,coords)
+	subroutine adv_ref_state(dt,dx,dy,dz,dxn,dyn,dzn,&
+						rhoa,rhoan,ip,jp,kp,l_h,r_h,u,v,w,psi_3d,psi_ref, &
+						comm3d,id,dims,coords)
 						
 		implicit none
 		 
+    	integer(i4b), intent(in) :: id, comm3d
 		real(sp), intent(in) :: dt
 		integer(i4b), intent(in) :: ip, jp, kp, l_h, r_h
+		real(sp), dimension(-l_h+1:ip+r_h), intent(in) :: dx,dxn
+		real(sp), dimension(-l_h+1:ip+r_h), intent(in) :: dy,dyn
 		real(sp), dimension(-l_h+1:kp+r_h), intent(in) :: rhoa, rhoan,dz, dzn, psi_ref
-		real(sp), dimension(-l_h+1:kp+r_h,-r_h+1:jp+r_h,-r_h+1:ip+r_h), intent(in) :: w
+		real(sp), dimension(-l_h+1:kp+r_h,-r_h+1:jp+r_h,-r_h+1:ip+r_h), intent(in) :: &
+		    u,v,w
 		real(sp), dimension(-r_h+1:kp+r_h,-r_h+1:jp+r_h,-r_h+1:ip+r_h), &
 							intent(inout) :: psi_3d
 		integer(i4b), dimension(3), intent(in) :: dims, coords
 		! locals:
 		integer(i4b) :: i, j, k
     	real(sp), dimension(kp) :: fz_r, fz_l
-		
+		real(sp), dimension(-r_h+1:kp+r_h,-r_h+1:jp+r_h,-r_h+1:ip+r_h) :: psi_3d_ref
+		real(sp) :: t1=0._sp,t2=0._sp
 		
 ! 		do i=1,ip
 ! 			do j=1,jp
@@ -728,32 +1113,33 @@
 !         enddo
 		
 		! upwind
-		do i=1-r_h,ip+r_h
-			do j=1-r_h,jp+r_h
-				do k=1,kp
-					psi_3d(k,j,i) = psi_3d(k,j,i) &
-								- dt*(0.5_sp/dz(k)*(w(k,j,i)+w(k-1,j,i))* &
-								rhoa(k)*(psi_ref(k+1)-psi_ref(k)))/rhoan(k)
-				enddo
-			enddo
-		enddo
-		
+! 		do i=1-r_h,ip+r_h
+! 			do j=1-r_h,jp+r_h
+! 				do k=1,kp
+! 					psi_3d(k,j,i) = psi_3d(k,j,i) &
+! 								- dt*(0.5_sp/dz(k)*(w(k,j,i)+w(k-1,j,i))* &
+! 								rhoa(k)*(psi_ref(k+1)-psi_ref(k)))/rhoan(k)
+! 				enddo
+! 			enddo
+! 		enddo
+
+
 		
 		! this is basically forward-in-time, centred space version of
 		! dq/dt+d/dz(wq)=0
 		! averages of theta are taken because of the staggered grid
 		! but the FTCS scheme is unconditionally unstable!!?
-! 		do i=1-r_h,ip+r_h
-! 			do j=1-r_h,jp+r_h
-! 				do k=1,kp
-! 					psi_3d(k,j,i) = psi_3d(k,j,i) &
-! 								- dt*(0.5_sp/dz(k-1)*w(k-1,j,i)*&
-! 								rhoa(k-1)*(psi_ref(k)-psi_ref(k-1)) &
-! 									 + 0.5_sp/dz(k)*w(k,j,i)* &
-! 								rhoa(k)*(psi_ref(k+1)-psi_ref(k)))/rhoan(k)
-! 				enddo
-! 			enddo
-! 		enddo
+		do i=1-r_h,ip+r_h
+			do j=1-r_h,jp+r_h
+				do k=1,kp
+					psi_3d(k,j,i) = psi_3d(k,j,i) &
+								- dt*(0.5_sp/dz(k-1)*w(k-1,j,i)*&
+								rhoa(k-1)*(psi_ref(k)-psi_ref(k-1)) &
+									 + 0.5_sp/dz(k)*w(k,j,i)* &
+								rhoa(k)*(psi_ref(k+1)-psi_ref(k)))/rhoan(k)
+				enddo
+			enddo
+		enddo
 		! bit of a fudge, because this method leads to temperature perturbations
 		! at surface
 		!if(coords(3) == 0) psi_3d(1-r_h:1,:,:)=0._sp		
