@@ -107,7 +107,7 @@
 				grid1%lamsq,grid1%lamsqn, &
 				io1%new_file, nm1%outputfile, nm1%output_interval, &
 				nm1%viscous_dissipation, &
-				nm1%advection_scheme, nm1%kord, nm1%monotone)
+				nm1%advection_scheme, nm1%kord, nm1%monotone, nm1%neumann)
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 

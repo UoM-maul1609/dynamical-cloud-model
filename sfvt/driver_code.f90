@@ -28,6 +28,7 @@
 	!>@param[in] output_interval: interval for output (s)
 	!>@param[in] viscous: logical for applying viscous dissipation
 	!>@param[in] advection_scheme, kord, monotone: flags for advection schemes
+	!>@param[in] neumann: boundary condition flag for advection schemes
 	!>@param[in] dims,id, world_process, ring_comm: mpi variables
     subroutine model_driver(ntim,dt,nq,l_h,r_h, &
     			ip,jp,kp, &
@@ -44,7 +45,7 @@
 				coords, &
 				new_file,outputfile, output_interval, &
 				viscous, &
-				advection_scheme, kord, monotone, &
+				advection_scheme, kord, monotone, neumann, &
 				dims,id, world_process, rank, ring_comm)
 		use nrtype
 		use mpi_module, only : exchange_full, exchange_along_dim
@@ -53,7 +54,7 @@
 
 		implicit none
 		logical, intent(inout) :: new_file
-		logical, intent(in) :: viscous, monotone
+		logical, intent(in) :: viscous, monotone, neumann
 		integer(i4b), intent(in) :: ntim,nq,ip,jp,kp, ipp,jpp,kpp, &
 						l_h,r_h, ipstart, jpstart, kpstart, &
 						advection_scheme, kord
@@ -161,20 +162,20 @@
 				case (0)
 				    do n2=1,nq
                         call first_order_upstream_3d(dt,dxn,dyn,dzn,rhoa,rhoan,&
-                            ipp,jpp,kpp,l_h,r_h,u,v,w,q(:,:,:,n2))
+                            ipp,jpp,kpp,l_h,r_h,u,v,w,q(:,:,:,n2),neumann,dims,coords)
                     enddo
 				case (1)
 				    do n2=1,nq
                         call mpdata_3d(dt,dx,dy,dz,dxn,dyn,dzn,rhoa,rhoan,&
                             ipp,jpp,kpp,l_h,r_h,u,v,w,q(:,:,:,n2),lbc(n2),ubc(n2),&
-                            kord,monotone,&
+                            kord,monotone,neumann, &
                             ring_comm,id, &
                             dims,coords)
                     enddo
 				case (2)
 					call mpdata_vec_3d(dt,dx,dy,dz,dxn,dyn,dzn,rhoa,rhoan,&
 						ipp,jpp,kpp,nq,l_h,r_h,u,v,w,q(:,:,:,:),lbc,ubc,kord, &
-						monotone,ring_comm,id, dims,coords)
+						monotone,neumann,ring_comm,id, dims,coords)
 				case default
 					print *,'not coded'
 					stop

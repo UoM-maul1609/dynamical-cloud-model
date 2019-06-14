@@ -249,32 +249,82 @@
 		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 		! set scalar field        														 !
 		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!		
+		call random_seed(size=l)
+		allocate(seed(1:l))
+		seed(:)=2
+		call random_seed(put=seed)
+
         q(:,:,:,:)=0._sp
-        rad=0._sp
-		do i=1-r_h,ipp+r_h
-			do j=1-r_h,jpp+r_h
-				do k=1-r_h,kpp+r_h
-				    
-				    if(kp> 1) rad = (zn(k)-2000._sp)**2._sp
-						
-					if (ip > 1) rad=rad+xn(i)**2._sp
-					if (jp > 1) rad=rad+2._sp*yn(j)**2._sp
+!         rad=0._sp
+! 		do i=1-r_h,ipp+r_h
+! 			do j=1-r_h,jpp+r_h
+! 				do k=1-r_h,kpp+r_h
+! 				    
+! 				    if(kp> 1) rad = (zn(k)-2000._sp)**2._sp
+! 						
+! 					if (ip > 1) rad=rad+xn(i)**2._sp
+! 					if (jp > 1) rad=rad+2._sp*yn(j)**2._sp
+! 					
+! 					rad=sqrt(rad)
+! 					if(rad<=1000._sp) then
+! 						q(k,j,i,1)=q(k,j,i,1)+0.1_sp
+!                         q(k,j,i,2)=q(k,j,i,1)*2._sp
+!                         q(k,j,i,3)=q(k,j,i,1)*3._sp
+!                         q(k,j,i,4)=q(k,j,i,1)*4._sp
+!                         q(k,j,i,5)=q(k,j,i,1)*5._sp
+!                         q(k,j,i,6)=q(k,j,i,1)*6._sp
+!                         q(k,j,i,7)=q(k,j,i,1)*7._sp
+!                         q(k,j,i,8)=q(k,j,i,1)*8._sp
+!                         q(k,j,i,9)=q(k,j,i,1)*9._sp
+! 					endif
+! 				enddo
+! 			enddo
+! 		enddo
+! 
+		do i=1-l_h,ipp+r_h
+			do j=1-l_h,jpp+r_h
+				do k=1-l_h,kpp+r_h
+				    r=random_normal() ! from the Netlib
+					if((i >= ipstart) .and. (i <=ipstart+ipp+1) &
+						.and. (j >= jpstart) .and. (j <= jpstart+jpp+1) &
+						.and. (k >= kpstart) .and. (k <= kpstart+kpp+1) ) then
 					
-					rad=sqrt(rad)
-					if(rad<=1000._sp) then
-						q(k,j,i,1)=q(k,j,i,1)+0.1_sp
-                        q(k,j,i,2)=q(k,j,i,1)*2._sp
-                        q(k,j,i,3)=q(k,j,i,1)*3._sp
-                        q(k,j,i,4)=q(k,j,i,1)*4._sp
-                        q(k,j,i,5)=q(k,j,i,1)*5._sp
-                        q(k,j,i,6)=q(k,j,i,1)*6._sp
-                        q(k,j,i,7)=q(k,j,i,1)*7._sp
-                        q(k,j,i,8)=q(k,j,i,1)*8._sp
-                        q(k,j,i,9)=q(k,j,i,1)*9._sp
+				    
+                        if(kp> 1) rad = (zn(k-kpstart)-2000._sp)**2._sp
+                        
+                        if (ip > 1) rad=rad+xn(i-ipstart)**2._sp
+                        if (jp > 1) rad=rad+2._sp*yn(j-jpstart)**2._sp
+
+                        rad=sqrt(rad)
+                        if(rad<=1000._sp) then
+                            q(k-kpstart,j-jpstart,i-ipstart,1)= &
+                                q(k-kpstart,j-jpstart,i-ipstart,1)+r/30._sp
+                            q(k-kpstart,j-jpstart,i-ipstart,2)= &
+                                q(k-kpstart,j-jpstart,i-ipstart,1)*2._sp
+                            q(k-kpstart,j-jpstart,i-ipstart,3)= &
+                                q(k-kpstart,j-jpstart,i-ipstart,1)*3._sp
+                            q(k-kpstart,j-jpstart,i-ipstart,4)= &
+                                q(k-kpstart,j-jpstart,i-ipstart,1)*4._sp
+                            q(k-kpstart,j-jpstart,i-ipstart,5)= &
+                                q(k-kpstart,j-jpstart,i-ipstart,1)*5._sp
+                            q(k-kpstart,j-jpstart,i-ipstart,6)= &
+                                q(k-kpstart,j-jpstart,i-ipstart,1)*6._sp
+                            q(k-kpstart,j-jpstart,i-ipstart,7)= &
+                                q(k-kpstart,j-jpstart,i-ipstart,1)*7._sp
+                            q(k-kpstart,j-jpstart,i-ipstart,8)= &
+                                q(k-kpstart,j-jpstart,i-ipstart,1)*8._sp
+                            q(k-kpstart,j-jpstart,i-ipstart,9)= &
+                                q(k-kpstart,j-jpstart,i-ipstart,1)*9._sp
+                        endif
+						
+
 					endif
+										
+
 				enddo
 			enddo
 		enddo
+		deallocate(seed)
 		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!		
 
 

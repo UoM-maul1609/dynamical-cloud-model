@@ -26,6 +26,7 @@
 	!>@param[in] output_interval: interval for output (s)
 	!>@param[in] viscous: logical for applying viscous dissipation
 	!>@param[in] advection_scheme, kord, monotone: flags for advection schemes
+	!>@param[in] neumann: boundary condition flag for advection schemes
     subroutine model_driver_2d(ntim,dt,nq,l_h,r_h, &
     			ip,kp, &
     			ipp,kpp, &
@@ -39,14 +40,14 @@
 				lamsq,lamsqn, &
 				new_file,outputfile, output_interval, &
 				viscous, &
-				advection_scheme, kord, monotone)
+				advection_scheme, kord, monotone,neumann)
 		use nrtype
 		use advection_s_2d, only : first_order_upstream_2d, mpdata_2d, &
 		                    mpdata_vec_2d
 
 		implicit none
 		logical, intent(inout) :: new_file
-		logical, intent(in) :: viscous, monotone
+		logical, intent(in) :: viscous, monotone, neumann
 		integer(i4b), intent(in) :: ntim,nq,ip,kp, ipp,kpp, &
 						l_h,r_h, ipstart, kpstart, &
 						advection_scheme, kord
@@ -139,17 +140,17 @@
 				case (0)
 				    do n2=1,nq
                         call first_order_upstream_2d(dt,dxn,dzn,rhoa,rhoan, &
-                            ipp,kpp,l_h,r_h,u,w,q(:,:,n2))
+                            ipp,kpp,l_h,r_h,u,w,q(:,:,n2),neumann)
                     enddo
 				case (1)
 				    do n2=1,nq
                         call mpdata_2d(dt,dx,dz,dxn,dzn,rhoa,rhoan, &
-                            ipp,kpp,l_h,r_h,u,w,q(:,:,n2),kord,monotone)
+                            ipp,kpp,l_h,r_h,u,w,q(:,:,n2),kord,monotone,neumann)
                     enddo
 				case (2)
 					call mpdata_vec_2d(dt,dx,dz,dxn,dzn,rhoa,rhoan, &
 						ipp,kpp,nq,l_h,r_h,u,w,q(:,:,:),kord, &
-						monotone)
+						monotone,neumann)
 				case default
 					print *,'not coded'
 					stop
@@ -221,6 +222,7 @@
 	!>@param[in] output_interval: interval for output (s)
 	!>@param[in] viscous: logical for applying viscous dissipation
 	!>@param[in] advection_scheme, kord, monotone: flags for advection schemes
+	!>@param[in] neumann: boundary condition flag for advection schemes
     subroutine model_driver(ntim,dt,nq,l_h,r_h, &
     			kp, &
     			kpp, &
@@ -234,14 +236,14 @@
 				lamsq,lamsqn, &
 				new_file,outputfile, output_interval, &
 				viscous, &
-				advection_scheme, kord, monotone)
+				advection_scheme, kord, monotone, neumann)
 		use nrtype
 		use advection_s_1d, only : first_order_upstream_1d, mpdata_1d, &
 		                    mpdata_vec_1d
 
 		implicit none
 		logical, intent(inout) :: new_file
-		logical, intent(in) :: viscous, monotone
+		logical, intent(in) :: viscous, monotone, neumann
 		integer(i4b), intent(in) :: ntim,nq,kp, kpp, &
 						l_h,r_h, kpstart, &
 						advection_scheme, kord
@@ -316,17 +318,17 @@
 				case (0)
 				    do n2=1,nq
                         call first_order_upstream_1d(dt,dzn,rhoa,rhoan, &
-                            kpp,l_h,r_h,w,q(:,n2))
+                            kpp,l_h,r_h,w,q(:,n2), neumann)
                     enddo
 				case (1)
 				    do n2=1,nq
                         call mpdata_1d(dt,dz,dzn,rhoa,rhoan, &
-                            kpp,l_h,r_h,w,q(:,n2),kord,monotone,0)
+                            kpp,l_h,r_h,w,q(:,n2),kord,monotone,neumann,0)
                     enddo
 				case (2)
 					call mpdata_vec_1d(dt,dz,dzn,rhoa,rhoan, &
 						kpp,nq,l_h,r_h,w,q(:,1:nq),kord, &
-						monotone)
+						monotone,neumann)
 				case default
 					print *,'not coded'
 					stop

@@ -23,7 +23,8 @@
 	!>@param[in] kp,l_h,r_h
 	!>@param[in] w
 	!>@param[inout] psi
-	subroutine first_order_upstream_1d(dt,dzn,rhoa,rhoan, kp,l_h,r_h,w,psi)
+	!>@param[in] neumann: boundary condition flag for advection schemes
+	subroutine first_order_upstream_1d(dt,dzn,rhoa,rhoan, kp,l_h,r_h,w,psi,neumann)
 	use nrtype
 	implicit none
 	real(sp), intent(in) :: dt
@@ -33,6 +34,7 @@
 	real(sp), dimension(-r_h+1:kp+r_h), &
 		intent(inout) :: psi
 	real(sp), dimension(-l_h+1:kp+r_h), intent(in) :: dzn, rhoa, rhoan
+	logical, intent(in) :: neumann
 	
 	! locals
 	real(sp), dimension(kp) :: fz_r, fz_l
@@ -50,6 +52,12 @@
     enddo
 !$omp end simd
 	
+    ! neumann boundary condition top and bottom
+    if(neumann) then
+        fz_l(1)=fz_r(1)
+        fz_r(kp)=fz_l(kp)    
+    endif
+
 	! could do a loop here and transport
 	psi(1:kp)=psi(1:kp)-(fz_r-fz_l)
 	end subroutine first_order_upstream_1d
@@ -75,17 +83,19 @@
 	!>@param[in] w
 	!>@param[inout] psi
 	!>@param[in] kord, monotone: order of MPDATA and whether it is monotone
+	!>@param[in] neumann: boundary condition flag for advection schemes
 	!>@param[in] boundary_cond
 	!>@param[in] comm3d, id, dims, coords: mpi variables
 	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 #ifdef MPI
 	subroutine mpdata_1d(dt,dz,dzn,&
-						rhoa,rhoan,kp,l_h,r_h,w,psi_in,kord,monotone, &
+						rhoa,rhoan,kp,l_h,r_h,w,psi_in,kord,monotone,neumann, &
 						boundary_cond,comm3d, id, &
 						dims,coords)
 #else
 	subroutine mpdata_1d(dt,dz,dzn,&
-						rhoa,rhoan,kp,l_h,r_h,w,psi_in,kord,monotone, boundary_cond)
+						rhoa,rhoan,kp,l_h,r_h,w,psi_in,kord,monotone, neumann, &
+						boundary_cond)
 #endif
 	use nrtype
 #ifdef MPI
@@ -105,7 +115,7 @@
 	real(sp), dimension(-r_h+1:kp+r_h), &
 		intent(inout), target :: psi_in
 	real(sp), dimension(-l_h+1:kp+r_h), intent(in) :: dz, dzn, rhoa,rhoan
-	logical :: monotone
+	logical, intent(in) :: monotone, neumann
 	integer(i4b), intent(in) :: boundary_cond
 	
 	! locals
@@ -351,7 +361,7 @@
 		! advect using first order upwind                                                !
 		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 		call first_order_upstream_1d(dt,dzn,rhoa,rhoan,&
-				kp,l_h,r_h,wt,psi_old)
+				kp,l_h,r_h,wt,psi_old,neumann)
 		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 
@@ -415,15 +425,16 @@
 	!>@param[in] w
 	!>@param[inout] psi
 	!>@param[in] kord, monotone: order of MPDATA and whether it is monotone
+	!>@param[in] neumann: boundary condition flag for advection schemes
 	!>@param[in] comm3d, id, dims, coords: mpi variables
 	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 #ifdef MPI
 	subroutine mpdata_vec_1d(dt,dz,dzn,&
 						rhoa,rhoan,kp,nq,l_h,r_h,w,psi_in,kord,monotone, comm3d, id, &
-						dims,coords)
+						neumann,dims,coords)
 #else
 	subroutine mpdata_vec_1d(dt,dz,dzn,&
-						rhoa,rhoan,kp,nq,l_h,r_h,w,psi_in,kord,monotone)
+						rhoa,rhoan,kp,nq,l_h,r_h,w,psi_in,kord,monotone,neumann)
 #endif
 	use nrtype
 #ifdef MPI
@@ -443,7 +454,7 @@
 	real(sp), dimension(-r_h+1:kp+r_h,1:nq), &
 		intent(inout), target :: psi_in
 	real(sp), dimension(-l_h+1:kp+r_h), intent(in) :: dz, dzn, rhoa, rhoan
-	logical :: monotone
+	logical, intent(in) :: monotone,neumann
 	
 	! locals
 	real(sp) :: u_div3, u_j_bar3, &
@@ -692,7 +703,7 @@
 		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 		do n=1,nq
             call first_order_upstream_1d(dt,dzn,rhoa,rhoan,&
-                    kp,l_h,r_h,wt,psi_in(:,n))
+                    kp,l_h,r_h,wt,psi_in(:,n),neumann)
             if((it <= kord) .and. (kord >= 1)) then
                 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
                 ! set halos													    		 !

@@ -10,6 +10,7 @@
 	nm1%dt=5.,
 	nm1%advection_scheme=2, ! 0=upstream, 1=mpdata , 2=mpdata v-flux (for scalars)
 	nm1%monotone=.true.,    ! monotone advection   (for scalars)
+	nm1%neumann=.true.,     ! neumann condition top and bottom
 	nm1%kord=3,    			! order for mpdata advection scheme
 	nm1%output_interval=10.,
 	nm1%ip=100,
