@@ -186,7 +186,7 @@
 				nm1%moisture, nm1%damping_layer, &
 				nm1%nq, &
 				mp1%dims,mp1%id, world_process, mp1%rank, mp1%ring_comm, &
-				mp1%sub_horiz_comm)
+				mp1%sub_horiz_comm,mp1%sub_comm)
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 

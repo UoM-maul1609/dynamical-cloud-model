@@ -43,6 +43,7 @@
 	!>@param[in] damping_layer: flag for damping layer
 	!>@param[in] nq: number of q-variables
 	!>@param[in] dims,id, world_process, ring_comm, sub_horiz_comm: mpi variables
+	!>@param[in] sub_vert_comm: mpi variables
     subroutine model_driver(ntim,dt,l_h,r_h, &
     			ip,jp,kp, &
     			ipp,jpp,kpp, &
@@ -68,12 +69,13 @@
 				viscous, &
 				advection_scheme, kord, monotone, &
 				moisture, damping_layer,nq, &
-				dims,id, world_process, rank, ring_comm,sub_horiz_comm)
+				dims,id, world_process, rank, ring_comm,sub_horiz_comm,sub_vert_comm)
 		use nrtype
 		use mpi_module, only : exchange_full, exchange_along_dim
 		!use advection_3d, only : first_order_upstream_3d, mpdata_3d, adv_ref_state
         use advection_s_3d, only : first_order_upstream_3d, &
-                    mpdata_3d, mpdata_vec_3d, adv_ref_state, mpdata_3d_add
+                    mpdata_3d, mpdata_vec_3d, adv_ref_state, mpdata_3d_add, &
+                    mpdata_vert_3d
 		use d_solver, only : bicgstab, sources, advance_momentum
 		use subgrid_3d, only : advance_scalar_fields_3d
         use diagnostics
@@ -84,7 +86,8 @@
 		integer(i4b), intent(in) :: ntim,ip,jp,kp, ipp,jpp,kpp, &
 						l_h,r_h, ipstart, jpstart, kpstart, &
 						advection_scheme, kord, nq
-		integer(i4b), intent(in) :: id, world_process, ring_comm, sub_horiz_comm,rank
+		integer(i4b), intent(in) :: id, world_process, ring_comm, sub_horiz_comm, &
+		    sub_vert_comm,rank
 		integer(i4b), dimension(3), intent(in) :: coords, dims
 		character (len=*), intent(in) :: outputfile
 		real(sp), intent(in) :: output_interval, dt, z0,z0th, ptol
@@ -278,8 +281,8 @@
                 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
                 ! advect the reference state	     									 !
                 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!		
-                call adv_ref_state(dt,dz,dzn,rhoa,rhoan,ipp,jpp,kpp,l_h,r_h,w,th,thetan, &
-                                    dims,coords)
+                call adv_ref_state(dt,dx,dy,dz,dxn,dyn,dzn,rhoa,rhoan,ipp,jpp,kpp,l_h,r_h, &
+                            u,v,w,th,thetan,ring_comm,id,dims,coords)
                 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
                 
 

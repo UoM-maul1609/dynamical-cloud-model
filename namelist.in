@@ -8,13 +8,13 @@
 	                        ! please note for mass conservation 1.e-8 required
 	                        ! for simulations with dy=200, dz=100, dt=5s
 	nm1%damping_thickness=6000.,
-	nm1%damping_tau=1000.,
+	nm1%damping_tau=1500.,
 	nm1%z0=1.e-4,
 	nm1%z0th=1.e-4,
 	nm1%restart=.false.,
 	nm1%cvis=0.23, ! 0.23 desirable
 	nm1%runtime= 28800.,
-	nm1%dt=2.5,
+	nm1%dt=1.,
 	nm1%advection_scheme=1, ! 0=upstream, 1=mpdata (for scalars with separate ref state),
 	                        ! 2=mpdata (for scalars with ref state added)
 	nm1%monotone=.true.,    ! monotone advection   (for scalars)
