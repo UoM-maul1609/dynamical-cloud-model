@@ -4,8 +4,7 @@
 	nm1%subgrid_model=2, ! 1 = constant viscosity, 2=smagorinsky
 	nm1%viscous_dissipation=.true.,
 	nm1%restart=.false.,
-	nm1%cvis=0.1, ! usually between 0.1 and 0.2 - think LEM has factor of 2 higher because
-	              ! of definition of Sij
+	nm1%cvis=0.23, ! desirable
 	nm1%z0=1.e-1, ! roughness length for momentum (m)
 	nm1%z0th=1.e-1, ! roughness length for scalars (m)
 	nm1%runtime= 14400.,
