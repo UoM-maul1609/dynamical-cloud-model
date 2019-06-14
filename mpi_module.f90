@@ -460,7 +460,7 @@
 		if ( mp1%face%s_east /= id ) then 
 			call MPI_Issend(array(1:kpp,1:jpp,ipp+1-w_h:ipp), &
 				(jpp*kpp)*w_h, MPI_REAL8, mp1%face%s_east, &
-				tag1, comm3d, request,error)
+				tag1, comm3d, request(1),error)
 		endif
 
 		! receive from the east of the west cell:

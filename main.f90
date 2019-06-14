@@ -153,7 +153,7 @@
 				grid3%coords, &
 				io1%new_file, nm1%outputfile, nm1%output_interval, &
 				nm1%viscous_dissipation, &
-				nm1%advection_scheme, nm1%kord, nm1%monotone, &
+				nm1%advection_scheme, nm1%kord, nm1%monotone, nm1%neumann,&
 				mp1%dims,mp1%id, world_process, mp1%rank, mp1%ring_comm)
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 

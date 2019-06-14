@@ -26,8 +26,11 @@
 	!>@param[in] v
 	!>@param[in] w
 	!>@param[inout] psi
+	!>@param[in] neumann - flag for having neumann condition top and bottom
+	!>@param[in] dims, coords: mpi variables
 	subroutine first_order_upstream_3d(dt,dxn,dyn,dzn,&
-	                    rhoa,rhoan,ip,jp,kp,l_h,r_h,u,v,w,psi)
+	                    rhoa,rhoan,ip,jp,kp,l_h,r_h,u,v,w,psi,neumann, &
+	                    dims,coords)
 	use nrtype
 	implicit none
 	real(sp), intent(in) :: dt
@@ -43,6 +46,8 @@
 	real(sp), dimension(-l_h+1:ip+r_h), intent(in) :: dxn
 	real(sp), dimension(-l_h+1:jp+r_h), intent(in) :: dyn
 	real(sp), dimension(-l_h+1:kp+r_h), intent(in) :: dzn, rhoa, rhoan
+	integer(i4b), dimension(3), intent(in) :: dims, coords
+	logical, intent(in) :: neumann
 	
 	! locals
 	real(sp), dimension(kp,jp,ip) :: fx_r, fx_l, fy_r, fy_l, fz_r, fz_l
@@ -80,7 +85,17 @@
 		enddo
 	enddo
 !$omp end simd
-	
+
+    ! neumann boundary condition top and bottom
+    if(neumann) then
+        if(coords(3)==0) then
+            fz_l(1,:,:)=fz_r(1,:,:)
+        endif
+        if(coords(3)==(dims(3)-1)) then
+            fz_r(kp,:,:)=fz_l(kp,:,:)    
+        endif
+    endif
+    	
 	! could do a loop here and transport
 	psi(1:kp,1:jp,1:ip)=psi(1:kp,1:jp,1:ip)-(fx_r-fx_l)-(fy_r-fy_l)-(fz_r-fz_l)
 	end subroutine first_order_upstream_3d
@@ -103,12 +118,13 @@
 	!>@param[in] psi_1d
 	!>@param[in] lbc,ubc
 	!>@param[in] kord, monotone: order of MPDATA and whether it is monotone
+	!>@param[in] neumann - flag for having neumann condition top and bottom
 	!>@param[in] comm3d, id, dims, coords: mpi variables
 	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 	subroutine mpdata_3d_add(dt,dx,dy,dz,dxn,dyn,dzn,&
 						rhoa,rhoan, &
 						ip,jp,kp,l_h,r_h,u,v,w,psi_in,psi_1d,lbc,ubc, &
-						kord,monotone, comm3d, id, &
+						kord,monotone, neumann, comm3d, id, &
 						dims,coords)
 	use nrtype
 	use mpi_module
@@ -134,7 +150,7 @@
 	real(sp), dimension(-l_h+1:ip+r_h), intent(in) :: dx, dxn
 	real(sp), dimension(-l_h+1:jp+r_h), intent(in) :: dy, dyn
 	real(sp), dimension(-l_h+1:kp+r_h), intent(in) :: dz, dzn, rhoa, rhoan
-	logical :: monotone
+	logical, intent(in) :: monotone,neumann
 	
 	! locals
 	integer(i4b) :: k
@@ -147,7 +163,7 @@
 	! call advection routine
     call mpdata_3d(dt,dx,dy,dz,dxn,dyn,dzn,rhoa,rhoan, &
         ip,jp,kp,l_h,r_h,u,v,w,psi_in,lbc,ubc, &
-        kord,monotone,comm3d,id, &
+        kord,monotone,neumann,comm3d,id, &
         dims,coords)
 	
 	! subtract 1d array
@@ -181,12 +197,13 @@
 	!>@param[inout] psi
 	!>@param[in] lbc,ubc
 	!>@param[in] kord, monotone: order of MPDATA and whether it is monotone
+	!>@param[in] neumann - flag for having neumann condition top and bottom
 	!>@param[in] comm3d, id, dims, coords: mpi variables
 	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 	subroutine mpdata_3d(dt,dx,dy,dz,dxn,dyn,dzn,&
 						rhoa,rhoan, &
 						ip,jp,kp,l_h,r_h,u,v,w,psi_in,lbc,ubc, &
-						kord,monotone, comm3d, id, &
+						kord,monotone, neumann, comm3d, id, &
 						dims,coords)
 	use nrtype
 	use mpi_module
@@ -211,7 +228,7 @@
 	real(sp), dimension(-l_h+1:ip+r_h), intent(in) :: dx, dxn
 	real(sp), dimension(-l_h+1:jp+r_h), intent(in) :: dy, dyn
 	real(sp), dimension(-l_h+1:kp+r_h), intent(in) :: dz, dzn, rhoa, rhoan
-	logical :: monotone
+	logical, intent(in) :: monotone, neumann
 	
 	! locals
 	real(sp) :: u_div1, u_div2, u_div3, u_j_bar1, u_j_bar2, u_j_bar3, &
@@ -239,7 +256,7 @@
 	
 
 	! has to be positive definite
-	minlocal=min(minval(psi_in(1:kp,1:jp,1:ip)),lbc,ubc)
+	minlocal=min(minval(psi_in(:,:,:)),lbc,ubc)
 	call mpi_allreduce(minlocal,minglobal,1,MPI_REAL8,MPI_MIN, comm3d,error)
 
 	psi_in=psi_in-minglobal
@@ -620,7 +637,6 @@
 														vt,0._sp,0._sp,dims,coords)
 			call exchange_full(comm3d, id, kp, jp, ip, l_h,r_h,r_h,r_h,r_h,r_h, &
 														wt,0._sp,0._sp,dims,coords)
-
 		endif
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
@@ -631,7 +647,7 @@
 		! advect using first order upwind                                                !
 		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 		call first_order_upstream_3d(dt,dxn,dyn,dzn,rhoa,rhoan, &
-				ip,jp,kp,l_h,r_h,ut,vt,wt,psi_old)
+				ip,jp,kp,l_h,r_h,ut,vt,wt,psi_old,neumann,dims,coords)
 		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 
@@ -693,18 +709,51 @@
 		integer(i4b), dimension(3), intent(in) :: dims, coords
 		! locals:
 		integer(i4b) :: i, j, k
+    	real(sp), dimension(kp) :: fz_r, fz_l
 		
+		
+! 		do i=1,ip
+! 			do j=1,jp
+! 				do k=1,kp
+!                     fz_r(k)=( (w(k,j,i)+abs(w(k,j,i)))*rhoan(k)*psi_ref(k)+ &
+!                         (w(k,j,i)-abs(w(k,j,i)))*rhoan(k+1)*psi_ref(k+1) )*dt/ &
+!                         (2._sp*dzn(k)*rhoa(k))
+!         
+!                     fz_l(k)=( (w(k-1,j,i)+abs(w(k-1,j,i)))*rhoan(k-1)*psi_ref(k-1)+ &
+!                         (w(k-1,j,i)-abs(w(k-1,j,i)))*rhoan(k)*psi_ref(k) )*dt/ &
+!                         (2._sp*dzn(k-1)*rhoa(k))
+!                 enddo
+!                 psi_3d(1:kp,j,i)=psi_3d(1:kp,j,i)-(fz_r-fz_l)
+!             enddo
+!         enddo
+		
+		! upwind
 		do i=1-r_h,ip+r_h
 			do j=1-r_h,jp+r_h
 				do k=1,kp
 					psi_3d(k,j,i) = psi_3d(k,j,i) &
-								- dt*(0.5_sp/dz(k-1)*w(k-1,j,i)*&
-								rhoa(k-1)*(psi_ref(k)-psi_ref(k-1)) &
-									 + 0.5_sp/dz(k)*w(k,j,i)* &
+								- dt*(0.5_sp/dz(k)*(w(k,j,i)+w(k-1,j,i))* &
 								rhoa(k)*(psi_ref(k+1)-psi_ref(k)))/rhoan(k)
 				enddo
 			enddo
 		enddo
+		
+		
+		! this is basically forward-in-time, centred space version of
+		! dq/dt+d/dz(wq)=0
+		! averages of theta are taken because of the staggered grid
+		! but the FTCS scheme is unconditionally unstable!!?
+! 		do i=1-r_h,ip+r_h
+! 			do j=1-r_h,jp+r_h
+! 				do k=1,kp
+! 					psi_3d(k,j,i) = psi_3d(k,j,i) &
+! 								- dt*(0.5_sp/dz(k-1)*w(k-1,j,i)*&
+! 								rhoa(k-1)*(psi_ref(k)-psi_ref(k-1)) &
+! 									 + 0.5_sp/dz(k)*w(k,j,i)* &
+! 								rhoa(k)*(psi_ref(k+1)-psi_ref(k)))/rhoan(k)
+! 				enddo
+! 			enddo
+! 		enddo
 		! bit of a fudge, because this method leads to temperature perturbations
 		! at surface
 		!if(coords(3) == 0) psi_3d(1-r_h:1,:,:)=0._sp		
@@ -738,12 +787,13 @@
 	!>@param[inout] psi
 	!>@param[in] lbc,ubc
 	!>@param[in] kord, monotone: order of MPDATA and whether it is monotone
+	!>@param[in] neumann - flag for having neumann condition top and bottom
 	!>@param[in] comm3d, id, dims, coords: mpi variables
 	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 	subroutine mpdata_vec_3d(dt,dx,dy,dz,dxn,dyn,dzn,&
 						rhoa,rhoan, &
 						ip,jp,kp,nq,l_h,r_h,u,v,w,psi_in,lbc,ubc, &
-						kord,monotone, comm3d, id, &
+						kord,monotone, neumann,comm3d, id, &
 						dims,coords)
 	use nrtype
 	use mpi_module
@@ -768,7 +818,7 @@
 	real(sp), dimension(-l_h+1:ip+r_h), intent(in) :: dx, dxn
 	real(sp), dimension(-l_h+1:jp+r_h), intent(in) :: dy, dyn
 	real(sp), dimension(-l_h+1:kp+r_h), intent(in) :: dz, dzn, rhoa, rhoan
-	logical :: monotone
+	logical, intent(in) :: monotone, neumann
 	
 	! locals
 	real(sp) :: u_div1, u_div2, u_div3, u_j_bar1, u_j_bar2, u_j_bar3, &
@@ -1196,7 +1246,7 @@
 		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 		do n=1,nq
             call first_order_upstream_3d(dt,dxn,dyn,dzn,rhoa,rhoan, &
-                    ip,jp,kp,l_h,r_h,ut,vt,wt,psi_in(:,:,:,n))
+                    ip,jp,kp,l_h,r_h,ut,vt,wt,psi_in(:,:,:,n),neumann,dims,coords)
             if((it <= kord) .and. (kord >= 1)) then
                 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
                 ! set halos																 !
