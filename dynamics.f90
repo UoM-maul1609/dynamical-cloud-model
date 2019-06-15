@@ -417,11 +417,16 @@
 			stop
 		endif
 		
-! 		if(coords(3)==(dims(3)-1)) then
-! 		    x(kp+1,:,:)=x(kp,:,:)+dzn(kp)*sw(kp,:,:)+dzn(kp)*rhoa(kp)/(2._sp*dt) * &
-! 		        (zw(kp,:,:)+zw(kp-1,:,:)+&
-! 		        2._sp*dt/rhoa(kp-1)*(sw(kp-1,:,:)+(x(kp-1,:,:)-x(kp,:,:))/dzn(kp-1)))
-! 		endif
+		if(coords(3)==(dims(3)-1)) then
+		    x(kp+1,:,:)=x(kp,:,:)+dzn(kp)*sw(kp,:,:)+dzn(kp)*rhoa(kp)/(2._sp*dt) * &
+		        (zw(kp,:,:)+zw(kp-1,:,:)+&
+		        2._sp*dt/rhoa(kp-1)*(sw(kp-1,:,:)+(x(kp-1,:,:)-x(kp,:,:))/dzn(kp-1)))
+		endif
+		if(coords(3)==0) then
+		    x(0,:,:)=x(1,:,:)-dzn(0)*sw(0,:,:)-dzn(0)*rhoa(0)/(2._sp*dt) * &
+		        (zw(1,:,:)+zw(0,:,:)+&
+		        2._sp*dt/rhoa(1)*(sw(1,:,:)+(x(1,:,:)-x(2,:,:))/dzn(1)))
+		endif
 
 	end subroutine bicgstab
 	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -667,6 +672,19 @@
                                         su,sv,sw,sth,sq, &
                                         moisture, &
                                         comm3d,id,dims,coords)
+                                   
+            ! vertical diffusion of reference state - is this the wrong sign in the LEM?     
+!             do i=1,ip
+!                 do j=1,jp
+!                     do k=2-l_h,kp
+!                         sth(k,j,i)=sth(k,j,i)- &
+!                             (vist(k,j,i)*(theta(k+1)-theta(k))*rhoa(k)/rhoan(k)/(dz(k-1)*dzn(k))  - &
+!                             vist(k-1,j,i)*(theta(k)-theta(k-1))*rhoa(k-1)/rhoan(k)/(dz(k-1)*dzn(k-1)))
+!                     enddo
+!                 enddo
+!             enddo		
+!             call exchange_full(comm3d, id, kp, jp, ip, r_h,r_h,r_h,r_h,l_h,r_h,sth,&
+!                 0._sp,0._sp,dims,coords)		
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 		else
             ! full exchange    
@@ -698,11 +716,9 @@
 							 ( sv(k,j,i)-sv(k,j-1,i) )/ dy(j-1) + &
 							 ( sw(k,j,i)-sw(k-1,j,i) )/ dz(k-1) )
 				enddo
-! 				if(coords(3)==0) then
-!                     rhs(1,j,i)=( ( su(1,j,i)-su(1,j,i-1) )/ dx(i-1) + &
-!                                  ( sv(1,j,i)-sv(1,j-1,i) )/ dy(j-1) + &
-!                                  ( 2._sp*sw(1,j,i) )/ dz(0) )
-!                 endif
+				if(coords(3)==0) then
+                    rhs(0,j,i)=rhs(1,j,i)
+                endif
 			enddo
 		enddo
 !$omp end simd	

@@ -323,6 +323,8 @@
 		wbar=0._sp	
 		thbar=0._sp	
 		qbar=0._sp	
+		div=0._sp
+		th=0._sp
 		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -475,7 +477,7 @@
 
 		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 		! calculate and add noise														 !
-		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!		
+		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!	
 		call random_seed(size=l)
 		allocate(seed(1:l))
 		seed(:)=2
@@ -519,28 +521,28 @@
 ! 			enddo
 ! 		enddo
 
-		do i=0,ip+1
-			do j=0,jp+1
-				do k=0,kp+1
-				    call random_number(r)
-					if((i >= ipstart) .and. (i <=ipstart+ipp+1) &
-						.and. (j >= jpstart) .and. (j <= jpstart+jpp+1) &
-						.and. (k >= kpstart) .and. (k <= kpstart+kpp+1) ) then
-					
-						if ( (z(k-kpstart)>1500._sp) .and. (z(k-kpstart)<1600._sp) ) &
-							th(k-kpstart,j-jpstart,i-ipstart) = -0.001_sp+(r-0.5_sp)/10._sp
-
-						if ( (z(k-kpstart)>1400._sp) .and. (z(k-kpstart)<1500._sp) ) &
-							th(k-kpstart,j-jpstart,i-ipstart) = 0.001_sp-(r-0.5_sp)/10._sp
-						
-
-					endif
-										
-
-				enddo
-			enddo
-		enddo
-		
+! 		do i=0,ip+1
+! 			do j=0,jp+1
+! 				do k=0,kp+1
+! 				    call random_number(r)
+! 					if((i >= ipstart) .and. (i <=ipstart+ipp+1) &
+! 						.and. (j >= jpstart) .and. (j <= jpstart+jpp+1) &
+! 						.and. (k >= kpstart) .and. (k <= kpstart+kpp+1) ) then
+! 					
+! 						if ( (z(k-kpstart)>1500._sp) .and. (z(k-kpstart)<1600._sp) ) &
+! 							th(k-kpstart,j-jpstart,i-ipstart) = -0.001_sp+(r-0.5_sp)/10._sp
+! 
+! 						if ( (z(k-kpstart)>1400._sp) .and. (z(k-kpstart)<1500._sp) ) &
+! 							th(k-kpstart,j-jpstart,i-ipstart) = 0.001_sp-(r-0.5_sp)/10._sp
+! 						
+! 
+! 					endif
+! 										
+! 
+! 				enddo
+! 			enddo
+! 		enddo
+! 		
 !  		do i=1-r_h,ipp+r_h
 !  			do j=1-r_h,jpp+r_h
 !                 do k=0,kpp+1
@@ -565,28 +567,28 @@
             enddo
         enddo
 
-!  		th=0._sp
-! 		
-! 		
-! 		do i=1-r_h,ipp+r_h
-! 			do j=1-r_h,jpp+r_h
-! 				do k=1-r_h,kpp+r_h
-! 					!th(k,j,i)=theta(k)
-! 				
-! 					rad = (zn(k)-3000._sp)**2._sp
-! 						
-! 					if (ip > 1) rad=rad+xn(i)**2._sp
-! 					if (jp > 1) rad=rad+yn(j)**2._sp
-! 					
-! 					rad=sqrt(rad)
-! 					if(rad<=1000._sp) then
-! 						th(k,j,i)=th(k,j,i)-0.1_sp
-! 					else
-! 						!th(k,j,i)=0._sp
-! 					endif
-! 				enddo
-! 			enddo
-! 		enddo
+ 		th=0._sp
+		
+		
+		do i=1-r_h,ipp+r_h
+			do j=1-r_h,jpp+r_h
+				do k=1-r_h,kpp+r_h
+					!th(k,j,i)=theta(k)
+				
+					rad = (zn(k)-3000._sp)**2._sp
+						
+					if (ip > 1) rad=rad+xn(i)**2._sp
+					if (jp > 1) rad=rad+yn(j)**2._sp
+					
+					rad=sqrt(rad)
+					if(rad<=1000._sp) then
+						th(k,j,i)=th(k,j,i)-0.1_sp
+					else
+						!th(k,j,i)=0._sp
+					endif
+				enddo
+			enddo
+		enddo
 		deallocate(seed)
 		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!		
 
