@@ -24,6 +24,8 @@
 	!>@param[inout] x,y,z,xn,yn,zn,u,v,w,p,th,div - grid positions and prognostics
 	!>@param[inout] ubar,vbar,wbar,thbar,qbar,dampfacn,dampfac
 	!>@param[in] damping_layer, damping_thickness, damping_tau
+	!>@param[in] forcing, forcing_tau_nml
+	!>@param[inout] forcing_tau_g, u_force, v_force
 	!>@param[inout] sth,strain,vism,vist - more prognostics
 	!>@param[in] z0,z0th - roughness lengths 
 	!>@param[inout] q,sq,viss - q-variable
@@ -51,6 +53,8 @@
 			dampfacn, dampfac, &
 			damping_layer, &
 			damping_thickness,damping_tau, &
+			forcing,forcing_tau_nml, &
+			forcing_tau_g, u_force,v_force, &
 			u,v,w,&
 			zu,zv,zw,&
 			tu,tv,tw,&
@@ -93,23 +97,24 @@
 															dxn,dyn,dzn, theta,thetan, &
 															rhoa, rhoan, lamsq, lamsqn, &
 															ubar, vbar, wbar,thbar, &
-															dampfac,dampfacn
+															dampfac,dampfacn, u_force, &
+															v_force
 															
 		real(sp), dimension(:,:), allocatable, intent(inout) :: qbar
 
 		real(sp), intent(in) :: dx_nm, dy_nm, dz_nm, cvis,z0,z0th
-		real(sp), intent(in) :: dt, runtime
+		real(sp), intent(in) :: dt, runtime, forcing_tau_nml
 		integer(i4b), intent(inout) :: ipp, jpp, kpp, ipstart, jpstart, kpstart
 		integer(i4b), intent(inout) :: ntim
 		integer(i4b), intent(in) :: ip, jp, kp, l_h, r_h, nq
-		logical :: moisture,damping_layer
+		logical, intent(in) :: moisture,damping_layer, forcing
 		integer(i4b), intent(in) :: n_levels
 		real(sp), dimension(n_levels), target, intent(in) :: z_read,theta_read
 		real(sp), intent(in) :: psurf, tsurf,damping_thickness,damping_tau
 		integer(i4b), dimension(3), intent(inout) :: coords
 		integer(i4b), dimension(3), intent(in) :: dims
 		integer(i4b), intent(in) :: id, comm3d
-		real(sp), intent(inout) :: thbase, thtop
+		real(sp), intent(inout) :: thbase, thtop, forcing_tau_g
 		
 		! locals:
 		integer(i4b) :: error, AllocateStatus,i,j,k
@@ -136,6 +141,9 @@
 		
 		! scalar formulae:
 		ntim=ceiling(runtime/dt)
+		
+		forcing_tau_g=forcing_tau_nml
+		
 
 		
 		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -241,6 +249,13 @@
         if (AllocateStatus /= 0) STOP "*** Not enough memory ***"		
         allocate( dampfac(1-l_h:kpp+r_h), STAT = AllocateStatus)
         if (AllocateStatus /= 0) STOP "*** Not enough memory ***"		
+        
+        if(forcing) then
+            allocate( u_force(1-l_h:kpp+r_h), STAT = AllocateStatus)
+            if (AllocateStatus /= 0) STOP "*** Not enough memory ***"		
+            allocate( v_force(1-l_h:kpp+r_h), STAT = AllocateStatus)
+            if (AllocateStatus /= 0) STOP "*** Not enough memory ***"		
+        endif
 
 
 		allocate( x(1-l_h:ipp+r_h), STAT = AllocateStatus)
@@ -521,27 +536,27 @@
 ! 			enddo
 ! 		enddo
 
-! 		do i=0,ip+1
-! 			do j=0,jp+1
-! 				do k=0,kp+1
-! 				    call random_number(r)
-! 					if((i >= ipstart) .and. (i <=ipstart+ipp+1) &
-! 						.and. (j >= jpstart) .and. (j <= jpstart+jpp+1) &
-! 						.and. (k >= kpstart) .and. (k <= kpstart+kpp+1) ) then
-! 					
-! 						if ( (z(k-kpstart)>1500._sp) .and. (z(k-kpstart)<1600._sp) ) &
-! 							th(k-kpstart,j-jpstart,i-ipstart) = -0.001_sp+(r-0.5_sp)/10._sp
-! 
-! 						if ( (z(k-kpstart)>1400._sp) .and. (z(k-kpstart)<1500._sp) ) &
-! 							th(k-kpstart,j-jpstart,i-ipstart) = 0.001_sp-(r-0.5_sp)/10._sp
-! 						
-! 
-! 					endif
-! 										
-! 
-! 				enddo
-! 			enddo
-! 		enddo
+		do i=0,ip+1
+			do j=0,jp+1
+				do k=0,kp+1
+				    call random_number(r)
+					if((i >= ipstart) .and. (i <=ipstart+ipp+1) &
+						.and. (j >= jpstart) .and. (j <= jpstart+jpp+1) &
+						.and. (k >= kpstart) .and. (k <= kpstart+kpp+1) ) then
+					
+						if ( (z(k-kpstart)>1500._sp) .and. (z(k-kpstart)<1600._sp) ) &
+							th(k-kpstart,j-jpstart,i-ipstart) = -0.001_sp+(r-0.5_sp)/10._sp
+
+						if ( (z(k-kpstart)>1400._sp) .and. (z(k-kpstart)<1500._sp) ) &
+							th(k-kpstart,j-jpstart,i-ipstart) = 0.001_sp-(r-0.5_sp)/10._sp
+						
+
+					endif
+										
+
+				enddo
+			enddo
+		enddo
 ! 		
 !  		do i=1-r_h,ipp+r_h
 !  			do j=1-r_h,jpp+r_h
@@ -567,31 +582,49 @@
             enddo
         enddo
 
- 		th=0._sp
-		
-		
-		do i=1-r_h,ipp+r_h
-			do j=1-r_h,jpp+r_h
-				do k=1-r_h,kpp+r_h
-					!th(k,j,i)=theta(k)
-				
-					rad = (zn(k)-3000._sp)**2._sp
-						
-					if (ip > 1) rad=rad+xn(i)**2._sp
-					if (jp > 1) rad=rad+yn(j)**2._sp
-					
-					rad=sqrt(rad)
-					if(rad<=1000._sp) then
-						th(k,j,i)=th(k,j,i)-0.1_sp
-					else
-						!th(k,j,i)=0._sp
-					endif
-				enddo
-			enddo
-		enddo
+!  		do i=1-r_h,ipp+r_h
+!  			do j=1-r_h,jpp+r_h
+!                 do k=0,kpp+1
+!                     v(k,j,i)=zn(k)/12000._sp*10._sp
+!                     if((coords(3)==(dims(3)-1)).and.(k==kpp)) v(k,j,i)=0._sp
+!                     if((coords(3)==0).and.(k<=1)) v(k,j,i)=0._sp
+!                     zv(k,j,i)=v(k,j,i)
+!                     tv(k,j,i)=v(k,j,i)
+!                 enddo
+!             enddo
+!         enddo
+! 
+!  		th=0._sp
+! 		
+! 		
+! 		do i=1-r_h,ipp+r_h
+! 			do j=1-r_h,jpp+r_h
+! 				do k=1-r_h,kpp+r_h
+! 					!th(k,j,i)=theta(k)
+! 				
+! 					rad = (zn(k)-3000._sp)**2._sp
+! 						
+! 					if (ip > 1) rad=rad+xn(i)**2._sp
+! 					if (jp > 1) rad=rad+yn(j)**2._sp
+! 					
+! 					rad=sqrt(rad)
+! 					if(rad<=1000._sp) then
+! 						th(k,j,i)=th(k,j,i)+0.1_sp
+! 					else
+! 						!th(k,j,i)=0._sp
+! 					endif
+! 				enddo
+! 			enddo
+! 		enddo
 		deallocate(seed)
 		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!		
 
+        if(forcing) then
+            do k=0,kpp+1
+                u_force(k)=u(k,1,1)
+                v_force(k)=v(k,1,1)
+            enddo        
+        endif
 
 
 		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!

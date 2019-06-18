@@ -20,6 +20,7 @@
 	!>@param[in] x,y,z, xn,ym,zn,dx, dy, dz, dxn, dyn, dzn: grids
 	!>@param[in] dampfacn,dampfac
 	!>@param[inout] ubar,vbar,wbar,thbar,qbar
+	!>@param[in] u_force, v_force, forcing_tau
 	!>@param[inout] ut,vt,wt: prognostics
 	!>@param[inout] zut,zvt,zwt: prognostics - previous time-step
 	!>@param[inout] tut,tvt,twt: prognostics - temp storage
@@ -41,6 +42,7 @@
 	!>@param[in] advection_scheme, kord, monotone: flags for advection schemes
 	!>@param[in] moisture: flag for moisture
 	!>@param[in] damping_layer: flag for damping layer
+	!>@param[in] forcing: flag for large-scale forcing
 	!>@param[in] nq: number of q-variables
 	!>@param[in] dims,id, world_process, ring_comm, sub_horiz_comm: mpi variables
 	!>@param[in] sub_vert_comm: mpi variables
@@ -52,6 +54,7 @@
 				dx,dy,dz, &
 				dxn,dyn,dzn, &
 				ubar,vbar,wbar,thbar,qbar,dampfacn,dampfac, &
+				u_force,v_force,forcing_tau, &
 				ut,vt,wt,&
 				zut,zvt,zwt,&
 				tut,tvt,twt,&
@@ -68,7 +71,7 @@
 				new_file,outputfile, output_interval, &
 				viscous, &
 				advection_scheme, kord, monotone, &
-				moisture, damping_layer,nq, &
+				moisture, damping_layer,forcing, nq, &
 				dims,id, world_process, rank, ring_comm,sub_horiz_comm,sub_vert_comm)
 		use nrtype
 		use mpi_module, only : exchange_full, exchange_along_dim
@@ -82,7 +85,7 @@
 
 		implicit none
 		logical, intent(inout) :: new_file
-		logical, intent(in) :: viscous, monotone, moisture, damping_layer
+		logical, intent(in) :: viscous, monotone, moisture, damping_layer, forcing
 		integer(i4b), intent(in) :: ntim,ip,jp,kp, ipp,jpp,kpp, &
 						l_h,r_h, ipstart, jpstart, kpstart, &
 						advection_scheme, kord, nq
@@ -90,12 +93,13 @@
 		    sub_vert_comm,rank
 		integer(i4b), dimension(3), intent(in) :: coords, dims
 		character (len=*), intent(in) :: outputfile
-		real(sp), intent(in) :: output_interval, dt, z0,z0th, ptol
+		real(sp), intent(in) :: output_interval, dt, z0,z0th, ptol, forcing_tau
 		real(sp), intent(inout) :: thbase, thtop
 		real(sp), dimension(1-l_h:ipp+r_h), intent(in) :: x,xn,dx, dxn
 		real(sp), dimension(1-l_h:jpp+r_h), intent(in) :: y,yn,dy,dyn
 		real(sp), dimension(1-l_h:kpp+r_h), intent(in) :: z,zn,dz,dzn, theta, thetan, &
-														rhoa, rhoan,lamsq, lamsqn
+														rhoa, rhoan,lamsq, lamsqn, &
+														u_force, v_force
 		real(sp), dimension(1-l_h:kpp+r_h), intent(inout) :: ubar,vbar,wbar,thbar,qbar
 		real(sp), dimension(1-l_h:kpp+r_h), intent(in) :: dampfacn,dampfac
 		real(sp), &
@@ -207,6 +211,7 @@
 				dt,x,y,z,zn,dx,dy,dz,dxn,dyn,dzn,ipp,jpp,kpp,l_h,r_h,&
 				nq, &
 				ubar,vbar,wbar,thbar,qbar, dampfacn,dampfac, &
+				u_force,v_force,forcing_tau, &
 				zu,zv,zw, &
 				u,v,w,su,sv,sw, &
 				q,sq,viss, &
@@ -214,7 +219,7 @@
 				th,sth, strain,vism,vist, &
 				theta,thetan,rhoa,rhoan,lamsq,lamsqn, &
 				z0,z0th, &
-				viscous, moisture,damping_layer)
+				viscous, moisture, damping_layer, forcing)
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!

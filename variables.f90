@@ -19,7 +19,7 @@
             ! variables for grid
             integer(i4b) :: ip, jp, kp, ntim, l_halo, r_halo, ipstart, jpstart, kpstart
             integer(i4b), dimension(3) :: coords
-            real(sp) :: f, re, g, dt
+            real(sp) :: f, re, g, dt,forcing_tau
             real(sp), dimension(:,:,:), allocatable :: u,v, w, rho, th, p, &
             										su, sv, sw, psrc,zu,zv,zw,tu,tv,tw, &
             										sth,strain,vism,vist, div
@@ -29,7 +29,7 @@
             										x, y, z, xn,yn,zn, theta, thetan, &
             										rhoa, rhoan, lamsq, lamsqn, &
             										ubar,vbar,wbar,thbar, &
-            										dampfacn,dampfac
+            										dampfacn,dampfac,u_force,v_force
             real(sp), dimension(:,:), allocatable :: qbar
             real(sp) :: thbase, thtop
             										 
@@ -51,7 +51,7 @@
             			viscous_dissipation, &
             			dissipate_h, nudge, restart, &
             			monotone, moisture, &
-            			damping_layer
+            			damping_layer, forcing
             integer(i4b) :: nq,ip, jp, kp, subgrid_model, advection_scheme, kord
             real(sp) :: vis, &
             			runtime, dt, output_interval, &
@@ -59,7 +59,7 @@
             			nudge_timescale, &
             			cvis,  &
             			dx, dy, dz, &
-            			damping_thickness, damping_tau
+            			damping_thickness, damping_tau, forcing_tau
             real(sp) :: psurf,tsurf,z0,z0th, ptol=1.e-8_sp
             integer(i4b) :: n_levels
             real(sp), dimension(n_lev) :: theta_read, z_read
