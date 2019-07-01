@@ -1,0 +1,16 @@
+Brief:
+	*Prognostic Aerosol Micro-Physics Module (PAMM).
+	 A 2-moment warm bulk cloud microphysics module for use with various models.
+Compilation:
+	*Type "make" to compile the micro_lib.a library
+Doxygen pages:
+	*self generating documentation (from the source code) can be created by typing
+	 "doxygen fortran.dxg" at the command line.
+	*you can then view the html pages by opening the file at "doxygen/html/index.html"
+Running code:
+	*No wrapper exists for running the code at the time of writing, to be compiled
+	and linked with other models.
+Contributing development:
+	* at the moment the code is under private repo with no development branches. Contact 
+	the code owner to contribute ideas. 
+	
