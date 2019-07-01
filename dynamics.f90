@@ -518,7 +518,7 @@
 		implicit none
 		integer(i4b), intent(in) :: id, comm3d, rank
 		integer(i4b), dimension(3), intent(in) :: dims, coords
-		logical, intent(in) :: viscous,moisture,damping_layer,forcing
+		logical, intent(in) :: viscous,moisture,damping_layer, forcing
 		
 		real(sp), intent(in) :: dt,z0,z0th, forcing_tau
 		integer(i4b), intent(in) :: ip, jp, kp, l_h,r_h,nq
@@ -660,27 +660,28 @@
             enddo		
 !$omp end simd	
         endif
-
+        
         if(forcing) then
-!$omp simd	
+!$omp simd     
             do i=2-l_h,ip
                 do j=1,jp
                     do k=1,kp
                         su(k,j,i)=su(k,j,i)-rhoan(k)*(zu(k,j,i)-u_force(k))/forcing_tau
                     enddo
                 enddo
-            enddo		
-!$omp end simd	
-!$omp simd	
+            enddo              
+!$omp end simd 
+!$omp simd     
             do i=1,ip
                 do j=2-l_h,jp
                     do k=1,kp
                         sv(k,j,i)=sv(k,j,i)-rhoan(k)*(zv(k,j,i)-v_force(k))/forcing_tau
                     enddo
                 enddo
-            enddo		
-!$omp end simd	        
+            enddo              
+!$omp end simd         
         endif
+
 
         if(viscous) then
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!

@@ -19,6 +19,7 @@
 	!>@param[in] l_h,r_h, ipstart,jpstart,kpstart: halo and dims
 	!>@param[in] x,y,z, xn,ym,zn,dx, dy, dz, dxn, dyn, dzn: grids
 	!>@param[in] dampfacn,dampfac
+	!>@param[in] pref,prefn
 	!>@param[inout] ubar,vbar,wbar,thbar,qbar
 	!>@param[in] u_force, v_force, forcing_tau
 	!>@param[inout] ut,vt,wt: prognostics
@@ -29,21 +30,30 @@
 	!>@param[inout] strain,vism,vist - viscosity subgrid 
 	!>@param[in] z0,z0th - roughness lengths 
 	!>@param[in] ptol - tolerance for pressure solver
+	!>@param[in] c_s, c_e: start and end indices for a category
+	!>@param[in] cat_am,cat_c, cat_r: category index for cloud and rain
+	!>@param[in] n_mode,inc,iqc
+	!>@param[in] q_name: name of q-variables
 	!>@param[inout] q,sq,viss - for clouds and subgrid
+	!>@param[inout] precip - array for precipitation
 	!>@param[in] theta, thetan: reference variables
 	!>@param[in] rhoa, rhoan: reference variables
 	!>@param[in] lamsq, lamsqn: reference variables
 	!>@param[inout] thbase, thtop: bottom and base th
 	!>@param[in] coords: for Cartesian topology
+	!>@param[inout] micro_init: initialise microphysics
 	!>@param[inout] new_file: flag for if this is a new file
 	!>@param[in] outputfile: netcdf output
 	!>@param[in] output_interval: interval for output (s)
 	!>@param[in] viscous: logical for applying viscous dissipation
 	!>@param[in] advection_scheme, kord, monotone: flags for advection schemes
 	!>@param[in] moisture: flag for moisture
+	!>@param[in] microphysics_flag: flag for microphysics
+	!>@param[in] hm_flag: flag for hallett-mossop (not always used)
+	!>@param[in] theta_flag: flag for adjusting theta
 	!>@param[in] damping_layer: flag for damping layer
 	!>@param[in] forcing: flag for large-scale forcing
-	!>@param[in] nq: number of q-variables
+	!>@param[in] nq,nprec,ncat: number of q-variables
 	!>@param[in] dims,id, world_process, ring_comm, sub_horiz_comm: mpi variables
 	!>@param[in] sub_vert_comm: mpi variables
     subroutine model_driver(ntim,dt,l_h,r_h, &
@@ -54,7 +64,7 @@
 				dx,dy,dz, &
 				dxn,dyn,dzn, &
 				ubar,vbar,wbar,thbar,qbar,dampfacn,dampfac, &
-				u_force,v_force,forcing_tau, &
+                u_force,v_force,forcing_tau, &
 				ut,vt,wt,&
 				zut,zvt,zwt,&
 				tut,tvt,twt,&
@@ -62,38 +72,49 @@
 				su,sv,sw,psrc, &
 				div, &
 				strain, vism, vist, z0,z0th, ptol, &
-				q,sq,viss, &
+				c_s, c_e, cat_am,cat_c,cat_r, &
+				n_mode,inc,iqc, &
+				q_name, q,sq,viss, &
+				precip, &
 				theta,thetan, &
 				rhoa,rhoan, &
+				pref,prefn, &
 				lamsq,lamsqn, &
 				thbase,thtop, &
 				coords, &
+				micro_init, &
 				new_file,outputfile, output_interval, &
 				viscous, &
 				advection_scheme, kord, monotone, &
-				moisture, damping_layer,forcing, nq, &
+				moisture, microphysics_flag, hm_flag, theta_flag, &
+				damping_layer,forcing, nq, nprec, ncat, &
 				dims,id, world_process, rank, ring_comm,sub_horiz_comm,sub_vert_comm)
 		use nrtype
 		use mpi_module, only : exchange_full, exchange_along_dim
-		!use advection_3d, only : first_order_upstream_3d, mpdata_3d, adv_ref_state
         use advection_s_3d, only : first_order_upstream_3d, &
                     mpdata_3d, mpdata_vec_3d, adv_ref_state, mpdata_3d_add, &
-                    mpdata_vert_3d
+                    mpdata_vert_3d, mpdata_vec_vert_3d
 		use d_solver, only : bicgstab, sources, advance_momentum
 		use subgrid_3d, only : advance_scalar_fields_3d
         use diagnostics
+        use p_micro_module
 
 		implicit none
 		logical, intent(inout) :: new_file
-		logical, intent(in) :: viscous, monotone, moisture, damping_layer, forcing
+		logical, intent(in) :: viscous, monotone, moisture, &
+		                    damping_layer, forcing, theta_flag, hm_flag
+		logical, intent(inout) :: micro_init
 		integer(i4b), intent(in) :: ntim,ip,jp,kp, ipp,jpp,kpp, &
 						l_h,r_h, ipstart, jpstart, kpstart, &
-						advection_scheme, kord, nq
+						advection_scheme, kord, nq,nprec,ncat, microphysics_flag
 		integer(i4b), intent(in) :: id, world_process, ring_comm, sub_horiz_comm, &
 		    sub_vert_comm,rank
 		integer(i4b), dimension(3), intent(in) :: coords, dims
 		character (len=*), intent(in) :: outputfile
 		real(sp), intent(in) :: output_interval, dt, z0,z0th, ptol, forcing_tau
+        integer(i4b), dimension(ncat), intent(in) :: c_s, c_e
+        integer(i4b), intent(in) :: cat_am,cat_c, cat_r, n_mode,inc,iqc
+		
 		real(sp), intent(inout) :: thbase, thtop
 		real(sp), dimension(1-l_h:ipp+r_h), intent(in) :: x,xn,dx, dxn
 		real(sp), dimension(1-l_h:jpp+r_h), intent(in) :: y,yn,dy,dyn
@@ -102,6 +123,7 @@
 														u_force, v_force
 		real(sp), dimension(1-l_h:kpp+r_h), intent(inout) :: ubar,vbar,wbar,thbar,qbar
 		real(sp), dimension(1-l_h:kpp+r_h), intent(in) :: dampfacn,dampfac
+		real(sp), dimension(1-l_h:kpp+r_h), intent(in) :: pref,prefn
 		real(sp), &
 			dimension(1-r_h:kpp+r_h,1-r_h:jpp+r_h,1-r_h:ipp+r_h), &
 			intent(inout) :: th,p,su,sv,sw,psrc,div
@@ -123,10 +145,16 @@
 		real(sp), &
 			dimension(1-l_h:kpp+r_h,1-r_h:jpp+r_h,1-r_h:ipp+r_h,1:nq), &
 			intent(inout) :: q,sq,viss
+
+		real(sp), &
+			dimension(1:kpp,1:jpp,1:ipp,1:nprec), &
+			intent(inout) :: precip
 					
+        character(len=20), intent(in), dimension(nq) :: q_name
 		! locals:		
-		integer(i4b) :: n,n2, cur=1, i,j,k, error, rank2
+		integer(i4b) :: n,n2, cur=1, i,j,k,nqc, error, rank2
 		real(sp) :: time, time_last_output, output_time, a,t1=0._sp,t2=0._sp
+		real(sp), dimension(nq) :: q1,q2
 		real(sp), dimension(:,:,:), pointer :: u,zu,tu
 		real(sp), dimension(:,:,:), pointer :: v,zv,tv
 		real(sp), dimension(:,:,:), pointer :: w,zw,tw
@@ -137,6 +165,8 @@
 		time_last_output=-output_interval
 		output_time=output_interval
 		rank2=dims(1)*dims(2)*dims(3)
+		q1=0._sp
+		q2=0._sp
 		
 		! associate pointers - for efficiency, when swapping arrays in leap-frog scheme
 		u => ut   ! current time-step
@@ -175,6 +205,7 @@
 							l_h,r_h, &
 							time, x,y,z,rhoa, thetan, &
 							u,v,w,th,p,div, &
+							q_name,q,nq, moisture, &
 							id, world_process, rank2, ring_comm)
 				!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
@@ -219,7 +250,7 @@
 				th,sth, strain,vism,vist, &
 				theta,thetan,rhoa,rhoan,lamsq,lamsqn, &
 				z0,z0th, &
-				viscous, moisture, damping_layer, forcing)
+				viscous, moisture,damping_layer, forcing)
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -274,6 +305,12 @@
 				case (0)
 					call first_order_upstream_3d(dt,dxn,dyn,dzn,rhoa,rhoan, &
 						ipp,jpp,kpp,l_h,r_h,u,v,w,th,.true.,dims,coords)
+                    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+                    ! set halos													   		 !
+                    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!		
+                    call exchange_full(ring_comm, id, kpp, jpp, ipp, &
+                                        r_h,r_h,r_h,r_h,r_h,r_h,th,t1,t2,dims,coords)
+                    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!	
 				case (1)
 					call mpdata_3d(dt,dx,dy,dz,dxn,dyn,dzn,rhoa,rhoan, &
 						ipp,jpp,kpp,l_h,r_h,u,v,w,th,t1,t2, &
@@ -289,15 +326,42 @@
 					stop
 			end select
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-			
+
 
 
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-			! set halos																	 !
-			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!		
-			call exchange_full(ring_comm, id, kpp, jpp, ipp, &
-								r_h,r_h,r_h,r_h,r_h,r_h,th,t1,t2,dims,coords)
-			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!	
+			! advect q-fields                                                            !
+			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+            if(moisture) then
+                select case (advection_scheme)
+                    case (0:2)
+                        do nqc=1,ncat
+                            call mpdata_vec_3d(dt,dx,dy,dz,dxn,dyn,dzn,rhoa,rhoan, &
+                                ipp,jpp,kpp,c_e(nqc)-c_s(nqc)+1, &
+                                l_h,r_h,u,v,w,q(:,:,:,c_s(nqc):c_e(nqc)), &
+                                q1(c_s(nqc):c_e(nqc)),q2(c_s(nqc):c_e(nqc)), &
+                                kord,monotone,.false.,ring_comm,id, &
+                                dims,coords)						
+! 
+!                            call mpdata_vec_vert_3d(dt,dz,dzn,&
+!                                     rhoa,rhoan, &
+!                                     ipp,jpp,kpp,c_e(nqc)-c_s(nqc)+1,l_h,r_h,&
+!                                     w,q(:,:,:,c_s(nqc):c_e(nqc)),&
+!                                     q1(c_s(nqc):c_e(nqc)),q2(c_s(nqc):c_e(nqc)), &
+!                                     1,.false., .false.,sub_vert_comm, id, &
+!                                     dims,coords)
+                        enddo
+                    case default
+                        print *,'not coded'
+                        stop
+                end select            
+            endif
+			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+
+			
+
+
 
 			
 
@@ -319,6 +383,36 @@
                     call advance_scalar_fields_3d(dt,&
                         q(:,:,:,1:nq),sq(:,:,:,1:nq),&
                         th,sth,rhoa,rhoan,ipp,jpp,kpp,nq,l_h,r_h)            
+            endif
+			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+
+
+			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+			! microphysics                                                               !
+			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+            if(moisture) then
+                select case (microphysics_flag)
+                    case (0) ! null microphysics
+
+                    case (1) ! not coded yet
+                    			
+                    case (2) ! not coded yet
+
+                    case (3) ! pamm microphysics
+                        call p_microphysics_3d(nq,ncat,n_mode,c_s,c_e, inc, iqc,&
+                                        cat_am,cat_c, cat_r, &
+                                        ipp,jpp,kpp,l_h,r_h,dt,dz,&
+                                        dzn,q(:,:,:,:),precip(:,:,:,:),&
+                                        th(:,:,:),prefn, &
+                                        zn(:),thetan,rhoa,rhoan,w(:,:,:), &
+                                        micro_init,hm_flag,1.e-14_sp, &
+                                        theta_flag, &
+                                        sub_vert_comm,id,dims,coords)		
+                    case default
+                        print *,'not coded'
+                        stop
+                end select
             endif
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
@@ -423,10 +517,14 @@
 	!>@param[in] kp: ditto for z
 	!>@param[in] kpp: ditto for z
 	!>@param[in] kpstart: start of j index on global grid
+	!>@param[in] nq: number of q-variables
 	!>@param[in] l_h,r_h: halo
 	!>@param[in] time: time (s)
 	!>@param[in] x,y,z, rhoa, thetan: grids
 	!>@param[in] u,v,w,th,p,div: prognostic variables
+	!>@param[in] q_name: name of q-variables
+	!>@param[in] q
+	!>@param[in] moisture: flag for moisture
 	!>@param[in] id: id
 	!>@param[in] world_process: world_process
 	!>@param[in] rank: rank
@@ -436,6 +534,8 @@
 					time, &
 					x,y,z,rhoa, thetan, &
 					u,v,w,th,p,div, &
+					q_name,q,nq, &
+					moisture, &
 				    id, world_process, rank, ring_comm)
 	
 		use netcdf
@@ -447,7 +547,7 @@
 		logical, intent(inout) :: new_file
 		character (len=*), intent(in) :: outputfile
 		integer(i4b), intent(in) :: n, ip, ipp, ipstart, jp, jpp, jpstart, &
-									kp, kpp, kpstart, l_h,r_h
+									kp, kpp, kpstart, l_h,r_h, nq
 		real(sp), intent(in) :: time
 		real(sp), dimension(1-l_h:ipp+r_h), intent(in) :: x
 		real(sp), dimension(1-l_h:jpp+r_h), intent(in) :: y
@@ -464,11 +564,14 @@
 		real(sp), &
 			dimension(1-l_h:kpp+r_h,1-r_h:jpp+r_h,1-r_h:ipp+r_h), &
 			intent(inout) :: w
-		
+
+        character(len=20), intent(in), dimension(nq) :: q_name
+        real(sp), dimension(1-l_h:kpp+r_h,1-r_h:jpp+r_h,1-r_h:ipp+r_h,nq), intent(in) :: q
+		logical, intent(in) :: moisture
 		integer(i4b), intent(in) :: id ,world_process, rank, ring_comm
 	
 		integer(i4b) :: ncid, x_dimid, nx_dimid, ny_dimid, nz_dimid, &
-						error, varid,a_dimid, id_go
+						error, varid,a_dimid, id_go, lq_dimid,nq_dimid
 		integer(i4b) :: i, tag1
 		logical :: var
 
@@ -497,7 +600,10 @@
 			call check( nf90_def_dim(ncid, "ip", ip, nx_dimid) )
 			call check( nf90_def_dim(ncid, "jp", jp, ny_dimid) )
 			call check( nf90_def_dim(ncid, "kp", kp, nz_dimid) )
-
+			if(moisture) then
+                call check( nf90_def_dim(ncid, "nq", nq, nq_dimid) )
+                call check( nf90_def_dim(ncid, "l_q_names", 20, lq_dimid) )
+            endif
 
 			! close the file, freeing up any internal netCDF resources
 			! associated with the file, and flush any buffers
@@ -619,15 +725,35 @@
 			call check( nf90_put_att(ncid, a_dimid, &
 					   "units", "m/s**2") )
 
+            if(moisture) then
+                ! define variable: q_names
+                call check( nf90_def_var(ncid, "q_names", NF90_CHAR, &
+                    (/lq_dimid,nq_dimid/), varid) )
 
+                ! define variable: q
+                call check( nf90_def_var(ncid, "q", nf90_float, &
+                    (/nq_dimid, nz_dimid, ny_dimid, nx_dimid,x_dimid/), varid) )
+                ! get id to a_dimid
+                call check( nf90_inq_varid(ncid, "q", a_dimid) )
+                ! units
+                call check( nf90_put_att(ncid, a_dimid, &
+                           "units", "kg or number per kg") )
+            
+            endif
 
 			! exit define mode
 			call check( nf90_enddef(ncid) )
-			
-			
+						
 			call check( nf90_close(ncid) )
 
 			new_file=.false.
+
+            call check( nf90_open(outputfile, NF90_WRITE, ncid) )
+			if(moisture) then
+                call check( nf90_inq_varid(ncid, "q_names", varid ) )
+                call check( nf90_put_var(ncid, varid, q_name, start = (/1,1/)))
+            endif			
+    		call check( nf90_close(ncid) )
 		endif
 	
 ! 	
@@ -738,6 +864,16 @@
 		call check( nf90_inq_varid(ncid, "div", varid ) )
 		call check( nf90_put_var(ncid, varid, div(1:kpp,1:jpp,1:ipp), &
 					start = (/kpstart,jpstart,ipstart,n/)))	
+					
+		if(moisture) then
+            call check( nf90_inq_varid(ncid, "q", varid ) )
+            call check( nf90_put_var(ncid, varid, &
+                reshape( &
+                reshape(q(1:kpp,1:jpp,1:ipp,1:nq),[nq,ipp,jpp,kpp],order=[4,3,2,1]), &
+                    [nq,kpp,jpp,ipp],order=[1,4,3,2]), &
+                        start = (/1,kpstart,jpstart,ipstart,n/)))	
+		endif
+		
 
 		call check( nf90_close(ncid) )
 		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!

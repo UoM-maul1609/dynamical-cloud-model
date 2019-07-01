@@ -1,5 +1,4 @@
-
- &run_vars
+&run_vars
 	nm1%outputfile = '/tmp/output.nc',
 	nm1%subgrid_model=2, ! 1 = constant viscosity, 2=smagorinsky
 	nm1%viscous_dissipation=.true.,
@@ -10,7 +9,7 @@
 	                        ! for simulations with dy=200, dz=100, dt=5s
 	nm1%damping_thickness=3000.,
 	nm1%damping_tau=1000.,
-	nm1%forcing_tau=1000.,
+	nm1%forcing_tau=500.,
 	nm1%z0=1.e-4,
 	nm1%z0th=1.e-4,
 	nm1%restart=.false.,
@@ -21,10 +20,21 @@
 	                        ! 2=mpdata (for scalars with ref state added)
 	nm1%monotone=.true.,    ! monotone advection   (for scalars)
 	nm1%kord=3,    			! order for mpdata advection scheme
+	nm1%microphysics_flag=3,! flag for microphysics: 0 (no micro)
+	                        ! 1 (bulk scheme #1)
+	                        ! 2 (bulk scheme #2)
+	                        ! 3 (bulk scheme #3)
+	nm1%bam_nmlfile='pamm/bam/namelist.in',  ! filename of bam namelist
+	nm1%aero_nmlfile='pamm/namelist.in',     ! filename of aerosol profile namelist
+	nm1%aero_prof_flag=.true.,              ! flag to read in a profile of aerosol
+	nm1%drop_num_init=.true.,       ! only works for microphysics_flag=2,3
+	nm1%drop_num=2000.e6,            ! initial drop number concentration
 	nm1%output_interval=10.,
 	nm1%rotation_period_hours=24.,
 	nm1%moisture=.true.,
+	nm1%theta_flag=.true.,
 	nm1%nq=3,
+    nm1%nprec=1, ! number of precipitation types
 	nm1%ip=1,
 	nm1%jp=101,
 	nm1%kp=120,
@@ -32,9 +42,10 @@
 	nm1%dy=200.,
 	nm1%dz=100.,
  	nm1%psurf=100000.,
- 	nm1%tsurf=297.9,
-    nm1%n_levels = 4,
-	nm1%q_read(1,1:4)   = 0.015, 0.0138, 0.0138, 0.0024,
-	nm1%theta_read(1:4) = 297.9, 297.9, 297.9, 307.9, !312.95,
-	nm1%z_read(1:4)     = 0.,740,6260, 6261/ ! 3260
+ 	nm1%tsurf=290.9,
+    nm1%n_levels = 7/
+&sounding_vars
+	q_read(1,1:7)   = 0.0099, 0.0099, 0.0099, 1.4e-11, 1.4e-11, 1.4e-11, 1.4e-11,
+	theta_read(1:7) = 290.9, 290.9, 290.9,290.9,290.9, 300.9, 400., !312.95,
+	z_read(1:7)     = 0.,740,1600,1601,6260, 6261, 12000./ ! 3260
 	

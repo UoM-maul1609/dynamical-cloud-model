@@ -6,13 +6,57 @@
     use nrtype
     implicit none
     
-    real(sp), parameter :: ra=287._sp, grav=9.81_sp,cp=1005._sp
+    real(sp), parameter :: ra=287._sp, rv=461.5_sp,eps1=ra/rv,grav=9.81_sp,cp=1005._sp, &
+                            ttr=273.15_sp
 	real(sp), dimension(:), pointer :: zr1, thr1
 	integer(i4b) :: nl1
 	
     private
-    public :: allocate_and_set
+    public :: allocate_and_set, allocate_nml_qs
     contains
+    
+    
+	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+	!>@author
+	!>Paul J. Connolly, The University of Manchester
+	!>@brief
+	!>allocate arrays for q_type and q_init
+	!>@param[in] nq number of q fields
+	!>@param[in] n_levels number of levels for reading in sounding
+	!>@param[inout] q_type: integer array
+	!>@param[inout] q_init: logical array
+	!>@param[inout] q_read: real array
+	!>@param[inout] z_read: real array
+	!>@param[inout] th_read: real array
+    subroutine allocate_nml_qs(nq,n_levels,q_type,q_init,q_read, &
+                z_read,th_read)
+    use nrtype
+    implicit none
+    integer(i4b), intent(in) :: nq, n_levels
+    integer(i4b), dimension(:), allocatable, intent(inout) :: q_type
+    logical, dimension(:), allocatable, intent(inout) :: q_init
+    real(sp), dimension(:), allocatable, intent(inout) :: z_read,th_read
+    real(sp), dimension(:,:), allocatable, intent(inout) :: q_read
+    ! local variables:
+    integer(i4b) :: AllocateStatus
+    
+    ! allocate arrays
+    allocate( q_type(1:nq), STAT = AllocateStatus)
+    if (AllocateStatus /= 0) STOP "*** Not enough memory ***"
+    allocate( q_init(1:nq), STAT = AllocateStatus)
+    if (AllocateStatus /= 0) STOP "*** Not enough memory ***"
+    allocate( q_read(1:nq,1:n_levels), STAT = AllocateStatus)
+    if (AllocateStatus /= 0) STOP "*** Not enough memory ***"
+    allocate( z_read(1:n_levels), STAT = AllocateStatus)
+    if (AllocateStatus /= 0) STOP "*** Not enough memory ***"
+    allocate( th_read(1:n_levels), STAT = AllocateStatus)
+    if (AllocateStatus /= 0) STOP "*** Not enough memory ***"
+    
+    
+    end subroutine allocate_nml_qs
+	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    
+    
 	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 	! Allocate and set arrays                                                            !
 	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -32,16 +76,22 @@
 	!>@param[inout] zu,zv,zw,tu,tv,tw - previous time-step and temporary storage
 	!>@param[inout] su,sv,sw,psrc - grid positions and prognostics
 	!>@param[inout] theta,thetan - reference potential temperatures
-	!>@param[inout] rhoa,rhoan - reference potential temperatures
+	!>@param[inout] rhoa,rhoan - reference density
+	!>@param[inout] pref,prefn - reference pressures
+	!>@param[inout] tref,trefn - reference temperatures
 	!>@param[inout] lamsq,lamsqn - mixing length
 	!>@param[in] cvis - smagorinsky parameter
 	!>@param[inout] dx,dy,dz - grid spacing on grid
 	!>@param[inout] dxn,dyn,dzn - grid spacing on grid - staggered
+	!>@param[inout] precip
 	!>@param[inout] ipp,jpp,kpp,ipstart,jpstart,kpstart - number of grid / starting position
 	!>@param[in] dx_nm,dy_nm,dz_nm - grid spacing from namelist
 	!>@param[in] ip,jp,kp - grid points from namelist
-	!>@param[in] moisture, nq - whether to have clouds and number of q-variables
-	!>@param[in] n_levels,z_read,theta_read, psurf,tsurf - sounding variables
+	!>@param[in] moisture, nq,nprec - whether to have clouds and number of q-variables
+	!>@param[in] nqg,nprecg - number of precipitation categories
+	!>@param[in] iqv,iqc,inc,drop_num_init, num_drop: moisture variables
+	!>@param[in] n_levels
+	!>@params[inout] q_read,z_read,theta_read, psurf,tsurf - sounding variables
 	!>@param[in] l_h,r_h - halo for arrays
 	!>@param[inout] thbase, thtop
 	!>@param[in] coords,dims - dimensions of cartesian topology
@@ -53,8 +103,8 @@
 			dampfacn, dampfac, &
 			damping_layer, &
 			damping_thickness,damping_tau, &
-			forcing,forcing_tau_nml, &
-			forcing_tau_g, u_force,v_force, &
+            forcing,forcing_tau_nml, &
+            forcing_tau_g, u_force,v_force, &
 			u,v,w,&
 			zu,zv,zw,&
 			tu,tv,tw,&
@@ -64,16 +114,21 @@
 			su,sv,sw,psrc, &
 			theta,thetan, &
 			rhoa,rhoan, &
+			pref,prefn,tref,trefn, &
 			lamsq,lamsqn, &
 			cvis, &
 			dx, dy, dz, &
 			dxn, dyn, dzn, &
+			precip, &
 			ipp, jpp, kpp,&
 			ipstart, jpstart, kpstart, &
 			dx_nm, dy_nm, dz_nm, &
 			ip, jp, kp, &
-			moisture,nq,&
-			n_levels,z_read, theta_read,psurf,tsurf, &
+			moisture,nq,nqg,nprec,nprecg,&
+			iqv,iqc,inc,drop_num_init, num_drop, &
+			n_levels, &
+			q_read, &
+			z_read, theta_read,psurf,tsurf, &
 			l_h,r_h, &
 			thbase,thtop, &
 			coords,dims, id, comm3d)
@@ -92,33 +147,36 @@
 														su,sv,sw,psrc, &
 														sth,strain,vism,vist
 		real(sp), dimension(:,:,:,:), allocatable, intent(inout) :: &
-														q,sq,viss
+														q,sq,viss, precip
 		real(sp), dimension(:), allocatable, intent(inout) :: x,y,z,xn,yn,zn,dx,dy,dz, &
 															dxn,dyn,dzn, theta,thetan, &
 															rhoa, rhoan, lamsq, lamsqn, &
 															ubar, vbar, wbar,thbar, &
-															dampfac,dampfacn, u_force, &
-															v_force
+															dampfac,dampfacn, &
+															u_force,v_force, &
+															pref,prefn,tref,trefn
 															
 		real(sp), dimension(:,:), allocatable, intent(inout) :: qbar
 
 		real(sp), intent(in) :: dx_nm, dy_nm, dz_nm, cvis,z0,z0th
-		real(sp), intent(in) :: dt, runtime, forcing_tau_nml
+		real(sp), intent(in) :: dt, runtime, forcing_tau_nml,num_drop
 		integer(i4b), intent(inout) :: ipp, jpp, kpp, ipstart, jpstart, kpstart
 		integer(i4b), intent(inout) :: ntim
-		integer(i4b), intent(in) :: ip, jp, kp, l_h, r_h, nq
-		logical, intent(in) :: moisture,damping_layer, forcing
+		integer(i4b), intent(in) :: ip, jp, kp, l_h, r_h, nq,nprec,iqv,iqc,inc
+		integer(i4b), intent(inout) :: nqg,nprecg
+		logical, intent(in) :: moisture,damping_layer, forcing, drop_num_init
 		integer(i4b), intent(in) :: n_levels
-		real(sp), dimension(n_levels), target, intent(in) :: z_read,theta_read
+		real(sp), dimension(n_levels), target, intent(inout) :: z_read,theta_read
+		real(sp), dimension(nq,n_levels), target, intent(inout) :: q_read
 		real(sp), intent(in) :: psurf, tsurf,damping_thickness,damping_tau
 		integer(i4b), dimension(3), intent(inout) :: coords
 		integer(i4b), dimension(3), intent(in) :: dims
 		integer(i4b), intent(in) :: id, comm3d
-		real(sp), intent(inout) :: thbase, thtop, forcing_tau_g
+		real(sp), intent(inout) :: thbase, thtop,forcing_tau_g
 		
 		! locals:
 		integer(i4b) :: error, AllocateStatus,i,j,k
-		real(sp) :: rho_surf, htry, hmin, eps2=1.e-5_sp
+		real(sp) :: rho_surf, htry, hmin, eps2=1.e-5_sp, t, qsat
 		real(sp), dimension(1) :: psolve
 		real(sp) :: var, dummy,ztop
 		integer(i4b) :: iloc
@@ -141,9 +199,9 @@
 		
 		! scalar formulae:
 		ntim=ceiling(runtime/dt)
-		
+		nqg=nq
+		nprecg=nprec
 		forcing_tau_g=forcing_tau_nml
-		
 
 		
 		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -234,6 +292,11 @@
             allocate( viss(1-r_h:kpp+r_h,1-r_h:jpp+r_h,1-r_h:ipp+r_h,1:nq), &
                 STAT = AllocateStatus)
             if (AllocateStatus /= 0) STOP "*** Not enough memory ***"
+            allocate( precip(1:kpp,1:jpp,1:ipp,1:nprec), &
+                STAT = AllocateStatus)
+            if (AllocateStatus /= 0) STOP "*** Not enough memory ***"
+                        
+            
 		endif	
 		
 		allocate( ubar(1-l_h:kpp+r_h), STAT = AllocateStatus)
@@ -249,12 +312,12 @@
         if (AllocateStatus /= 0) STOP "*** Not enough memory ***"		
         allocate( dampfac(1-l_h:kpp+r_h), STAT = AllocateStatus)
         if (AllocateStatus /= 0) STOP "*** Not enough memory ***"		
-        
+
         if(forcing) then
             allocate( u_force(1-l_h:kpp+r_h), STAT = AllocateStatus)
-            if (AllocateStatus /= 0) STOP "*** Not enough memory ***"		
+            if (AllocateStatus /= 0) STOP "*** Not enough memory ***"          
             allocate( v_force(1-l_h:kpp+r_h), STAT = AllocateStatus)
-            if (AllocateStatus /= 0) STOP "*** Not enough memory ***"		
+            if (AllocateStatus /= 0) STOP "*** Not enough memory ***"          
         endif
 
 
@@ -268,6 +331,10 @@
 		if (AllocateStatus /= 0) STOP "*** Not enough memory ***"
 		allocate( rhoa(1-l_h:kpp+r_h), STAT = AllocateStatus)
 		if (AllocateStatus /= 0) STOP "*** Not enough memory ***"
+		allocate( pref(1-l_h:kpp+r_h), STAT = AllocateStatus)
+		if (AllocateStatus /= 0) STOP "*** Not enough memory ***"
+		allocate( tref(1-l_h:kpp+r_h), STAT = AllocateStatus)
+		if (AllocateStatus /= 0) STOP "*** Not enough memory ***"
 		allocate( lamsq(1-l_h:kpp+r_h), STAT = AllocateStatus)
 		if (AllocateStatus /= 0) STOP "*** Not enough memory ***"
 		
@@ -280,6 +347,10 @@
 		allocate( thetan(1-l_h:kpp+r_h), STAT = AllocateStatus)
 		if (AllocateStatus /= 0) STOP "*** Not enough memory ***"
 		allocate( rhoan(1-l_h:kpp+r_h), STAT = AllocateStatus)
+		if (AllocateStatus /= 0) STOP "*** Not enough memory ***"
+		allocate( prefn(1-l_h:kpp+r_h), STAT = AllocateStatus)
+		if (AllocateStatus /= 0) STOP "*** Not enough memory ***"
+		allocate( trefn(1-l_h:kpp+r_h), STAT = AllocateStatus)
 		if (AllocateStatus /= 0) STOP "*** Not enough memory ***"
 		allocate( lamsqn(1-l_h:kpp+r_h), STAT = AllocateStatus)
 		if (AllocateStatus /= 0) STOP "*** Not enough memory ***"
@@ -398,6 +469,7 @@
 				call odeint(psolve,0._sp,z(i),eps2,htry,hmin,hydrostatic1a,rkqs)
 			endif
 			p(i,:,:)=psolve(1)
+
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 
@@ -414,6 +486,8 @@
 !			th(:,:,i)=var
 			theta(i)=var
 			rhoa(i)=psolve(1)/(ra*theta(i)*(psolve(1)/psurf)**(ra/cp))
+			pref(i)=psolve(1)
+			tref(i)=(theta(i)*(psolve(1)/psurf)**(ra/cp))
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 
@@ -446,9 +520,43 @@
 						min(zn(i),z_read(n_levels)), var,dummy)
 			thetan(i)=var
 			rhoan(i)=psolve(1)/(ra*thetan(i)*(psolve(1)/psurf)**(ra/cp))
+			prefn(i)=psolve(1)
+			trefn(i)=(thetan(i)*(psolve(1)/psurf)**(ra/cp))
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 		enddo
+		
+		if(moisture) then
+    		do i=1-l_h,kpp+r_h
+                !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+                ! locate and interpolate to find q-vapour:							     !
+                !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+                iloc=locate(z_read(1:n_levels),zn(i))
+                iloc=min(n_levels-1,iloc)
+                iloc=max(1,iloc)
+                ! linear interp q-vapour
+                call polint(z_read(iloc:iloc+1), q_read(1,iloc:iloc+1), &
+                            min(zn(i),z_read(n_levels)), var,dummy)
+                q(i,:,:,1)=var
+                !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!	
+                
+                !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+                ! set the cloud, etc                                                     !
+                !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+                t=thetan(i)*(prefn(i)/psurf)**(ra/cp)
+                qsat=eps1*svp_liq(t)/(prefn(i)-svp_liq(t))
+                if (var >= qsat) then
+                    q(i,:,:,iqc)=var-qsat
+                    q(i,:,:,iqv)=qsat
+                    q(i,:,:,inc)=num_drop
+                else
+                    q(i,:,:,inc)=0._sp
+                endif
+                !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!                
+            enddo
+		endif
+		
+		
 		p(:,:,:)=0._sp
 ! 		rhoa=1._sp
 ! 		rhoan=1._sp
@@ -582,18 +690,6 @@
             enddo
         enddo
 
-!  		do i=1-r_h,ipp+r_h
-!  			do j=1-r_h,jpp+r_h
-!                 do k=0,kpp+1
-!                     v(k,j,i)=zn(k)/12000._sp*10._sp
-!                     if((coords(3)==(dims(3)-1)).and.(k==kpp)) v(k,j,i)=0._sp
-!                     if((coords(3)==0).and.(k<=1)) v(k,j,i)=0._sp
-!                     zv(k,j,i)=v(k,j,i)
-!                     tv(k,j,i)=v(k,j,i)
-!                 enddo
-!             enddo
-!         enddo
-! 
 !  		th=0._sp
 ! 		
 ! 		
@@ -609,7 +705,7 @@
 ! 					
 ! 					rad=sqrt(rad)
 ! 					if(rad<=1000._sp) then
-! 						th(k,j,i)=th(k,j,i)+0.1_sp
+! 						th(k,j,i)=th(k,j,i)-0.1_sp
 ! 					else
 ! 						!th(k,j,i)=0._sp
 ! 					endif
@@ -619,12 +715,14 @@
 		deallocate(seed)
 		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!		
 
+
         if(forcing) then
             do k=0,kpp+1
                 u_force(k)=u(k,1,1)
                 v_force(k)=v(k,1,1)
             enddo        
         endif
+
 
 
 		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -699,6 +797,24 @@
 
 
 
+	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+	! saturation vapour pressure over liquid                                       !
+	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+	!>@author
+	!>Paul J. Connolly, The University of Manchester
+	!>@brief
+	!>calculates the saturation vapour pressure over liquid water according to buck fit
+	!>@param[in] t: temperature
+	!>@return svp_liq: saturation vapour pressure over liquid water
+	function svp_liq(t)
+		use nrtype
+		implicit none
+		real(sp), intent(in) :: t
+		real(sp) :: svp_liq
+		svp_liq = 100._sp*6.1121_sp* &
+			  exp((18.678_sp - (t-ttr)/ 234.5_sp)* &
+			  (t-ttr)/(257.14_sp + (t-ttr)))
+	end function svp_liq
 
 
 	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!

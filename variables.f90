@@ -17,21 +17,34 @@
 		!>main model prognostic variables
         type grid
             ! variables for grid
-            integer(i4b) :: ip, jp, kp, ntim, l_halo, r_halo, ipstart, jpstart, kpstart
+            integer(i4b) :: ip, jp, kp, ntim, l_halo, r_halo, ipstart, jpstart, kpstart, &
+                            nq,ncat, nprec, &
+                            iqv, iqc, iqr, iqi, iqs, iqg, inc, inr, ini, ins, ing, &
+                            cat_am, cat_c, cat_r
             integer(i4b), dimension(3) :: coords
-            real(sp) :: f, re, g, dt,forcing_tau
+            real(sp) :: f, re, g, dt, forcing_tau
             real(sp), dimension(:,:,:), allocatable :: u,v, w, rho, th, p, &
             										su, sv, sw, psrc,zu,zv,zw,tu,tv,tw, &
             										sth,strain,vism,vist, div
 
-            real(sp), dimension(:,:,:,:), allocatable :: q, sq, viss
+            real(sp), dimension(:,:,:,:), allocatable :: q, sq, viss, &
+            										precip
             real(sp), dimension(:), allocatable ::	dx, dy, dz, dxn,dyn,dzn, &
             										x, y, z, xn,yn,zn, theta, thetan, &
             										rhoa, rhoan, lamsq, lamsqn, &
             										ubar,vbar,wbar,thbar, &
-            										dampfacn,dampfac,u_force,v_force
+            										dampfacn,dampfac, &
+            										u_force,v_force, &
+            										pref,prefn,tref,trefn
+            ! point to the start and end of a category
+            integer(i4b), dimension(:), allocatable :: c_s, c_e
+            character(len=20), dimension(:), allocatable :: q_name
+            integer(i4b) :: n_mode
             real(sp), dimension(:,:), allocatable :: qbar
             real(sp) :: thbase, thtop
+            
+            integer(i4b), dimension(:), allocatable :: q_type
+            logical :: micro_init=.true.
             										 
         end type grid
 
@@ -46,13 +59,17 @@
         type namelist_input
             character (len=200) :: inputfile='input'
             character (len=200) :: outputfile='output'
+            character (len=200) :: bam_nmlfile='input'
+            character (len=200) :: aero_nmlfile='input'
             logical :: add_random_height_noise, &
             			initially_geostrophic, &
             			viscous_dissipation, &
             			dissipate_h, nudge, restart, &
             			monotone, moisture, &
-            			damping_layer, forcing
-            integer(i4b) :: nq,ip, jp, kp, subgrid_model, advection_scheme, kord
+            			damping_layer,forcing, aero_prof_flag,drop_num_init, theta_flag, &
+            			hm_flag=.false.
+            integer(i4b) :: nq,ip, jp, kp, subgrid_model, advection_scheme, kord, &
+                        microphysics_flag,nprec
             real(sp) :: vis, &
             			runtime, dt, output_interval, &
             			rotation_period_hours, &
@@ -60,13 +77,16 @@
             			cvis,  &
             			dx, dy, dz, &
             			damping_thickness, damping_tau, forcing_tau
-            real(sp) :: psurf,tsurf,z0,z0th, ptol=1.e-8_sp
+            real(sp) :: psurf,tsurf,z0,z0th, ptol=1.e-8_sp, drop_num
             integer(i4b) :: n_levels
-            real(sp), dimension(n_lev) :: theta_read, z_read
-            real(sp), dimension(n_q,n_lev) :: q_read
         end type namelist_input
 
 
+        real(sp), allocatable, dimension(:) :: theta_read, z_read
+        real(sp), allocatable, dimension(:,:) :: q_read
+        integer(i4b), dimension(:), allocatable :: q_type
+        logical, dimension(:), allocatable :: q_init
+        
 
 
 
