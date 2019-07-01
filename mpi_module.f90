@@ -21,6 +21,11 @@
         	integer(i4b) :: s_top, r_top
         end type mpi_faces
         
+        type mpi_faces_v
+        	integer(i4b) :: s_bottom, r_bottom
+        	integer(i4b) :: s_top, r_top
+        end type mpi_faces_v
+        
         type mpi_edges
         	integer(i4b) :: s_ws_bt, s_wn_bt, s_es_bt, s_en_bt, s_bs_we, &
         					s_bn_we, s_ts_we, s_tn_we, s_bw_sn, s_be_sn, s_tw_sn, s_te_sn
@@ -47,6 +52,7 @@
         	integer(i4b) :: sub_comm
         	integer(i4b) :: sub_horiz_comm
         	type(mpi_faces) :: face
+        	type(mpi_faces_v) :: face_v
         	type(mpi_edges) :: edge
         	type(mpi_corners) :: cnr
         end type mpi_vars
@@ -60,7 +66,7 @@
     private
     public :: mpi_define, block_ring, exchange_full, mpi_integer9, mp1, world_process, &
     			mpi_cart_initialise, exchange_along_dim, find_base_top, find_top, &
-    			exchange_fluxes
+    			exchange_fluxes, exchange_along_z
     
 
 	contains
@@ -203,6 +209,15 @@
 		if(mp1%id  < mp1%dx * mp1%dy * mp1%dz) then
             call MPI_Cart_sub(mp1%ring_comm,mp1%remain_dims,&
                 mp1%sub_comm,mp1%error)
+            !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+            ! Find ids for sending and receiving 6 faces                                 !
+            !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+            call MPI_CART_SHIFT( mp1%sub_comm, 0, 1, &
+                                mp1%face_v%s_bottom, mp1%face_v%s_top, error)
+                            
+            mp1%face_v%r_top   = mp1%face_v%s_bottom
+            mp1%face_v%r_bottom= mp1%face_v%s_top
+            !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         endif
 		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 		
@@ -390,6 +405,84 @@
 	end subroutine exchange_fluxes
 	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
+	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+	! exchange along z dim for a variable using Cartesian topology                       !
+	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+	!>@author
+	!>Paul J. Connolly, The University of Manchester
+	!>@brief
+	!>define some types to be used in the model
+	!>@param[in] comm3d, id, ipp, jpp, kpp, w_h,e_h,s_h,n_h,d_h,u_h
+	!>@param[inout] array: the array to exchange_halos on
+	!>@param[in] lbc, ubc, dims,coords
+	subroutine exchange_along_z(comm3d, id, kpp, jpp, ipp, &
+							d_h,u_h,s_h,n_h,w_h, e_h,  array, lbc, ubc, dims,coords)
+		implicit none
+		
+		integer(i4b), intent(in) :: comm3d, id, ipp, jpp, kpp, w_h, e_h, s_h,n_h,d_h,u_h
+		real(sp), intent(inout), &
+			 dimension(1-d_h:u_h+kpp,1-s_h:n_h+jpp,1-w_h:e_h+ipp) :: &
+			 array
+		real(sp), intent(in) :: lbc, ubc
+		integer(i4b), dimension(3), intent(in) :: dims,coords
+		
+		! locals:
+		integer(i4b), dimension(12) :: request
+		integer(i4b), dimension(MPI_STATUS_SIZE, 12) :: status
+		integer(i4b) :: error, tag1,num_messages,imess, tag2
+		
+		
+
+			
+		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+		! message passing for adjacent cells in up / down direction                      !
+		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+		tag1=10
+		! send to the top:
+		call MPI_Issend(array(kpp+1-d_h:kpp,1:jpp,1:ipp), &
+			(ipp*jpp)*d_h, MPI_REAL8, mp1%face_v%s_top, &
+			tag1, comm3d, request(1),error)
+
+		! receive from the top of the lower cell:
+		call MPI_Recv(array(1-d_h:0,1:jpp,1:ipp), &
+			(ipp*jpp)*d_h, MPI_REAL8, mp1%face_v%r_top, &
+			tag1, comm3d, status(:,1),error)
+		call MPI_Wait(request(1), status(:,1), error)
+		tag1=11
+		! send to the bottom:
+		call MPI_Issend(array(1:u_h,1:jpp,1:ipp), &
+			(ipp*jpp)*u_h, MPI_REAL8, mp1%face_v%s_bottom, &
+			tag1, comm3d, request(1),error)
+
+		! receive from the bottom of upper cell:
+		call MPI_Recv(array(kpp+1:kpp+u_h,1:jpp,1:ipp), &
+			(ipp*jpp)*u_h, MPI_REAL8, mp1%face_v%r_bottom, &
+			tag1, comm3d, status(:,1),error)
+		call MPI_Wait(request(1), status(:,1), error)
+		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+
+
+
+
+		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+		! case where only 1 pe in x or y directions                                      !
+		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+		if ( mp1%face%s_top == -1) then
+			! adjacent cells:
+			array(kpp+1:kpp+u_h,1-s_h:jpp+n_h,1-w_h:ipp+e_h)=ubc
+			! corner cells - not relevant, because below surface and above lid			
+		endif
+		if ( mp1%face%s_bottom == -1) then
+			! adjacent cells:
+			array(1-d_h:0,1-s_h:jpp+n_h,1-w_h:ipp+e_h)=lbc
+			! corner cells - not relevant, because below surface and above lid			
+		endif
+		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+	end subroutine exchange_along_z
+	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+
 
 	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 	! exchange along dim for a variable using Cartesian topology                         !
@@ -460,7 +553,7 @@
 		if ( mp1%face%s_east /= id ) then 
 			call MPI_Issend(array(1:kpp,1:jpp,ipp+1-w_h:ipp), &
 				(jpp*kpp)*w_h, MPI_REAL8, mp1%face%s_east, &
-				tag1, comm3d, request(1),error)
+				tag1, comm3d, request,error)
 		endif
 
 		! receive from the east of the west cell:
