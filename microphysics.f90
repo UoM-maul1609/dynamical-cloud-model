@@ -1041,8 +1041,8 @@
     				micro_init,hm_flag, mass_ice, theta_flag, &
     				comm_vert,id,dims,coords)
     use mpi
-#endif
 	use advection_s_3d, only : mpdata_vec_vert_3d, mpdata_vert_3d
+#endif
     implicit none
     ! arguments:
     integer(i4b), intent(in) :: nq, ncat, n_mode, ip,jp,kp, inc, iqc, cat_am,&
@@ -1161,7 +1161,7 @@
 	!>@param[inout] theta: theta 
 	!>@param[inout] p: pressure
 	!>@param[in] z: vertical levels 
-	!>@param[inout] t: temperature 
+	!>@param[in] theta_ref: reference potential temperature 
 	!>@param[inout] rho, rhon: density 
 	!>@param[in] w: vertical wind 
 	!>@param[inout] micro_init: boolean to initialise microphysics 
@@ -1170,7 +1170,7 @@
 	!>@param[in] theta_flag: whether to alter theta
     subroutine p_microphysics_2d(nq,ncat,n_mode,cst,cen,inc,iqc, &
                     cat_am,cat_c, cat_r, &
-                    ip,kp,o_halo,dt,dz,dzn,q,precip,theta,p, z,t,rho,rhon,w, &
+                    ip,kp,o_halo,dt,dz,dzn,q,precip,theta,p, z,theta_ref,rho,rhon,w, &
     						micro_init,hm_flag, mass_ice, theta_flag)
     implicit none
     ! arguments:
@@ -1181,8 +1181,8 @@
     real(sp), dimension(-o_halo+1:kp+o_halo,-o_halo+1:ip+o_halo,nq), intent(inout) :: q
     real(sp), dimension(1:kp,1:ip,1), intent(inout) :: precip
     real(sp), dimension(-o_halo+1:kp+o_halo,-o_halo+1:ip+o_halo), intent(inout) :: &
-    					theta, p, t, rho
-    real(sp), dimension(-o_halo+1:kp+o_halo), intent(in) :: z, dz, dzn, rhon
+    					theta, p, rho
+    real(sp), dimension(-o_halo+1:kp+o_halo), intent(in) :: z, dz, dzn, rhon, theta_ref
     real(sp), dimension(-o_halo+1:kp+o_halo,-o_halo+1:ip+o_halo), intent(in) :: w
     logical, intent(in) :: hm_flag, theta_flag
     logical , intent(inout) :: micro_init
@@ -1206,13 +1206,13 @@
 		call p_microphysics_1d(nq,ncat,n_mode,cst,cen,inc,iqc, &
 		                cat_am,cat_c, cat_r, &
 		                kp,o_halo,dt,dz,dzn,q(:,i,:),precip(:,i,:),theta(:,i),p(:,i), &
-							z(:),t(:,i),rho(:,i),rhon(:),w(:,i), &
+							z(:),theta_ref,rho(:,i),rhon(:),w(:,i), &
     						micro_init,hm_flag, mass_ice, theta_flag)
 #else
 		call p_microphysics_1d(nq,ncat,n_mode,cst,cen,inc,iqc, &
 		                cat_am,cat_c, cat_r, &
 		                kp,o_halo,dt,dz,dzn,q(:,i,:),precip(:,i,:),theta(:,i),p(:,i), &
-							z(:),t(:,i),rho(:,i),rhon(:),w(:,i), &
+							z(:),theta_ref,rho(:,i),rhon(:),w(:,i), &
 							vqc(:,i),vqr(:,i), n_step, adv_l, &
     						micro_init,hm_flag, mass_ice, theta_flag)
     	n_step_o=max(n_step_o,n_step)
