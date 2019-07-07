@@ -578,8 +578,9 @@
 	!>just add the source term to the current value of the field
 	!>@param[in] sq,sth,ipp, jpp, kpp, nq, l_h,r_h,dt, rhoa, rhoan
 	!>@param[inout] q,th
+	!>@param[in] moisture
     subroutine advance_scalar_fields_3d(dt, &
-        q,sq,th,sth,rhoa,rhoan,ip,jp,kp,nq,l_h,r_h)
+        q,sq,th,sth,rhoa,rhoan,ip,jp,kp,nq,l_h,r_h,moisture)
 	use nrtype
 	use mpi_module
 	use mpi
@@ -595,6 +596,7 @@
     real(sp), intent(in), dimension(-r_h+1:kp+r_h,-r_h+1:jp+r_h,-l_h+1:ip+r_h,nq) :: sq
     real(sp), intent(inout), dimension(-r_h+1:kp+r_h,-r_h+1:jp+r_h,-l_h+1:ip+r_h,nq) :: q
     real(sp), intent(in) :: dt
+    logical, intent(in) :: moisture
     ! locals
     integer(i4b) :: i,j,k,n
     
@@ -605,17 +607,17 @@
             enddo
         enddo
     enddo
-    
-    do n=1,nq
-        do i=1-l_h,ip+r_h
-            do j=1-l_h,jp+r_h
-                do k=1-l_h,kp+r_h
-                    q(k,j,i,n)=q(k,j,i,n)+sq(k,j,i,n)*dt
+    if(moisture) then
+        do n=1,nq
+            do i=1-l_h,ip+r_h
+                do j=1-l_h,jp+r_h
+                    do k=1-l_h,kp+r_h
+                        q(k,j,i,n)=q(k,j,i,n)+sq(k,j,i,n)*dt
+                    enddo
                 enddo
             enddo
-        enddo
-    enddo    
-    
+        enddo    
+    endif    
     end subroutine advance_scalar_fields_3d
     
 	
