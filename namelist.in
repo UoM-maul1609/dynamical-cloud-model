@@ -3,7 +3,7 @@
 	nm1%subgrid_model=2, ! 1 = constant viscosity, 2=smagorinsky
 	nm1%viscous_dissipation=.true.,
 	nm1%damping_layer=.true.,
-	nm1%forcing=.true.,
+	nm1%forcing=.false.,
 	nm1%ptol=1.e-8,         ! tolerance for pressure solver
 	                        ! please note for mass conservation 1.e-8 required
 	                        ! for simulations with dy=200, dz=100, dt=5s
@@ -15,7 +15,7 @@
 	nm1%restart=.false.,
 	nm1%cvis=0.23, ! 0.23 desirable
 	nm1%runtime= 28800.,
-	nm1%dt=5.,
+	nm1%dt=2.5,
 	nm1%advection_scheme=1, ! 0=upstream, 1=mpdata (for scalars with separate ref state),
 	                        ! 2=mpdata (for scalars with ref state added)
 	nm1%monotone=.true.,    ! monotone advection   (for scalars)
@@ -28,10 +28,10 @@
 	nm1%aero_nmlfile='pamm/namelist.in',     ! filename of aerosol profile namelist
 	nm1%aero_prof_flag=.true.,              ! flag to read in a profile of aerosol
 	nm1%drop_num_init=.true.,       ! only works for microphysics_flag=2,3
-	nm1%drop_num=2000.e6,            ! initial drop number concentration
+	nm1%drop_num=5000.e6,            ! initial drop number concentration
 	nm1%output_interval=10.,
 	nm1%rotation_period_hours=24.,
-	nm1%moisture=.true.,
+	nm1%moisture=.false.,
 	nm1%theta_flag=.true.,
 	nm1%nq=3,
     nm1%nprec=1, ! number of precipitation types

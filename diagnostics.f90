@@ -73,13 +73,8 @@
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         ! one call to allreduce                                                          !
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-        if(moisture) then
-            call MPI_Allreduce(local_sum, global_sum, (4+nq)*(kpp+l_h+r_h), &
+        call MPI_Allreduce(local_sum, global_sum, (4+nq)*(kpp+l_h+r_h), &
                 MPI_REAL8, MPI_SUM, comm3d, error)
-        else
-            call MPI_Allreduce(local_sum, global_sum, 4*(kpp+l_h+r_h), &
-                MPI_REAL8, MPI_SUM, comm3d, error)        
-        endif
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
                 
         

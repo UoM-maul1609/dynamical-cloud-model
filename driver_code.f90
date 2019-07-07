@@ -342,14 +342,6 @@
                                 q1(c_s(nqc):c_e(nqc)),q2(c_s(nqc):c_e(nqc)), &
                                 kord,monotone,.false.,ring_comm,id, &
                                 dims,coords)						
-! 
-!                            call mpdata_vec_vert_3d(dt,dz,dzn,&
-!                                     rhoa,rhoan, &
-!                                     ipp,jpp,kpp,c_e(nqc)-c_s(nqc)+1,l_h,r_h,&
-!                                     w,q(:,:,:,c_s(nqc):c_e(nqc)),&
-!                                     q1(c_s(nqc):c_e(nqc)),q2(c_s(nqc):c_e(nqc)), &
-!                                     1,.false., .false.,sub_vert_comm, id, &
-!                                     dims,coords)
                         enddo
                     case default
                         print *,'not coded'
@@ -381,8 +373,8 @@
             if(viscous) then
                     ! advance fields
                     call advance_scalar_fields_3d(dt,&
-                        q(:,:,:,1:nq),sq(:,:,:,1:nq),&
-                        th,sth,rhoa,rhoan,ipp,jpp,kpp,nq,l_h,r_h)            
+                        q,sq,&
+                        th,sth,rhoa,rhoan,ipp,jpp,kpp,nq,l_h,r_h,moisture)            
             endif
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
