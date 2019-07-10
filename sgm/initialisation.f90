@@ -276,6 +276,7 @@
 		tau13=0._sp
 		tau23=0._sp
 		strain=0._sp
+		q=0._sp
 
 		! grid spacing:
 		dx(:)=dx_nm
@@ -338,6 +339,7 @@
 		! set scalar field        														 !
 		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!		
         q(:,:,:,:)=0._sp
+        th=0._sp
         rad=0._sp
 		do i=1-r_h,ipp+r_h
 			do j=1-r_h,jpp+r_h
