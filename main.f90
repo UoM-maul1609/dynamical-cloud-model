@@ -275,14 +275,13 @@
 				nm1%viscous_dissipation, &
 				nm1%advection_scheme, nm1%kord, nm1%monotone, &
 				nm1%moisture, nm1%microphysics_flag, &
-				nm1%theta_flag, &
 				nm1%hm_flag, &
+				nm1%theta_flag, &
 				nm1%damping_layer,  nm1%forcing, &
 				grid1%nq, grid1%nprec, grid1%ncat, &
 				mp1%dims,mp1%id, world_process, mp1%rank, mp1%ring_comm, &
 				mp1%sub_horiz_comm,mp1%sub_comm)
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-
 
 
 
