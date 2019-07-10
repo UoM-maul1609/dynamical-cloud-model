@@ -530,6 +530,7 @@
 		enddo
 		
 		if(moisture) then
+		    q=0._sp
     		do i=1-l_h,kpp+r_h
                 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
                 ! locate and interpolate to find q-vapour:							     !
