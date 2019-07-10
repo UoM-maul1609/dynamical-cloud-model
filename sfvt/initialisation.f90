@@ -281,9 +281,9 @@
 ! 			enddo
 ! 		enddo
 ! 
-		do i=1-l_h,ipp+r_h
-			do j=1-l_h,jpp+r_h
-				do k=1-l_h,kpp+r_h
+		do i=1-l_h,ip+r_h
+			do j=1-l_h,jp+r_h
+				do k=1-l_h,kp+r_h
 				    r=random_normal() ! from the Netlib
 					if((i >= ipstart) .and. (i <=ipstart+ipp+1) &
 						.and. (j >= jpstart) .and. (j <= jpstart+jpp+1) &
