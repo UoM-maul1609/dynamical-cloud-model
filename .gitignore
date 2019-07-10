@@ -12,5 +12,6 @@ doxygen
 papers
 tests
 matlab-dev
+mpi_old
 *.dSYM
 
