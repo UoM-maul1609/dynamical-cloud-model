@@ -20,7 +20,7 @@
             integer(i4b) :: ip, jp, kp, ntim, l_halo, r_halo, ipstart, jpstart, kpstart, &
                             nq,ncat, nprec, &
                             iqv, iqc, iqr, iqi, iqs, iqg, inc, inr, ini, ins, ing, &
-                            cat_am, cat_c, cat_r
+                            cat_am, cat_c, cat_r, cat_i
             integer(i4b), dimension(3) :: coords
             real(sp) :: f, re, g, dt, forcing_tau
             real(sp), dimension(:,:,:), allocatable :: u,v, w, rho, th, p, &
@@ -67,7 +67,7 @@
             			dissipate_h, nudge, restart, &
             			monotone, moisture, &
             			damping_layer,forcing, aero_prof_flag,drop_num_init, theta_flag, &
-            			hm_flag=.false.
+            			hm_flag=.false.,ice_flag=.false.
             integer(i4b) :: nq,ip, jp, kp, subgrid_model, advection_scheme, kord, &
                         microphysics_flag,nprec
             real(sp) :: vis, &

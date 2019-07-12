@@ -49,6 +49,7 @@
 	!>@param[in] advection_scheme, kord, monotone: flags for advection schemes
 	!>@param[in] moisture: flag for moisture
 	!>@param[in] microphysics_flag: flag for microphysics
+	!>@param[in] ice_flag: flag for ice microphysics
 	!>@param[in] hm_flag: flag for hallett-mossop (not always used)
 	!>@param[in] theta_flag: flag for adjusting theta
 	!>@param[in] damping_layer: flag for damping layer
@@ -86,7 +87,7 @@
 				new_file,outputfile, output_interval, &
 				viscous, &
 				advection_scheme, kord, monotone, &
-				moisture, microphysics_flag, hm_flag, theta_flag, &
+				moisture, microphysics_flag, ice_flag, hm_flag, theta_flag, &
 				damping_layer,forcing, nq, nprec, ncat, &
 				dims,id, world_process, rank, ring_comm,sub_horiz_comm,sub_vert_comm)
 		use nrtype
@@ -102,7 +103,7 @@
 		implicit none
 		logical, intent(inout) :: new_file
 		logical, intent(in) :: viscous, monotone, moisture, &
-		                    damping_layer, forcing, theta_flag, hm_flag
+		                    damping_layer, forcing, theta_flag, ice_flag, hm_flag
 		logical, intent(inout) :: micro_init
 		integer(i4b), intent(in) :: ntim,ip,jp,kp, ipp,jpp,kpp, &
 						l_h,r_h, ipstart, jpstart, kpstart, &
@@ -399,7 +400,7 @@
                                         th(:,:,:),prefn, &
                                         zn(:),thetan,rhoa,rhoan,w(:,:,:), &
                                         micro_init,hm_flag,1.e-14_sp, &
-                                        theta_flag, &
+                                        ice_flag, theta_flag, &
                                         sub_vert_comm,id,dims,coords)		
                     case default
                         print *,'not coded'

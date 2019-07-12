@@ -24,6 +24,7 @@
 	                        ! 1 (bulk scheme #1)
 	                        ! 2 (bulk scheme #2)
 	                        ! 3 (bulk scheme #3)
+	nm1%ice_flag=.false.,    ! include ice microphysics part of pamm
 	nm1%bam_nmlfile='pamm/bam/namelist.in',  ! filename of bam namelist
 	nm1%aero_nmlfile='pamm/namelist.in',     ! filename of aerosol profile namelist
 	nm1%aero_prof_flag=.true.,              ! flag to read in a profile of aerosol

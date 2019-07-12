@@ -95,11 +95,13 @@
                     call read_in_pamm_bam_namelist(nm1%bam_nmlfile,&
                         nm1%aero_nmlfile, &
                         nm1%aero_prof_flag, &
+                        nm1%ice_flag, &
                         grid1%q_name,grid1%q_type,grid1%c_s,grid1%c_e,grid1%nq,&
                         grid1%ncat, &
                         grid1%nprec, grid1%n_mode, &
-                        grid1%iqv, grid1%iqc, grid1%inc, grid1%cat_am, &
-                        grid1%cat_c, grid1%cat_r)    
+                        grid1%iqv, grid1%iqc, grid1%inc, &
+                        grid1%iqi,grid1%ini,grid1%cat_am, &
+                        grid1%cat_c, grid1%cat_r,grid1%cat_i)    
 
                     nm1%nq=grid1%nq
                         
@@ -275,6 +277,7 @@
 				nm1%viscous_dissipation, &
 				nm1%advection_scheme, nm1%kord, nm1%monotone, &
 				nm1%moisture, nm1%microphysics_flag, &
+				nm1%ice_flag, &
 				nm1%hm_flag, &
 				nm1%theta_flag, &
 				nm1%damping_layer,  nm1%forcing, &
