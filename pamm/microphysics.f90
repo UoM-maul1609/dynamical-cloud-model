@@ -250,19 +250,22 @@
 	!> and set variables for microphysics
 	!>@param[in] nmlfile, aero_nmlfile
 	!>@param[in] aero_prof_flag
+	!>@param[in] ice_flag
 	!>@param[inout] q_name, q_type, c_s, c_e
-	!>@param[inout] nq,ncat, nprec, iqv, iqc, inc, n_modeg, cat_am,cat_c, cat_r
+	!>@param[inout] nq,ncat, nprec, iqv, iqc, inc, iqi,ini, n_modeg, cat_am,cat_c, cat_r
+	!>@param[inout] cat_i
 	subroutine read_in_pamm_bam_namelist(nmlfile, aero_nmlfile, &
 	            aero_prof_flag, &
+	            ice_flag, &
                 q_name,q_type,c_s,c_e,nq,ncat,nprec,n_modeg, &
-                iqv,iqc,inc, cat_am,cat_c, cat_r)
+                iqv,iqc,inc, iqi,ini, cat_am,cat_c, cat_r, cat_i)
 		use bam, only : read_in_bam_namelist, n_mode
 		implicit none
-        logical :: aero_prof_flag
+        logical, intent(in) :: aero_prof_flag, ice_flag
         character (len=200), intent(in) :: nmlfile
         character (len=200), intent(in) :: aero_nmlfile
-        integer(i4b), intent(inout) :: nq, ncat, nprec, iqv, iqc, inc, cat_am,&
-            cat_c, cat_r
+        integer(i4b), intent(inout) :: nq, ncat, nprec, iqv, iqc, inc, iqi, ini, cat_am,&
+            cat_c, cat_r, cat_i
         integer(i4b), intent(inout) :: n_modeg
         integer(i4b), intent(inout), dimension(:), allocatable :: q_type, c_s, c_e
         character(len=20), dimension(:), allocatable :: q_name
@@ -314,6 +317,16 @@
             (n_mode-1)*3 + & ! mixed-mode aerosol
             (n_mode-1)*3 + & ! aerosol in cloud water
             (n_mode-1)*3     ! aerosol in rain water
+
+        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        ! if you would like to calculate ice microphysics                                !
+        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        if(ice_flag) then
+            ncat=ncat+1             ! add the ice category
+            nq=nq+(n_mode-1)*3 + &  ! aerosol in ice water
+                6                   ! qi, ni, shape, density, number of mon, rime mass
+        endif
+        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
         allocate(q_name(nq))
         allocate(q_type(ncat))
@@ -390,7 +403,35 @@
         cat_am=(n_mode-1)+2
         cat_c=cat_am+1
         cat_r=cat_c+1
+        
+        
+        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        ! if you would like to calculate ice microphysics                                !
+        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        if(ice_flag) then
+            q_type(3+n_mode+1:3+n_mode+1)=1 ! ice water 
+            c_s(3+n_mode+1:3+n_mode+1)=(n_mode-1)*6+3+2+3*(n_mode-1)+1+3*(n_mode-1)+1
+            c_e(3+n_mode+1:3+n_mode+1)=(n_mode-1)*6+3+2+3*(n_mode-1)+1+3*(n_mode-1)+ &
+                        (n_mode-1)*3 + 6 
 
+            ! ice water
+            q_name( 7+(n_mode-1)*12) = "ni"
+            q_name( 8+(n_mode-1)*12) = "qi"
+            q_name( 9+(n_mode-1)*12) = "phi"
+            q_name(10+(n_mode-1)*12) = "vol"
+            q_name(11+(n_mode-1)*12) = "nmon"
+            q_name(12+(n_mode-1)*12) = "rmass"
+            ! aerosol particles in ice water
+            do i=1,n_mode-1
+                q_name(13+(n_mode-1)*12+(i-1)*3)="in_" // itoa(i)
+                q_name(14+(n_mode-1)*12+(i-1)*3)="is_" // itoa(i)
+                q_name(15+(n_mode-1)*12+(i-1)*3)="im_" // itoa(i)
+            enddo
+            ini=7+(n_mode-1)*12
+            iqi=8+(n_mode-1)*12
+            cat_i=cat_r+1
+        endif
+        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
                 
 	end subroutine read_in_pamm_bam_namelist
 
@@ -1000,11 +1041,12 @@
 	!>@param[inout] micro_init: boolean to initialise microphysics 
 	!>@param[in] hm_flag: switch hm-process on and off
 	!>@param[in] mass_ice: mass of a single ice crystal (override)
+	!>@param[in] ice_flag: ice microphysics
 	!>@param[in] theta_flag: whether to alter theta
     subroutine p_microphysics_3d(nq,ncat,n_mode,cst,cen,inc,iqc, &
                     cat_am,cat_c, cat_r, &
                     ip,jp,kp,l_h,r_h,dt,dz,dzn,q,precip,th,prefn, z,thetan,rhoa,rhoan,w, &
-    				micro_init,hm_flag, mass_ice, theta_flag)
+    				micro_init,hm_flag, mass_ice, ice_flag, theta_flag)
 #else
 	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 	!>@author
@@ -1033,12 +1075,13 @@
 	!>@param[inout] micro_init: boolean to initialise microphysics 
 	!>@param[in] hm_flag: switch hm-process on and off
 	!>@param[in] mass_ice: mass of a single ice crystal (override)
+	!>@param[in] ice_flag: ice microphysics
 	!>@param[in] theta_flag: whether to alter theta
 	!>@param[in] comm_vert,id,dims,coords: MPI variables
     subroutine p_microphysics_3d(nq,ncat,n_mode,cst,cen,inc,iqc, &
                     cat_am,cat_c, cat_r, &
                     ip,jp,kp,l_h,r_h,dt,dz,dzn,q,precip,th,prefn, z,thetan,rhoa,rhoan,w, &
-    				micro_init,hm_flag, mass_ice, theta_flag, &
+    				micro_init,hm_flag, mass_ice, ice_flag, theta_flag, &
     				comm_vert,id,dims,coords)
     use mpi
 	use advection_s_3d, only : mpdata_vec_vert_3d, mpdata_vert_3d
@@ -1056,7 +1099,7 @@
     real(sp), dimension(-l_h+1:kp+r_h), intent(in) :: z, dz, dzn, rhoa,rhoan, thetan, &
         prefn
     real(sp), dimension(-l_h+1:kp+r_h,-l_h+1:jp+r_h,-l_h+1:ip+r_h), intent(in) :: w
-    logical, intent(in) :: hm_flag, theta_flag
+    logical, intent(in) :: ice_flag, hm_flag, theta_flag
     logical , intent(inout) :: micro_init
     real(sp), intent(in) :: mass_ice
 
