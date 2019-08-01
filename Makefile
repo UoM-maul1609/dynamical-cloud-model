@@ -23,10 +23,11 @@ FFLAGS2 =  $(DEBUG) -O0 -o
 
 pmicro_lib.a	:   nrtype.$(OBJ) nr.$(OBJ) nrutil.$(OBJ) locate.$(OBJ) polint.$(OBJ) \
 				rkqs.$(OBJ) rkck.$(OBJ) odeint.$(OBJ) zbrent.$(OBJ) dfridr.$(OBJ) \
-				hygfx.$(OBJ) microphysics.$(OBJ) advection_1d.$(OBJ) bam_code sfvt_code
+				hygfx.$(OBJ) microphysics.$(OBJ) advection_1d.$(OBJ) erfinv.$(OBJ) \
+				bam_code sfvt_code
 	$(AR) rc pmicro_lib.a nrutil.$(OBJ) locate.$(OBJ) polint.$(OBJ) \
 				rkqs.$(OBJ) rkck.$(OBJ) odeint.$(OBJ) zbrent.$(OBJ) dfridr.$(OBJ) \
-				hygfx.$(OBJ) microphysics.$(OBJ) advection_1d.$(OBJ) \
+				hygfx.$(OBJ) microphysics.$(OBJ) advection_1d.$(OBJ) erfinv.$(OBJ) \
 				$(BAM_DIR)/nr_code.$(OBJ) $(BAM_DIR)/bulk_activation_module.$(OBJ) \
 				$(BAM_DIR)/random.$(OBJ) \
 				$(SFVT_DIR)/nrutil.$(OBJ) $(SFVT_DIR)/locate.$(OBJ) $(SFVT_DIR)/polint.$(OBJ) \
@@ -55,9 +56,12 @@ odeint.$(OBJ)	: odeint.f90
 	$(FOR) odeint.f90 $(FFLAGS)odeint.$(OBJ)	
 zbrent.$(OBJ)	: zbrent.f90
 	$(FOR) zbrent.f90 $(FFLAGS2)zbrent.$(OBJ)	
+erfinv.$(OBJ) : erfinv.f90
+	$(FOR) erfinv.f90 $(FFLAGS)erfinv.$(OBJ) 
 advection_1d.$(OBJ) : advection_1d.f90 
 	$(FOR) advection_1d.f90 $(FFLAGS)advection_1d.$(OBJ)
-microphysics.$(OBJ) : microphysics.f90 advection_1d.$(OBJ) dfridr.$(OBJ) bam_code sfvt_code
+microphysics.$(OBJ) : microphysics.f90 advection_1d.$(OBJ) dfridr.$(OBJ) erfinv.$(OBJ) \
+                bam_code sfvt_code
 	$(FOR) microphysics.f90 -cpp -DMPI_PAMM=$(MPI_PAMM) $(FFLAGS)microphysics.$(OBJ) -I$(BAM_DIR) -I$(SFVT_DIR)
 hygfx.$(OBJ) : hygfx.for 
 	$(FOR) hygfx.for $(FFLAGS)hygfx.$(OBJ) 
