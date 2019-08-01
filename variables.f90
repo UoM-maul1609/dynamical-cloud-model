@@ -20,7 +20,7 @@
             integer(i4b) :: ip, jp, kp, ntim, l_halo, r_halo, ipstart, jpstart, kpstart, &
                             nq,ncat, nprec, &
                             iqv, iqc, iqr, iqi, iqs, iqg, inc, inr, ini, ins, ing, &
-                            cat_am, cat_c, cat_r, cat_i
+                            cat_am, cat_c, cat_r, cat_i, iai
             integer(i4b), dimension(3) :: coords
             real(sp) :: f, re, g, dt, forcing_tau
             real(sp), dimension(:,:,:), allocatable :: u,v, w, rho, th, p, &

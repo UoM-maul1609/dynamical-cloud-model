@@ -42,6 +42,7 @@
                 p_initialise_aerosol_3d
         
         implicit none
+        real(sp) :: var
         
         character (len=200) :: nmlfile = ' '
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -62,8 +63,6 @@
 		mp1%wtime = MPI_Wtime ( )	
 		print *,'MPI running with ID: ',mp1%id,' and rank ',mp1%rank
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-
-
 
 
 
@@ -99,8 +98,8 @@
                         grid1%q_name,grid1%q_type,grid1%c_s,grid1%c_e,grid1%nq,&
                         grid1%ncat, &
                         grid1%nprec, grid1%n_mode, &
-                        grid1%iqv, grid1%iqc, grid1%inc, &
-                        grid1%iqi,grid1%ini,grid1%cat_am, &
+                        grid1%iqv, grid1%iqc, grid1%inc, grid1%iqr, grid1%inr, &
+                        grid1%iqi,grid1%ini,grid1%iai,grid1%cat_am, &
                         grid1%cat_c, grid1%cat_r,grid1%cat_i)    
 
                     nm1%nq=grid1%nq
@@ -263,7 +262,8 @@
 				grid1%strain, grid1%vism, grid1%vist, &
 				nm1%z0,nm1%z0th, nm1%ptol, &
 				grid1%c_s,grid1%c_e,grid1%cat_am,grid1%cat_c,grid1%cat_r, &
-				grid1%n_mode,grid1%inc,grid1%iqc, &
+				grid1%n_mode,grid1%inc,grid1%iqc, grid1%inr,grid1%iqr, &
+				grid1%ini,grid1%iqi,grid1%iai, &
 				grid1%q_name, grid1%q,grid1%sq,grid1%viss, &
 				grid1%precip, &
 				grid1%theta,grid1%thetan, &
