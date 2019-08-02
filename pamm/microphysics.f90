@@ -1535,10 +1535,11 @@
     lam_c=(max(q(1:kp,inc),1._sp)*cc*gam2c / (max(q(1:kp,iqc),1.e-10_sp)*gam1c))**(1._sp/1._sp)
     n_c=rho(1:kp)*max(q(1:kp,inc),0._sp)*lam_c**(1._sp+alpha_c) / gam1c
     
-    ! ice n0, lambda
-    lam_i=(max(q(1:kp,ini),1._sp)*ci*gam2i / (max(q(1:kp,iqi),1.e-10_sp)*gam1i))**(1._sp/di)
-    n_i=rho(1:kp)*max(q(1:kp,ini),0._sp)*lam_i**(1._sp+alpha_i) / gam1i
-
+    if(ice_flag) then
+        ! ice n0, lambda
+        lam_i=(max(q(1:kp,ini),1._sp)*ci*gam2i / (max(q(1:kp,iqi),1.e-10_sp)*gam1i))**(1._sp/di)
+        n_i=rho(1:kp)*max(q(1:kp,ini),0._sp)*lam_i**(1._sp+alpha_i) / gam1i
+    endif
     
     ! precipitation
 	precip(1:kp,1)=cr*n_r*(a_r*chi_rain/(lam_r**(alpha_r+b_r+dr+1._sp)) - &
@@ -1974,7 +1975,7 @@
 		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 		! deposition & sublimation onto ice                                              !
 		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!	
-		if (t(k).le.ttr) then
+		if ((t(k).le.ttr) .and. ice_flag) then
 			nu_ice=2._sp*pi*n_i(k) / rho(k) * &
 					(nu_i1 / lam_i(k)**(2._sp+alpha_i) + &
 					(a_i/nu_vis)**0.5_sp*sc**(1._sp/3._sp)* &
@@ -2021,7 +2022,7 @@
     ! vapour mass
     q(1:kp,1)=q(1:kp,1)+(pgsub+pssub+pisub-(psdep+pidep+piprm+pgdep))*dt
     ! ice mass
-    q(1:kp,iqi)=q(1:kp,iqi)+(pidep-pisub)*dt
+    if(ice_flag) q(1:kp,iqi)=q(1:kp,iqi)+(pidep-pisub)*dt
 
     		
     ! liquid mass 
