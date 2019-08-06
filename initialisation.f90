@@ -7,8 +7,10 @@
     implicit none
     
     real(sp), parameter :: ra=287._sp, rv=461.5_sp,eps1=ra/rv,grav=9.81_sp,cp=1005._sp, &
-                            ttr=273.15_sp
+                            cw=4190._sp, ttr=273.15_sp, lv=2.5e6_sp
 	real(sp), dimension(:), pointer :: zr1, thr1
+	real(sp) :: tsurf_glob, p_glob,theta_q_sat_glob,rv_glob,t_glob, rh_glob,th_grad_glob,&
+	            z_glob, adiabatic_frac_glob
 	integer(i4b) :: nl1
 	
     private
@@ -92,6 +94,7 @@
 	!>@param[in] iqv,iqc,inc,drop_num_init, num_drop: moisture variables
 	!>@param[in] n_levels
 	!>@params[inout] q_read,z_read,theta_read, psurf,tsurf - sounding variables
+	!>@params[in] adiabatic_prof,adiabatic_frac,t_cbase,t_ctop, rh_above, th_grad
 	!>@param[in] l_h,r_h - halo for arrays
 	!>@param[inout] thbase, thtop
 	!>@param[in] coords,dims - dimensions of cartesian topology
@@ -129,6 +132,7 @@
 			n_levels, &
 			q_read, &
 			z_read, theta_read,psurf,tsurf, &
+			adiabatic_prof,adiabatic_frac,t_cbase,t_ctop, rh_above, th_grad,&
 			l_h,r_h, &
 			thbase,thtop, &
 			coords,dims, id, comm3d)
@@ -164,11 +168,13 @@
 		integer(i4b), intent(inout) :: ntim
 		integer(i4b), intent(in) :: ip, jp, kp, l_h, r_h, nq,nprec,iqv,iqc,inc
 		integer(i4b), intent(inout) :: nqg,nprecg
-		logical, intent(in) :: moisture,damping_layer, forcing, drop_num_init
+		logical, intent(in) :: moisture,damping_layer, forcing, drop_num_init, &
+		    adiabatic_prof
 		integer(i4b), intent(in) :: n_levels
 		real(sp), dimension(n_levels), target, intent(inout) :: z_read,theta_read
 		real(sp), dimension(nq,n_levels), target, intent(inout) :: q_read
-		real(sp), intent(in) :: psurf, tsurf,damping_thickness,damping_tau
+		real(sp), intent(in) :: psurf, tsurf,damping_thickness,damping_tau, &
+		    adiabatic_frac,t_cbase,t_ctop,rh_above,th_grad
 		integer(i4b), dimension(3), intent(inout) :: coords
 		integer(i4b), dimension(3), intent(in) :: dims
 		integer(i4b), intent(in) :: id, comm3d
@@ -186,6 +192,7 @@
 		integer(i4b) :: l, nbottom, ntop, tag1
 		integer(i4b), allocatable, dimension(:) :: seed
 		real(sp) :: rad
+		real(sp), allocatable, dimension(:) :: qv1d,qc1d
 		
 ! if the pe is not being used in the cartesian topology, do not use here
 		if(id>=dims(1)*dims(2)*dims(3)) return 
@@ -298,6 +305,10 @@
             STAT = AllocateStatus)
         if (AllocateStatus /= 0) STOP "*** Not enough memory ***"
                         
+		allocate( qv1d(1-l_h:kpp+r_h), STAT = AllocateStatus)
+		if (AllocateStatus /= 0) STOP "*** Not enough memory ***"
+		allocate( qc1d(1-l_h:kpp+r_h), STAT = AllocateStatus)
+		if (AllocateStatus /= 0) STOP "*** Not enough memory ***"
             
 		
 		allocate( ubar(1-l_h:kpp+r_h), STAT = AllocateStatus)
@@ -456,110 +467,133 @@
 		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 		! set-up density, pressure, theta, etc                                           !
 		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-		rho_surf=psurf / (ra*tsurf)
-		do i=1-l_h,kpp+r_h
-			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-			! solve the hydrostatic equation											 !
-			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-			psolve=psurf
-			if( z(i) < 0._sp ) then
-				hmin=-1.e-2_sp
-				htry=-dz(i)
-				call odeint(psolve,0._sp,z(i),eps2,htry,hmin,hydrostatic1a,rkqs)
-			else
-				hmin=1.e-2_sp
-				htry=dz(i)
-				call odeint(psolve,0._sp,z(i),eps2,htry,hmin,hydrostatic1a,rkqs)
-			endif
-			p(i,:,:)=psolve(1)
-
-			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-
-
-
-			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-			! locate and interpolate to find theta:										 !
-			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-			iloc=locate(z_read(1:n_levels),z(i))
-			iloc=min(n_levels-1,iloc)
-			iloc=max(1,iloc)
-			! linear interp theta
-			call polint(z_read(iloc:iloc+1), theta_read(iloc:iloc+1), &
-						min(z(i),z_read(n_levels)), var,dummy)
-!			th(:,:,i)=var
-			theta(i)=var
-			rhoa(i)=psolve(1)/(ra*theta(i)*(psolve(1)/psurf)**(ra/cp))
-			pref(i)=psolve(1)
-			tref(i)=(theta(i)*(psolve(1)/psurf)**(ra/cp))
-			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-
-
-
-			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-			! solve the hydrostatic equation for k+1/2 levels							 !
-			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-			psolve=psurf
-			if( zn(i) < 0._sp ) then
-				hmin=-1.e-2_sp
-				htry=-dzn(i)
-				call odeint(psolve,0._sp,zn(i),eps2,htry,hmin,hydrostatic1a,rkqs)
-			else
-				hmin=1.e-2_sp
-				htry=dzn(i)
-				call odeint(psolve,0._sp,zn(i),eps2,htry,hmin,hydrostatic1a,rkqs)
-			endif
-			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-
-
-
-			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-			! locate and interpolate to find theta:										 !
-			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-			iloc=locate(z_read(1:n_levels),zn(i))
-			iloc=min(n_levels-1,iloc)
-			iloc=max(1,iloc)
-			! linear interp theta
-			call polint(z_read(iloc:iloc+1), theta_read(iloc:iloc+1), &
-						min(zn(i),z_read(n_levels)), var,dummy)
-			thetan(i)=var
-			rhoan(i)=psolve(1)/(ra*thetan(i)*(psolve(1)/psurf)**(ra/cp))
-			prefn(i)=psolve(1)
-			trefn(i)=(thetan(i)*(psolve(1)/psurf)**(ra/cp))
-			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-
-		enddo
-		
-		if(moisture) then
-		    q=0._sp
-    		do i=1-l_h,kpp+r_h
+        rho_surf=psurf / (ra*tsurf)
+		if(.not.adiabatic_prof) then
+            do i=1-l_h,kpp+r_h
+    
                 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-                ! locate and interpolate to find q-vapour:							     !
+                ! solve the hydrostatic equation on staggered points					 !
+                !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+                psolve=psurf
+                if( z(i) < 0._sp ) then
+                    hmin=-1.e-2_sp
+                    htry=-dz(i)
+                    call odeint(psolve,0._sp,z(i),eps2,htry,hmin,hydrostatic1a,rkqs)
+                else
+                    hmin=1.e-2_sp
+                    htry=dz(i)
+                    call odeint(psolve,0._sp,z(i),eps2,htry,hmin,hydrostatic1a,rkqs)
+                endif
+                p(i,:,:)=psolve(1)
+
+                !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+
+
+                !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+                ! locate and interpolate to find theta on staggered points:		    	 !
+                !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+                iloc=locate(z_read(1:n_levels),z(i))
+                iloc=min(n_levels-1,iloc)
+                iloc=max(1,iloc)
+                ! linear interp theta
+                call polint(z_read(iloc:iloc+1), theta_read(iloc:iloc+1), &
+                            min(z(i),z_read(n_levels)), var,dummy)
+    !			th(:,:,i)=var
+                theta(i)=var
+                rhoa(i)=psolve(1)/(ra*theta(i)*(psolve(1)/psurf)**(ra/cp))
+                pref(i)=psolve(1)
+                tref(i)=(theta(i)*(psolve(1)/psurf)**(ra/cp))
+                !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+
+
+                !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+                ! solve the hydrostatic equation on integer points				    	 !
+                !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+                psolve=psurf
+                if( zn(i) < 0._sp ) then
+                    hmin=-1.e-2_sp
+                    htry=-dzn(i)
+                    call odeint(psolve,0._sp,zn(i),eps2,htry,hmin,hydrostatic1a,rkqs)
+                else
+                    hmin=1.e-2_sp
+                    htry=dzn(i)
+                    call odeint(psolve,0._sp,zn(i),eps2,htry,hmin,hydrostatic1a,rkqs)
+                endif
+                !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+
+
+                !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+                ! locate and interpolate to find theta on integer points			     !
                 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
                 iloc=locate(z_read(1:n_levels),zn(i))
                 iloc=min(n_levels-1,iloc)
                 iloc=max(1,iloc)
-                ! linear interp q-vapour
-                call polint(z_read(iloc:iloc+1), q_read(1,iloc:iloc+1), &
+                ! linear interp theta
+                call polint(z_read(iloc:iloc+1), theta_read(iloc:iloc+1), &
                             min(zn(i),z_read(n_levels)), var,dummy)
-                q(i,:,:,1)=var
-                !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!	
-                
+                thetan(i)=var
+                rhoan(i)=psolve(1)/(ra*thetan(i)*(psolve(1)/psurf)**(ra/cp))
+                prefn(i)=psolve(1)
+                trefn(i)=(thetan(i)*(psolve(1)/psurf)**(ra/cp))
                 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-                ! set the cloud, etc                                                     !
-                !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-                t=thetan(i)*(prefn(i)/psurf)**(ra/cp)
-                qsat=eps1*svp_liq(t)/(prefn(i)-svp_liq(t))
-                if (var >= qsat) then
-                    q(i,:,:,iqc)=var-qsat
-                    q(i,:,:,iqv)=qsat
-                    q(i,:,:,inc)=num_drop
-                else
-                    q(i,:,:,inc)=0._sp
-                endif
-                !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!                
+
             enddo
-		endif
-		
+        
+            if(moisture) then
+                q=0._sp
+                do i=1-l_h,kpp+r_h
+                    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+                    ! locate and interpolate to find q-vapour:							 !
+                    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+                    iloc=locate(z_read(1:n_levels),zn(i))
+                    iloc=min(n_levels-1,iloc)
+                    iloc=max(1,iloc)
+                    ! linear interp q-vapour
+                    call polint(z_read(iloc:iloc+1), q_read(1,iloc:iloc+1), &
+                                min(zn(i),z_read(n_levels)), var,dummy)
+                    q(i,:,:,1)=var
+                    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!	
+                
+                    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+                    ! set the cloud, etc                                                 !
+                    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+                    t=thetan(i)*(prefn(i)/psurf)**(ra/cp)
+                    qsat=eps1*svp_liq(t)/(prefn(i)-svp_liq(t))
+                    if (var >= qsat) then
+                        q(i,:,:,iqc)=var-qsat
+                        q(i,:,:,iqv)=qsat
+                        q(i,:,:,inc)=num_drop
+                    else
+                        q(i,:,:,inc)=0._sp
+                    endif
+                    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!               
+                enddo
+            endif
+            
+        else
+            
+            ! if we are assuming adiabatic cloud, etc
+            call setup_adiabatic_profile(l_h,r_h,kpp, psurf,tsurf,t_cbase,t_ctop, &
+                                        rho_surf, rh_above, th_grad,&
+                                        adiabatic_frac, &
+                                        pref,tref,theta,rhoa,qv1d,qc1d,z,dz,&
+                                        prefn,trefn,thetan,rhoan,zn,dzn, &
+                                        coords,dims, id, comm3d)
+            if(moisture) then
+                q(i,:,:,inc)=0._sp
+                do i=1-l_h,kpp+r_h
+                    q(i,:,:,iqc)=qc1d(i)
+                    q(i,:,:,iqv)=qv1d(i)
+                    if(qc1d(i).gt.0._sp) q(i,:,:,inc)=num_drop
+                enddo
+            endif
+            
+        endif
+        
+        		
 		
 		p(:,:,:)=0._sp
 ! 		rhoa=1._sp
@@ -656,10 +690,10 @@
 						.and. (j >= jpstart) .and. (j <= jpstart+jpp+1) &
 						.and. (k >= kpstart) .and. (k <= kpstart+kpp+1) ) then
 					
-						if ( (z(k-kpstart)>1500._sp) .and. (z(k-kpstart)<1600._sp) ) &
+						if ( (z(k-kpstart)>2000._sp) .and. (z(k-kpstart)<2100._sp) ) &
 							th(k-kpstart,j-jpstart,i-ipstart) = -0.001_sp+(r-0.5_sp)/10._sp
 
-						if ( (z(k-kpstart)>1400._sp) .and. (z(k-kpstart)<1500._sp) ) &
+						if ( (z(k-kpstart)>1900._sp) .and. (z(k-kpstart)<2000._sp) ) &
 							th(k-kpstart,j-jpstart,i-ipstart) = 0.001_sp-(r-0.5_sp)/10._sp
 						
 
@@ -686,7 +720,7 @@
  		do i=1-r_h,ipp+r_h
  			do j=1-r_h,jpp+r_h
                 do k=0,kpp+1
-                    v(k,j,i)=(0.5_sp*erf((zn(k)-1500._sp)/200._sp)+0.5_sp)*5._sp
+                    v(k,j,i)=(0.5_sp*erf((zn(k)-2000._sp)/200._sp)+0.5_sp)*10._sp
                     if((coords(3)==(dims(3)-1)).and.(k==kpp)) v(k,j,i)=0._sp
                     if((coords(3)==0).and.(k<=1)) v(k,j,i)=0._sp
                     zv(k,j,i)=v(k,j,i)
@@ -695,7 +729,7 @@
             enddo
         enddo
 
-!  		th=0._sp
+		th=0._sp
 ! 		
 ! 		
 ! 		do i=1-r_h,ipp+r_h
@@ -750,7 +784,9 @@
         call find_base_top(comm3d, id, kpp,l_h,r_h,thetan,thbase,thtop, dims,coords)
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!              
         
-
+        ! deallocate
+        deallocate(qv1d)
+        deallocate(qc1d)
 
 		! no dangling pointers
 		if (associated(zr1) ) nullify(zr1)
@@ -760,10 +796,580 @@
 	
 
 
+	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+	! Setup the profile to be adiabatic                                                  !
+	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+	!>@author
+	!>Paul J. Connolly, The University of Manchester
+	!>@brief
+	!>adiabatic profile:                                        
+    subroutine setup_adiabatic_profile(l_h,r_h,kpp, psurf,tsurf,t_cbase,t_ctop, &
+                                        rho_surf, rh_above, th_grad,&
+                                        adiabatic_frac, &
+                                        pref,tref,theta,rhoa,qv1d,qc1d,z,dz,&
+                                        prefn,trefn,thetan,rhoan,zn,dzn, &
+                                        coords,dims, id, comm3d)                      
+        use nrtype
+		use nr, only : rkqs, odeint, zbrent
+        implicit none
+        integer(i4b), intent(in) :: l_h,r_h,kpp
+        real(sp), intent(in) :: psurf,tsurf,t_cbase,t_ctop,rh_above, th_grad, &
+                            adiabatic_frac
+        real(sp), intent(inout) :: rho_surf
+        real(sp), dimension(1-l_h:kpp+r_h), intent(in) :: z,zn,dz,dzn
+        real(sp), dimension(1-l_h:kpp+r_h), intent(inout) :: pref,tref,theta,rhoa,qv1d, &
+                                                    qc1d,prefn,trefn,thetan,rhoan
+		integer(i4b), dimension(3), intent(inout) :: coords
+		integer(i4b), dimension(3), intent(in) :: dims
+		integer(i4b), intent(in) :: id, comm3d
+
+
+
+                                                    
+        real(sp) :: zcb, htry, hmin, eps2=1.e-5_sp,t,pcb,rv_sub, theta_q_sat, lmr_ctop, &
+                q_tot,pct,zct,t_ctop_evap
+        real(sp),dimension(1) :: psolve, zsolve
+        integer(i4b) :: k                        
+        
+                   
+        ! 1. Solve hydrostatic equation up to cloud-base, 
+        !    conserving dry potential temperature
+        ! 2. Calculate the cloud-base pressure,
+        !     by integrating hydrostatic equation
+        ! 3. Solve hydrostatic equation up to cloud-top, 
+        !    conserving moist potential temperature
+        ! 4. Calculate the cloud-top pressure
+        ! 5. Calculate the cloud-top pressure
+        
+        
+        
+        
+        
+        
+        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        ! 1. Solve hydrostatic equation up to cloud-base, conserving dry potential       !
+        !    temperature                                                                 !
+        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        zcb=(tsurf-t_cbase)*cp/grav   
+        qv1d(:)=0._sp
+        qc1d(:)=0._sp
+        tsurf_glob=tsurf
+        do k=1-l_h,kpp+r_h
+            if(z(k).gt.0._sp) then
+                hmin=1.e-2_sp
+                htry=dz(k)
+            else
+                hmin=-1.e-2_sp
+                htry=-dz(k)
+            endif
+            psolve(1)=psurf
+            call odeint(psolve,0._sp,z(k),eps2,htry,hmin,hydrostatic1b,rkqs)
+
+            t=tsurf*(psolve(1)/1.e5_sp)**(ra/cp)
+            if(t.lt.t_cbase) exit
+            
+            !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+            ! set reference variables                                                    !
+            !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+            pref(k)=psolve(1)
+            tref(k)=t
+            theta(k)=tsurf
+            rhoa(k)=pref(k)/(ra*tref(k))
+            !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+            
+            
+        enddo
+        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        ! 1. done                                                                        !
+        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        ! 2. calculate the cloud-base pressure                                           !
+        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        psolve(1)=psurf
+        call odeint(psolve,0._sp,zcb,eps2,htry,hmin,hydrostatic1b,rkqs)
+        t=tsurf*(psolve(1)/1.e5_sp)**(ra/cp)
+        pcb=psolve(1)
+        rv_sub=eps1*svp_liq(t_cbase)/(pcb-svp_liq(t_cbase))
+        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        ! 2. done                                                                           !
+        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        
+        
+        
+        
+        
+        
+        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        ! 3. Solve hydrostatic equation up to cloud-top, conserving moist potential      !
+        !    temperature                                                                 !
+        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        hmin=1.e-2_sp
+        rv_glob=rv_sub
+        adiabatic_frac_glob=adiabatic_frac
+        p_glob=pcb
+        theta_q_sat_glob=0._sp
+        theta_q_sat=calc_theta_q(t_cbase)        
+        theta_q_sat_glob=theta_q_sat
+        p_glob=pcb
+        rv_glob=rv_sub
+        t=zbrent(calc_theta_q,1.01_sp*t_cbase,t_cbase,1.e-5_sp)
+        t_glob=t_cbase
+        do k=1-l_h,kpp+r_h
+            if(zcb.ge.z(k)) then 
+                qv1d(k)=rv_sub
+                cycle
+            endif
+            psolve(1)=pcb
+            htry=dz(k)
+            call odeint(psolve,zcb,z(k),eps2,htry,hmin,hydrostatic2b,rkqs)
+            p_glob=psolve(1)
+            t=zbrent(calc_theta_q,20._sp,t_cbase,1.e-5_sp)
+            if(t.lt.t_ctop) exit
+            
+            !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+            ! set reference variables                                                    !
+            !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+            pref(k)=psolve(1)
+            tref(k)=t
+            theta(k)=t*(1.e5_sp/psolve(1))**(ra/cp)
+            rhoa(k)=pref(k)/(ra*tref(k))
+            qv1d(k)=eps1*svp_liq(t)/(psolve(1)-svp_liq(t))
+            qc1d(k)=(rv_sub-qv1d(k))*adiabatic_frac
+            !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+        enddo
+        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        ! 3. done                                                                        !
+        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+     
+     
+     
+     
+     
+     
+        
+        
+        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        ! 4. calculate the cloud-top pressure                                            !
+        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        t_glob=t_ctop
+        pct=zbrent(calc_theta_q2,pcb,psolve(1),1.e-5_sp)
+        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        ! 4. done                                                                        !
+        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        
+        
+        
+        
+        
+        
+        
+        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        ! 5. calculate the cloud-top height                                              !
+        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        hmin=-1.e-2_sp
+        htry=-10._sp
+        zsolve(1)=zcb
+        t_glob=t_cbase
+        call odeint(zsolve,pcb,pct,eps2,htry,hmin,hydrostatic2c,rkqs)
+        zct=zsolve(1)
+        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        ! 5. done                                                                        !
+        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        
+        
+        
+        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        ! 6. Solve hydrostatic equation up to domain top, with theta gradient and        !
+        ! constant rh                                                                    !
+        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        z_glob=zct
+        t_glob=t_ctop*(1.e5_sp/pct)**(ra/cp) ! potential temperature at cloud top
+        hmin=1.e-2_sp
+        th_grad_glob=th_grad
+        do k=1-l_h,kpp+r_h
+            if(zct.ge.z(k)) cycle
+            htry=dz(k)
+            psolve(1)=pct
+            call odeint(psolve,zct,z(k),eps2,htry,hmin,hydrostatic2e,rkqs)
+
+
+            t=(t_glob+th_grad_glob*(z(k)-zct))*(psolve(1)/1.e5_sp)**(ra/cp)
+            
+            rv_glob=rh_above*eps1*svp_liq(t)/(psolve(1)-svp_liq(t))
+
+
+            !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+            ! set reference variables                                                    !
+            !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+            pref(k)=psolve(1)
+            tref(k)=t
+            theta(k)=t*(1.e5_sp/psolve(1))**(ra/cp)
+            rhoa(k)=pref(k)/(ra*tref(k))
+            qv1d(k)=rh_above*eps1*svp_liq(t)/(psolve(1)-svp_liq(t))
+            !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        enddo
+        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        ! 6. done                                                                        !
+        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+                                             
+                                             
+                                             
+                                             
+                                             
+                       
+                       
+                       
+                       
+                                             
+                                             
+                                              
+        ! now do the same, but for the node values
+        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        ! 1. Solve hydrostatic equation up to cloud-base, conserving dry potential       !
+        !    temperature                                                                 !
+        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        zcb=(tsurf-t_cbase)*cp/grav   
+        qv1d(:)=0._sp
+        qc1d(:)=0._sp
+        tsurf_glob=tsurf
+        do k=1-l_h,kpp+r_h
+            if(zn(k).gt.0._sp) then
+                hmin=1.e-2_sp
+                htry=dzn(k)
+            else
+                hmin=-1.e-2_sp
+                htry=-dzn(k)
+            endif
+            psolve(1)=psurf
+            call odeint(psolve,0._sp,zn(k),eps2,htry,hmin,hydrostatic1b,rkqs)
+
+            t=tsurf*(psolve(1)/1.e5_sp)**(ra/cp)
+            if(t.lt.t_cbase) exit
+            
+            !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+            ! set reference variables                                                    !
+            !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+            prefn(k)=psolve(1)
+            trefn(k)=t
+            thetan(k)=tsurf
+            rhoan(k)=prefn(k)/(ra*trefn(k))
+            !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+            
+            
+        enddo
+        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        ! 1. done                                                                        !
+        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        ! 2. calculate the cloud-base pressure                                           !
+        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        psolve(1)=psurf
+        call odeint(psolve,0._sp,zcb,eps2,htry,hmin,hydrostatic1b,rkqs)
+        t=tsurf*(psolve(1)/1.e5_sp)**(ra/cp)
+        pcb=psolve(1)
+        rv_sub=eps1*svp_liq(t_cbase)/(pcb-svp_liq(t_cbase))
+        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        ! 2. done                                                                           !
+        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        
+        
+        
+        
+        
+        
+        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        ! 3. Solve hydrostatic equation up to cloud-top, conserving moist potential      !
+        !    temperature                                                                 !
+        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        hmin=1.e-2_sp
+        rv_glob=rv_sub
+        adiabatic_frac_glob=adiabatic_frac
+        p_glob=pcb
+        theta_q_sat_glob=0._sp
+        theta_q_sat=calc_theta_q(t_cbase)        
+        theta_q_sat_glob=theta_q_sat
+        p_glob=pcb
+        rv_glob=rv_sub
+        t=zbrent(calc_theta_q,1.01_sp*t_cbase,t_cbase,1.e-5_sp)
+        t_glob=t_cbase
+        do k=1-l_h,kpp+r_h
+            if(zcb.ge.zn(k)) then 
+                qv1d(k)=rv_sub
+                cycle
+            endif
+            psolve(1)=pcb
+            htry=dzn(k)
+            call odeint(psolve,zcb,zn(k),eps2,htry,hmin,hydrostatic2b,rkqs)
+            p_glob=psolve(1)
+            t=zbrent(calc_theta_q,20._sp,t_cbase,1.e-5_sp)
+            if(t.lt.t_ctop) exit
+            
+            !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+            ! set reference variables                                                    !
+            !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+            prefn(k)=psolve(1)
+            trefn(k)=t
+            thetan(k)=t*(1.e5_sp/psolve(1))**(ra/cp)
+            rhoan(k)=pref(k)/(ra*tref(k))
+            qv1d(k)=eps1*svp_liq(t)/(psolve(1)-svp_liq(t))
+            qc1d(k)=(rv_sub-qv1d(k))*adiabatic_frac
+            !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+        enddo
+        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        ! 3. done                                                                        !
+        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+     
+     
+     
+     
+     
+     
+        
+        
+        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        ! 4. calculate the cloud-top pressure                                            !
+        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        t_glob=t_ctop
+        pct=zbrent(calc_theta_q2,pcb,psolve(1),1.e-5_sp)
+        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        ! 4. done                                                                        !
+        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        
+        
+        
+        
+        
+        
+        
+        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        ! 5. calculate the cloud-top height                                              !
+        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        hmin=-1.e-2_sp
+        htry=-10._sp
+        zsolve(1)=zcb
+        t_glob=t_cbase
+        call odeint(zsolve,pcb,pct,eps2,htry,hmin,hydrostatic2c,rkqs)
+        zct=zsolve(1)
+        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        ! 5. done                                                                        !
+        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        
+        
+        
+        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        ! 6. Solve hydrostatic equation up to domain top, with theta gradient and        !
+        ! constant rh                                                                    !
+        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        z_glob=zct
+        t_glob=t_ctop*(1.e5_sp/pct)**(ra/cp) ! potential temperature at cloud top
+        hmin=1.e-2_sp
+        th_grad_glob=th_grad
+        do k=1-l_h,kpp+r_h
+            if(zct.ge.zn(k)) cycle
+            htry=dzn(k)
+            psolve(1)=pct
+            call odeint(psolve,zct,zn(k),eps2,htry,hmin,hydrostatic2e,rkqs)
+
+
+            t=(t_glob+th_grad_glob*(zn(k)-zct))*(psolve(1)/1.e5_sp)**(ra/cp)
+            
+            rv_glob=rh_above*eps1*svp_liq(t)/(psolve(1)-svp_liq(t))
+
+
+            !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+            ! set reference variables                                                    !
+            !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+            prefn(k)=psolve(1)
+            trefn(k)=t
+            thetan(k)=t*(1.e5_sp/psolve(1))**(ra/cp)
+            rhoan(k)=prefn(k)/(ra*trefn(k))
+            qv1d(k)=rh_above*eps1*svp_liq(t)/(psolve(1)-svp_liq(t))
+            !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        enddo
+        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        ! 6. done                                                                        !
+        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        
+        
+        
+    end subroutine setup_adiabatic_profile
+	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
 
 
 	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-	! calculate hydrostatic equation                                                            !
+	! calculate hydrostatic equation                                                     !
+	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+	!>@author
+	!>Paul J. Connolly, The University of Manchester
+	!>@brief
+	!>calculate the hydrostatic equation (version for th gradient):
+	!>\f$ \frac{\partial P}{\partial z} = -\rho g \f$
+	!>@param[in] z,p
+	!>@param[inout] dpdz
+	subroutine hydrostatic2e(z,p,dpdz)
+        use nrtype
+        use nr, only : zbrent
+        implicit none
+        real(sp), intent(in) :: z
+        real(sp), dimension(:), intent(in) :: p
+        real(sp), dimension(:), intent(out) :: dpdz
+        real(sp) :: t,theta
+    
+        theta=t_glob+th_grad_glob*(z-z_glob)
+	
+		
+		! calculate t from theta and p:
+		t=theta*(p(1)/1.e5_sp)**(ra/cp)
+		! hydrostatic equation:
+		dpdz(1)=-(grav*p(1)) / (ra*t) 	
+	end subroutine hydrostatic2e
+	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+
+
+
+	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+	! calculate hydrostatic equation                                                     !
+	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+	!>@author
+	!>Paul J. Connolly, The University of Manchester
+	!>@brief
+	!>calculate the hydrostatic equation (version for constant rh):
+	!>\f$ \frac{\partial P}{\partial z} = -\rho g \f$
+	!>@param[in] z,p
+	!>@param[inout] dpdz
+	subroutine hydrostatic2d(z,p,dpdz)
+        use nrtype
+        use nr, only : zbrent
+        implicit none
+        real(sp), intent(in) :: z
+        real(sp), dimension(:), intent(in) :: p
+        real(sp), dimension(:), intent(out) :: dpdz
+        real(sp) :: t
+    
+        p_glob=p(1)
+
+        t=zbrent(rh_specified,20._sp,t_glob*1.5_sp,1.e-5_sp)
+
+        dpdz(1)=-(grav*p(1))/(ra*t)
+	
+	end subroutine hydrostatic2d
+	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+	! calculate hydrostatic equation                                                     !
+	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+	!>@author
+	!>Paul J. Connolly, The University of Manchester
+	!>@brief
+	!>calculate the hydrostatic equation (version for constant theta_q_sat):
+	!>\f$ \frac{\partial P}{\partial z} = -\rho g \f$
+	!>@param[in] z,p
+	!>@param[inout] dpdz
+	subroutine hydrostatic2c(p,z,dzdp)
+        use nrtype
+        use nr, only : zbrent
+        implicit none
+        real(sp), intent(in) :: p
+        real(sp), dimension(:), intent(in) :: z
+        real(sp), dimension(:), intent(out) :: dzdp
+        real(sp) :: t
+    
+        p_glob=p
+
+        t=tsurf_glob*(p_glob/1.e5_sp)**(ra/cp)
+        ! find the temperature by iteration
+        t=zbrent(calc_theta_q,t,t_glob,1.e-5_sp)
+
+        dzdp(1)=-(ra*t)/(grav*p)
+	
+	end subroutine hydrostatic2c
+	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+	! calculate hydrostatic equation                                                     !
+	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+	!>@author
+	!>Paul J. Connolly, The University of Manchester
+	!>@brief
+	!>calculate the hydrostatic equation (version for constant theta_q_sat):
+	!>\f$ \frac{\partial P}{\partial z} = -\rho g \f$
+	!>@param[in] z,p
+	!>@param[inout] dpdz
+	subroutine hydrostatic2b(z,p,dpdz)
+        use nrtype
+        use nr, only : zbrent
+        implicit none
+        real(sp), intent(in) :: z
+        real(sp), dimension(:), intent(in) :: p
+        real(sp), dimension(:), intent(out) :: dpdz
+        real(sp) :: t
+    
+        p_glob=p(1)
+
+        t=tsurf_glob*(p_glob/1.e5_sp)**(ra/cp)
+        ! find the temperature by iteration
+        t=zbrent(calc_theta_q,t,t_glob,1.e-5_sp)
+
+        dpdz(1)=-(grav*p(1))/(ra*t)
+	
+	end subroutine hydrostatic2b
+	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+	! calculate hydrostatic equation                                                     !
+	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+	!>@author
+	!>Paul J. Connolly, The University of Manchester
+	!>@brief
+	!>calculate the hydrostatic equation (version for constant theta):
+	!>\f$ \frac{\partial P}{\partial z} = -\rho g \f$
+	!>@param[in] z,p
+	!>@param[inout] dpdz
+	subroutine hydrostatic1b(z,p,dpdz)
+		use nrtype
+		implicit none
+		real(sp), intent(in) :: z
+		real(sp), dimension(:), intent(in) :: p
+		real(sp), dimension(:), intent(out) :: dpdz
+		real(sp) :: t
+		integer(i4b) :: iloc
+		
+		
+		! calculate t from theta and p:
+		t=tsurf_glob*(p(1)/1.e5_sp)**(ra/cp)
+		! hydrostatic equation:
+		dpdz(1)=-(grav*p(1)) / (ra*t) 
+	
+	end subroutine hydrostatic1b
+	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+
+	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+	! calculate hydrostatic equation                                                     !
 	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 	!>@author
 	!>Paul J. Connolly, The University of Manchester
@@ -801,10 +1407,88 @@
 	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 
+	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+	! calculate the value of temperature required to reach specified RH                  !
+	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+	!>@author
+	!>Paul J. Connolly, The University of Manchester
+	!>@brief
+	!>calculates the value of temperature required to evaporate 
+	!> liquid water and reach specified rh (note!!! p_glob, rv_glob 
+	!>      and rh_glob must be set externally before calling)
+	!>@param[in] t: temperature
+	!>@return rh_specified: value of rh_specified
+	function rh_specified(t)
+        use nrtype
 
-	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-	! saturation vapour pressure over liquid                                       !
-	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        implicit none
+        real(sp), intent(in) :: t
+        real(sp) :: rh_specified
+        real(sp) :: ws
+        
+    
+        ws=eps1*svp_liq(t)/(p_glob-svp_liq(t))
+        
+        rh_specified= rv_glob/(ws)-rh_glob
+
+	end function rh_specified
+	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+	! calculate the value of theta_q_sat                                                 !
+	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+	!>@author
+	!>Paul J. Connolly, The University of Manchester
+	!>@brief
+	!>calculates the value of theta_q_sat (note!!! t_glob, rv_glob 
+	!>      and theta_q_sat_glob must be set externally before calling)
+	!>@param[in] t: temperature
+	!>@return calc_theta_q2: value of theta_q_sat
+	function calc_theta_q2(p)
+        use nrtype
+
+        implicit none
+        real(sp), intent(in) :: p
+        real(sp) :: calc_theta_q2
+        real(sp) :: ws
+        
+        ws=eps1*svp_liq(t_glob)/(p-svp_liq(t_glob))
+        calc_theta_q2=t_glob*(1e5_sp/p)**(ra/(cp+cw*rv_glob))* &
+            exp(lv*ws/(cp+cw*rv_glob)/t_glob)-theta_q_sat_glob
+
+	end function calc_theta_q2  
+	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+	
+	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+	! calculate the value of theta_q_sat                                                 !
+	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+	!>@author
+	!>Paul J. Connolly, The University of Manchester
+	!>@brief
+	!>calculates the value of theta_q_sat (note!!! p_glob, rv_glob 
+	!>      and theta_q_sat_glob must be set externally before calling)
+	!>@param[in] t: temperature
+	!>@return calc_theta_q: value of theta_q_sat
+	function calc_theta_q(t)
+        use nrtype
+        implicit none
+        real(sp), intent(in) :: t
+        real(sp) :: calc_theta_q
+        real(sp) :: ws
+        
+        
+        ws=eps1*svp_liq(t)/(p_glob-svp_liq(t))
+        calc_theta_q=t*(1.e5_sp/p_glob)**(ra/(cp+cw*rv_glob))* &
+            exp(lv*ws/(t*(cp+cw*rv_glob)))-theta_q_sat_glob
+
+	end function calc_theta_q    
+	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+	
+	
+	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+	! saturation vapour pressure over liquid                                             !
+	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 	!>@author
 	!>Paul J. Connolly, The University of Manchester
 	!>@brief
@@ -822,9 +1506,9 @@
 	end function svp_liq
 
 
-	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-	! HELPER ROUTINE                                                       !
-	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+	! HELPER ROUTINE                                                                     !
+	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 	subroutine check(status)
 	use netcdf
 	use nrtype
@@ -835,7 +1519,7 @@
 		stop "Stopped"
 	end if
 	end subroutine check
-	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 	end module initialisation
 	

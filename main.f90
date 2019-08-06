@@ -193,6 +193,8 @@
 			z_read(1:nm1%n_levels), &
 			theta_read(1:nm1%n_levels), &
 			nm1%psurf,nm1%tsurf, &
+			nm1%adiabatic_prof, nm1%adiabatic_frac,nm1%t_cbase,nm1%t_ctop, &
+			nm1%rh_above, nm1%th_grad, &
 			grid1%l_halo,grid1%r_halo, &
 			grid1%thbase,grid1%thtop, &
 			grid1%coords,mp1%dims, mp1%id, mp1%ring_comm)

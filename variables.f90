@@ -67,7 +67,8 @@
             			dissipate_h, nudge, restart, &
             			monotone, moisture, &
             			damping_layer,forcing, aero_prof_flag,drop_num_init, theta_flag, &
-            			hm_flag=.false.,ice_flag=.false.
+            			hm_flag=.false.,ice_flag=.false., &
+            			adiabatic_prof=.false.
             integer(i4b) :: nq,ip, jp, kp, subgrid_model, advection_scheme, kord, &
                         microphysics_flag,nprec
             real(sp) :: vis, &
@@ -76,7 +77,8 @@
             			nudge_timescale, &
             			cvis,  &
             			dx, dy, dz, &
-            			damping_thickness, damping_tau, forcing_tau
+            			damping_thickness, damping_tau, forcing_tau, &
+            			adiabatic_frac,t_cbase,t_ctop,rh_above,th_grad
             real(sp) :: psurf,tsurf,z0,z0th, ptol=1.e-8_sp, drop_num
             integer(i4b) :: n_levels
         end type namelist_input
