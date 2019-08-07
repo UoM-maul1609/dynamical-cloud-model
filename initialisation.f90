@@ -827,7 +827,7 @@
 
                                                     
         real(sp) :: zcb, htry, hmin, eps2=1.e-5_sp,t,pcb,rv_sub, theta_q_sat, lmr_ctop, &
-                q_tot,pct,zct,t_ctop_evap
+                q_tot,pct,zct,t_ctop_evap,pctop_dry
         real(sp),dimension(1) :: psolve, zsolve
         integer(i4b) :: k                        
         
@@ -924,6 +924,7 @@
         rv_glob=rv_sub
         t=zbrent(calc_theta_q,1.01_sp*t_cbase,t_cbase,1.e-5_sp)
         t_glob=t_cbase
+
         do k=1-l_h,kpp+r_h
             if(zcb.ge.z(k)) then 
                 qv1d(k)=rv_sub
@@ -952,24 +953,20 @@
         ! 3. done                                                                        !
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
      
-     
-     
-     
-     
-     
-        
-        
+      
+      
+
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         ! 4. calculate the cloud-top pressure                                            !
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         t_glob=t_ctop
-        pct=zbrent(calc_theta_q2,pcb,psolve(1),1.e-5_sp)
+	pctop_dry=pcb*exp(cp/ra*log(t_ctop/t_cbase))
+        pct=zbrent(calc_theta_q2,pcb,pctop_dry/2._sp,1.e-5_sp)
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         ! 4. done                                                                        !
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         
-        
-        
+         
         
         
         
@@ -1152,7 +1149,8 @@
         ! 4. calculate the cloud-top pressure                                            !
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         t_glob=t_ctop
-        pct=zbrent(calc_theta_q2,pcb,psolve(1),1.e-5_sp)
+	pctop_dry=pcb*exp(cp/ra*log(t_ctop/t_cbase))
+        pct=zbrent(calc_theta_q2,pcb,pctop_dry/2._sp,1.e-5_sp)
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         ! 4. done                                                                        !
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
