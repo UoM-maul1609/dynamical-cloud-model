@@ -7,9 +7,9 @@
 	nm1%ptol=1.e-8,         ! tolerance for pressure solver
 	                        ! please note for mass conservation 1.e-8 required
 	                        ! for simulations with dy=200, dz=100, dt=5s
-	nm1%damping_thickness=3000.,
+	nm1%damping_thickness=7000.,
 	nm1%damping_tau=1000.,
-	nm1%forcing_tau=250.,
+	nm1%forcing_tau=500.,
 	nm1%z0=1.e-4,
 	nm1%z0th=1.e-4,
 	nm1%restart=.false.,
@@ -32,7 +32,7 @@
 	nm1%drop_num=5000.e6,            ! initial drop number concentration
 	nm1%output_interval=10.,
 	nm1%rotation_period_hours=24.,
-	nm1%moisture=.false.,
+	nm1%moisture=.true.,
 	nm1%theta_flag=.true.,
 	nm1%nq=3,
     nm1%nprec=1, ! number of precipitation types
@@ -44,15 +44,15 @@
 	nm1%dz=100.,
  	nm1%psurf=100000.,
  	nm1%tsurf=290.9,
- 	nm1%adiabatic_prof=.false.,
+ 	nm1%adiabatic_prof=.true.,
  	nm1%adiabatic_frac=1.,
- 	nm1%t_cbase=283.,
- 	nm1%t_ctop=274.,
+ 	nm1%t_cbase=285.,
+ 	nm1%t_ctop=280,
  	nm1%rh_above=0.9,
  	nm1%th_grad=0.005,
     nm1%n_levels = 7/
 &sounding_vars
-	q_read(1,1:7)   = 0.0099, 0.0099, 0.0099, 1.4e-11, 1.4e-11, 1.4e-11, 1.4e-11,
+	q_read(1,1:7)   = 0.0099, 0.0099, 0.0099, 1.4e-4, 1.4e-4, 1.4e-11, 1.4e-11,
 	theta_read(1:7) = 290.9, 290.9, 290.9,290.9,290.9, 300.9, 400., !312.95,
 	z_read(1:7)     = 0.,740,1600,1601,6260, 6261, 12000./ ! 3260
 	

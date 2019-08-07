@@ -690,10 +690,10 @@
 						.and. (j >= jpstart) .and. (j <= jpstart+jpp+1) &
 						.and. (k >= kpstart) .and. (k <= kpstart+kpp+1) ) then
 					
-						if ( (z(k-kpstart)>2000._sp) .and. (z(k-kpstart)<2100._sp) ) &
+						if ( (z(k-kpstart)>1600._sp) .and. (z(k-kpstart)<1700._sp) ) &
 							th(k-kpstart,j-jpstart,i-ipstart) = -0.001_sp+(r-0.5_sp)/10._sp
 
-						if ( (z(k-kpstart)>1900._sp) .and. (z(k-kpstart)<2000._sp) ) &
+						if ( (z(k-kpstart)>1500._sp) .and. (z(k-kpstart)<1600._sp) ) &
 							th(k-kpstart,j-jpstart,i-ipstart) = 0.001_sp-(r-0.5_sp)/10._sp
 						
 
@@ -720,7 +720,7 @@
  		do i=1-r_h,ipp+r_h
  			do j=1-r_h,jpp+r_h
                 do k=0,kpp+1
-                    v(k,j,i)=(0.5_sp*erf((zn(k)-2000._sp)/200._sp)+0.5_sp)*10._sp
+                    v(k,j,i)=(0.5_sp*erf((zn(k)-1700._sp)/50._sp)+0.5_sp)*10._sp
                     if((coords(3)==(dims(3)-1)).and.(k==kpp)) v(k,j,i)=0._sp
                     if((coords(3)==0).and.(k<=1)) v(k,j,i)=0._sp
                     zv(k,j,i)=v(k,j,i)
@@ -729,7 +729,7 @@
             enddo
         enddo
 
-		th=0._sp
+ 		th=0._sp
 ! 		
 ! 		
 ! 		do i=1-r_h,ipp+r_h
