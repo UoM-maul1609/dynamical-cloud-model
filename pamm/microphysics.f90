@@ -1129,7 +1129,7 @@
     integer(i4b), intent(in) :: id, comm_vert
     integer(i4b), dimension(3), intent(in) :: coords, dims
     real(sp), dimension(nq) :: lbc,ubc
-    logical, dimension(2) :: adv_lg, adv_l=[.false.,.false.]
+    logical, dimension(2) :: adv_lg, adv_l=[.false.,.false.], adv_l_o=[.false.,.false.]
 
     n_step=1
     n_step_o=1
@@ -1156,13 +1156,16 @@
 							vqc(:,j,i),vqr(:,j,i),n_step, adv_l, &
     						micro_init,hm_flag, mass_ice, ice_flag, theta_flag)
     		n_step_o=max(n_step,n_step_o)
+
+    		adv_l_o=adv_l_o .or. adv_l ! if there has been a true at any point, 
+    		                           ! set adv_l_o to true on this PE
 #endif
     	enddo
 	enddo
 	
 	! collective communication
 #if MPI_PAMM == 1
-	call mpi_allreduce(adv_l(1:2),adv_lg(1:2),2,MPI_LOGICAL,MPI_LOR, comm_vert,error)
+	call mpi_allreduce(adv_l_o(1:2),adv_lg(1:2),2,MPI_LOGICAL,MPI_LOR, comm_vert,error)
 	call mpi_allreduce(n_step_o(1:2),n_step_g(1:2),2,MPI_INTEGER,MPI_MAX, comm_vert,error)
 #endif
     
@@ -1170,7 +1173,7 @@
 #if MPI_PAMM == 1
     if(adv_lg(1)) then
         do n=1,n_step_g(1)
-            call mpdata_vec_vert_3d(dt/real(n_step_o(1),sp),dz,dzn,&
+            call mpdata_vec_vert_3d(dt/real(n_step_g(1),sp),dz,dzn,&
                     rhoa,rhoan, &
                     ip,jp,kp,cen(cat_c)-cst(cat_c)+1,l_h,r_h,&
                     vqc,q(:,:,:,cst(cat_c):cen(cat_c)),&
@@ -1181,7 +1184,7 @@
     endif       
      if(adv_lg(2)) then
         do n=1,n_step_g(2)
-            call mpdata_vec_vert_3d(dt/real(n_step_o(2),sp),dz,dzn,&
+            call mpdata_vec_vert_3d(dt/real(n_step_g(2),sp),dz,dzn,&
                     rhoa,rhoan, &
                     ip,jp,kp,cen(cat_r)-cst(cat_r)+1,l_h,r_h,&
                     vqr,q(:,:,:,cst(cat_r):cen(cat_r)),&
