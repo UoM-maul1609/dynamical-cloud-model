@@ -28,6 +28,19 @@
     public :: p_microphysics_3d, &
             p_microphysics_2d, p_microphysics_1d, read_in_pamm_bam_namelist, &
             p_initialise_aerosol_3d,p_initialise_aerosol, p_initialise_aerosol_1d
+            
+    ! Chen and Lamb (1994) Gamma variable fit (scaled and centred logarithm)
+    integer(i4b), parameter :: n_cl=18
+    real(sp), dimension(n_cl), parameter :: gam_cl=[-0.072328469664620_sp, &
+        -0.324623262465577_sp, 0.363138099937540_sp, 3.323089908344732_sp, &
+        0.874844989423720_sp, &
+        -13.554426432462339_sp, -9.810322482346461_sp, 27.846739088352344_sp, &
+        26.480447842355410_sp,&
+         -29.890199206698309_sp, -32.327548996894521_sp, 15.827423311652167_sp, &
+         18.466605783503052_sp, -4.158566361058538_sp, -5.039533848938808_sp, &
+         1.477272813054374_sp, 1.038600921563425_sp, -0.457007828432810_sp]
+    real(sp), dimension(2), parameter :: gam_mu_cl=[260.163817050062335_sp, &
+                                                8.274747821396463_sp]
     
     ! physical constants
     real(sp), parameter :: rhow=1000._sp, rhoi=920._sp,lv=2.5e6_sp,ls=2.8e6_sp,lf=ls-lv, &
@@ -1459,6 +1472,8 @@
 	real(sp) :: qold,des_dt,dqs_dt,err,cond,temp1, dummy1,dummy2, dummy3,&
 	            n_mix,s_mix,m_mix, nin_c, din_c,nin_r,din_r, n_tot, s_tot, m_tot
 	
+	real(sp) :: gamma_t,v1,c1,a1, dep_density
+	
     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     ! initialise some variables that do not depend on prognostics                        !
     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -1613,7 +1628,17 @@
 !         endif
         
 
-
+!         if(t(k).lt.273.15_sp) then
+!             v1=1.e-12_sp
+!             c1=1._sp
+!             a1=1._sp
+!             call chen_and_lamb_ice(t(k),q(k,1),smr_i(k),rhon(k),1.e-15_sp,&
+!                 gamma_t,v1,c1,a1, dep_density)
+!             print *,t(k),gamma_t,v1,c1/a1,dep_density
+!         endif        
+        
+        
+        
 
 		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         ! activation of cloud drops                                                      !
@@ -2480,7 +2505,10 @@
 	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 	!>@author
 	!>Paul J. Connolly, The University of Manchester
-	!>@brief
+	!>@brief calculate the number of active INPs and the threshold diameter for 
+	!> activation
+	!>@param[in] n_aer,sig_aer,d_aer,T
+	!>@param[inout] nin,din
     subroutine ice_nucleation_aerosol(nin,din, &
                 n_aer, &    ! number
                 sig_aer, &  ! sigma 
@@ -2512,6 +2540,75 @@
                     
     end subroutine ice_nucleation_aerosol
 	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+
+
+	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+	! deposition density for vapour growth                                               !
+	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+	!>@author
+	!>Paul J. Connolly, The University of Manchester
+	!>@brief calculates ice growth model of Chen and Lamb (1994) 
+	!>@param[in] t,qv, qvsat,rhoa,dm
+	!>@param[inout] gamma_t,v,c,a,dep_density
+    subroutine chen_and_lamb_ice(t,qv,qvsat,rhoa,dm,gamma_t,v,c,a, dep_density)
+        use nrtype
+        implicit none
+        real(sp), intent(in) :: t,qv,qvsat,rhoa,dm
+        real(sp), intent(inout) :: gamma_t, v, c, a, dep_density
+
+
+        real(sp) :: delta_rho,t1,deltaV,v_old,rgamma_tp2,ln_vn_vo
+        integer(i4b) :: i
+        
+        
+        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        ! calculate the inherent growth ratio - this is from a 17th order polynomial
+        gamma_t=0._sp
+        t1=min(max(t,243.15),273.15) ! range of fit
+        do i=1,n_cl
+            gamma_t=gamma_t+((t1-gam_mu_cl(1))/gam_mu_cl(2))**(n_cl-i)*gam_cl(i)
+        enddo
+        gamma_t=10._sp**gamma_t
+        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        
+        
+        
+        
+        
+        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        ! equation 42 from Chen and Lamb (1994, JAS: The Theoretical Basis for 
+        !   Parameterisation of Ice Crystal Habits)
+        delta_rho=(qv-qvsat)*rhoa*1000._sp ! g/m^3
+        dep_density=910._sp*exp(-3._sp*max(delta_rho-0.05_sp,0._sp)/gamma_t)
+        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+
+        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        ! increment to volume of crystals - see equation 41
+        ! note that this will be per kg of air, rather than crystal but, since we are 
+        ! taking the ratio to determine c and a-axes, it should not matter
+        deltaV=dm/dep_density
+        v_old=v
+        v=v+deltaV
+        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        ! solving equations 43 and 43 over dV
+        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        rgamma_tp2=1._sp/(gamma_t+2._sp)
+        ln_vn_vo=log(v/v_old)
+        c=c*exp(gamma_t*rgamma_tp2*ln_vn_vo)       
+        a=a*exp(1._sp*rgamma_tp2*ln_vn_vo)       
+        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+
+
+            
+    end subroutine chen_and_lamb_ice
+	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+
 
     end module p_micro_module
     
