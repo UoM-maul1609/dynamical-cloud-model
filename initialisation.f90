@@ -10,7 +10,7 @@
                             cw=4190._sp, ttr=273.15_sp, lv=2.5e6_sp
 	real(sp), dimension(:), pointer :: zr1, thr1
 	real(sp) :: tsurf_glob, p_glob,theta_q_sat_glob,rv_glob,t_glob, rh_glob,th_grad_glob,&
-	            z_glob, adiabatic_frac_glob
+	            z_glob, adiabatic_frac_glob, adiabatic_frac_glob2
 	integer(i4b) :: nl1
 	
     private
@@ -72,6 +72,8 @@
 	!>@param[in] damping_layer, damping_thickness, damping_tau
 	!>@param[in] forcing, forcing_tau_nml
 	!>@param[inout] forcing_tau_g, u_force, v_force
+	!>@param[in] divergence,divergence_val,divergence_hgt
+	!>@param[inout] w_subs
 	!>@param[inout] sth,strain,vism,vist - more prognostics
 	!>@param[in] z0,z0th - roughness lengths 
 	!>@param[inout] q,sq,viss - q-variable
@@ -90,6 +92,7 @@
 	!>@param[in] dx_nm,dy_nm,dz_nm - grid spacing from namelist
 	!>@param[in] ip,jp,kp - grid points from namelist
 	!>@param[in] moisture, nq,nprec - whether to have clouds and number of q-variables
+	!>@param[in] theta_flag - whether latent heat is released
 	!>@param[in] nqg,nprecg - number of precipitation categories
 	!>@param[in] iqv,iqc,inc,drop_num_init, num_drop: moisture variables
 	!>@param[in] n_levels
@@ -108,6 +111,7 @@
 			damping_thickness,damping_tau, &
             forcing,forcing_tau_nml, &
             forcing_tau_g, u_force,v_force, &
+            divergence,divergence_val,divergence_hgt,w_subs, &
 			u,v,w,&
 			zu,zv,zw,&
 			tu,tv,tw,&
@@ -127,7 +131,7 @@
 			ipstart, jpstart, kpstart, &
 			dx_nm, dy_nm, dz_nm, &
 			ip, jp, kp, &
-			moisture,nq,nqg,nprec,nprecg,&
+			moisture,theta_flag,nq,nqg,nprec,nprecg,&
 			iqv,iqc,inc,drop_num_init, num_drop, &
 			n_levels, &
 			q_read, &
@@ -158,18 +162,20 @@
 															ubar, vbar, wbar,thbar, &
 															dampfac,dampfacn, &
 															u_force,v_force, &
+															w_subs, &
 															pref,prefn,tref,trefn
 															
 		real(sp), dimension(:,:), allocatable, intent(inout) :: qbar
 
 		real(sp), intent(in) :: dx_nm, dy_nm, dz_nm, cvis,z0,z0th
-		real(sp), intent(in) :: dt, runtime, forcing_tau_nml,num_drop
+		real(sp), intent(in) :: dt, runtime, forcing_tau_nml,num_drop,divergence_val, &
+		                        divergence_hgt
 		integer(i4b), intent(inout) :: ipp, jpp, kpp, ipstart, jpstart, kpstart
 		integer(i4b), intent(inout) :: ntim
 		integer(i4b), intent(in) :: ip, jp, kp, l_h, r_h, nq,nprec,iqv,iqc,inc
 		integer(i4b), intent(inout) :: nqg,nprecg
-		logical, intent(in) :: moisture,damping_layer, forcing, drop_num_init, &
-		    adiabatic_prof
+		logical, intent(in) :: moisture,theta_flag,damping_layer, forcing, drop_num_init, &
+		    adiabatic_prof,divergence
 		integer(i4b), intent(in) :: n_levels
 		real(sp), dimension(n_levels), target, intent(inout) :: z_read,theta_read
 		real(sp), dimension(nq,n_levels), target, intent(inout) :: q_read
@@ -301,7 +307,7 @@
         allocate( viss(1-r_h:kpp+r_h,1-r_h:jpp+r_h,1-r_h:ipp+r_h,1:nq), &
             STAT = AllocateStatus)
         if (AllocateStatus /= 0) STOP "*** Not enough memory ***"
-        allocate( precip(1:kpp,1:jpp,1:ipp,1:nprec), &
+        allocate( precip(1:kpp,1-r_h:jpp+r_h,1-r_h:ipp+r_h,1:nprec), &
             STAT = AllocateStatus)
         if (AllocateStatus /= 0) STOP "*** Not enough memory ***"
                         
@@ -331,7 +337,12 @@
             allocate( v_force(1-l_h:kpp+r_h), STAT = AllocateStatus)
             if (AllocateStatus /= 0) STOP "*** Not enough memory ***"          
         endif
-
+        
+        if(divergence) then
+            allocate( w_subs(1-l_h:kpp+r_h), STAT = AllocateStatus)
+            if (AllocateStatus /= 0) STOP "*** Not enough memory ***"          
+        endif
+        
 
 		allocate( x(1-l_h:ipp+r_h), STAT = AllocateStatus)
 		if (AllocateStatus /= 0) STOP "*** Not enough memory ***"
@@ -578,7 +589,7 @@
             ! if we are assuming adiabatic cloud, etc
             call setup_adiabatic_profile(l_h,r_h,kpp, psurf,tsurf,t_cbase,t_ctop, &
                                         rho_surf, rh_above, th_grad,&
-                                        adiabatic_frac, &
+                                        adiabatic_frac, theta_flag, &
                                         pref,tref,theta,rhoa,qv1d,qc1d,z,dz,&
                                         prefn,trefn,thetan,rhoan,zn,dzn, &
                                         coords,dims, id, comm3d)
@@ -690,11 +701,11 @@
 						.and. (j >= jpstart) .and. (j <= jpstart+jpp+1) &
 						.and. (k >= kpstart) .and. (k <= kpstart+kpp+1) ) then
 					
-						if ( (z(k-kpstart)>1600._sp) .and. (z(k-kpstart)<1700._sp) ) &
-							th(k-kpstart,j-jpstart,i-ipstart) = -0.001_sp+(r-0.5_sp)/10._sp
+						if ( (z(k-kpstart)>2500._sp) .and. (z(k-kpstart)<2600._sp) ) &
+							th(k-kpstart,j-jpstart,i-ipstart) = -0.001_sp+(r-0.5_sp)/100._sp
 
-						if ( (z(k-kpstart)>1500._sp) .and. (z(k-kpstart)<1600._sp) ) &
-							th(k-kpstart,j-jpstart,i-ipstart) = 0.001_sp-(r-0.5_sp)/10._sp
+						if ( (z(k-kpstart)>2400._sp) .and. (z(k-kpstart)<2500._sp) ) &
+							th(k-kpstart,j-jpstart,i-ipstart) = 0.001_sp-(r-0.5_sp)/100._sp
 						
 
 					endif
@@ -720,7 +731,7 @@
  		do i=1-r_h,ipp+r_h
  			do j=1-r_h,jpp+r_h
                 do k=0,kpp+1
-                    v(k,j,i)=(0.5_sp*erf((zn(k)-1700._sp)/50._sp)+0.5_sp)*10._sp
+                    v(k,j,i)=(0.5_sp*erf((zn(k)-2500._sp)/50._sp)+0.5_sp)*15._sp
                     if((coords(3)==(dims(3)-1)).and.(k==kpp)) v(k,j,i)=0._sp
                     if((coords(3)==0).and.(k<=1)) v(k,j,i)=0._sp
                     zv(k,j,i)=v(k,j,i)
@@ -729,7 +740,7 @@
             enddo
         enddo
 
- 		th=0._sp
+!  		th=0._sp
 ! 		
 ! 		
 ! 		do i=1-r_h,ipp+r_h
@@ -759,6 +770,17 @@
             do k=0,kpp+1
                 u_force(k)=u(k,1,1)
                 v_force(k)=v(k,1,1)
+            enddo        
+        endif
+
+
+        if(divergence) then
+            do k=0,kpp+1
+                if(z(k).le.divergence_hgt) then
+                    w_subs(k)=-divergence_val*z(k)
+                else
+                    w_subs(k)=-divergence_val*divergence_hgt
+                endif
             enddo        
         endif
 
@@ -805,13 +827,14 @@
 	!>adiabatic profile:                                        
     subroutine setup_adiabatic_profile(l_h,r_h,kpp, psurf,tsurf,t_cbase,t_ctop, &
                                         rho_surf, rh_above, th_grad,&
-                                        adiabatic_frac, &
+                                        adiabatic_frac, theta_flag, &
                                         pref,tref,theta,rhoa,qv1d,qc1d,z,dz,&
                                         prefn,trefn,thetan,rhoan,zn,dzn, &
                                         coords,dims, id, comm3d)                      
         use nrtype
 		use nr, only : rkqs, odeint, zbrent
         implicit none
+        logical, intent(in) :: theta_flag
         integer(i4b), intent(in) :: l_h,r_h,kpp
         real(sp), intent(in) :: psurf,tsurf,t_cbase,t_ctop,rh_above, th_grad, &
                             adiabatic_frac
@@ -914,14 +937,19 @@
         !    temperature                                                                 !
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         hmin=1.e-2_sp
-        rv_glob=rv_sub
         adiabatic_frac_glob=adiabatic_frac
+        rv_glob=rv_sub
+        if(.not.theta_flag) then
+            adiabatic_frac_glob2=1._sp
+        else
+            adiabatic_frac_glob2=0._sp
+            rv_glob=0._sp
+        endif
         p_glob=pcb
         theta_q_sat_glob=0._sp
         theta_q_sat=calc_theta_q(t_cbase)        
         theta_q_sat_glob=theta_q_sat
         p_glob=pcb
-        rv_glob=rv_sub
         t=zbrent(calc_theta_q,1.01_sp*t_cbase,t_cbase,1.e-5_sp)
         t_glob=t_cbase
 
@@ -960,7 +988,7 @@
         ! 4. calculate the cloud-top pressure                                            !
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         t_glob=t_ctop
-	pctop_dry=pcb*exp(cp/ra*log(t_ctop/t_cbase))
+	    pctop_dry=pcb*exp(cp/ra*log(t_ctop/t_cbase))
         pct=zbrent(calc_theta_q2,pcb,pctop_dry/2._sp,1.e-5_sp)
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         ! 4. done                                                                        !
@@ -991,7 +1019,7 @@
         ! constant rh                                                                    !
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         z_glob=zct
-        t_glob=t_ctop*(1.e5_sp/pct)**(ra/cp) ! potential temperature at cloud top
+        t_glob=(t_ctop)*(1.e5_sp/pct)**(ra/cp) ! potential temperature at cloud top
         hmin=1.e-2_sp
         th_grad_glob=th_grad
         do k=1-l_h,kpp+r_h
@@ -1102,12 +1130,18 @@
         hmin=1.e-2_sp
         rv_glob=rv_sub
         adiabatic_frac_glob=adiabatic_frac
+        rv_glob=rv_sub
+        if(theta_flag) then
+            adiabatic_frac_glob2=1._sp
+        else
+            adiabatic_frac_glob2=0._sp
+            rv_glob=0._sp
+        endif
         p_glob=pcb
         theta_q_sat_glob=0._sp
         theta_q_sat=calc_theta_q(t_cbase)        
         theta_q_sat_glob=theta_q_sat
         p_glob=pcb
-        rv_glob=rv_sub
         t=zbrent(calc_theta_q,1.01_sp*t_cbase,t_cbase,1.e-5_sp)
         t_glob=t_cbase
         do k=1-l_h,kpp+r_h
@@ -1149,7 +1183,7 @@
         ! 4. calculate the cloud-top pressure                                            !
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         t_glob=t_ctop
-	pctop_dry=pcb*exp(cp/ra*log(t_ctop/t_cbase))
+	    pctop_dry=pcb*exp(cp/ra*log(t_ctop/t_cbase))
         pct=zbrent(calc_theta_q2,pcb,pctop_dry/2._sp,1.e-5_sp)
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         ! 4. done                                                                        !
@@ -1181,7 +1215,7 @@
         ! constant rh                                                                    !
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         z_glob=zct
-        t_glob=t_ctop*(1.e5_sp/pct)**(ra/cp) ! potential temperature at cloud top
+        t_glob=(t_ctop)*(1.e5_sp/pct)**(ra/cp) ! potential temperature at cloud top
         hmin=1.e-2_sp
         th_grad_glob=th_grad
         do k=1-l_h,kpp+r_h
@@ -1450,7 +1484,7 @@
         real(sp) :: calc_theta_q2
         real(sp) :: ws
         
-        ws=eps1*svp_liq(t_glob)/(p-svp_liq(t_glob))
+        ws=eps1*svp_liq(t_glob)/(p-svp_liq(t_glob))*adiabatic_frac_glob2
         calc_theta_q2=t_glob*(1e5_sp/p)**(ra/(cp+cw*rv_glob))* &
             exp(lv*ws/(cp+cw*rv_glob)/t_glob)-theta_q_sat_glob
 
@@ -1476,7 +1510,7 @@
         real(sp) :: ws
         
         
-        ws=eps1*svp_liq(t)/(p_glob-svp_liq(t))
+        ws=eps1*svp_liq(t)/(p_glob-svp_liq(t))*adiabatic_frac_glob2
         calc_theta_q=t*(1.e5_sp/p_glob)**(ra/(cp+cw*rv_glob))* &
             exp(lv*ws/(t*(cp+cw*rv_glob)))-theta_q_sat_glob
 

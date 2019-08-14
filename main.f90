@@ -166,6 +166,7 @@
 			nm1%damping_thickness,nm1%damping_tau, &
             nm1%forcing,nm1%forcing_tau, &
             grid1%forcing_tau, grid1%u_force,grid1%v_force, &
+            nm1%divergence,nm1%divergence_val,nm1%divergence_hgt,grid1%w_subs, &
 			grid1%u,grid1%v,grid1%w,&
 			grid1%zu,grid1%zv,grid1%zw,&
 			grid1%tu,grid1%tv,grid1%tw,&
@@ -186,7 +187,7 @@
 			grid1%ipstart, grid1%jpstart, grid1%kpstart, &
 			nm1%dx, nm1%dy, nm1%dz, &
 			nm1%ip, nm1%jp, nm1%kp, & 
-            nm1%moisture, nm1%nq, grid1%nq,nm1%nprec,grid1%nprec, &
+            nm1%moisture, nm1%theta_flag, nm1%nq, grid1%nq,nm1%nprec,grid1%nprec, &
             grid1%iqv, grid1%iqc, grid1%inc,nm1%drop_num_init, nm1%drop_num, &
 			nm1%n_levels, &
 			q_read(1:nm1%nq,1:nm1%n_levels), &
@@ -254,7 +255,8 @@
 				grid1%dxn, grid1%dyn, grid1%dzn, &
                 grid1%ubar, grid1%vbar, grid1%wbar,grid1%thbar, grid1%qbar, &
                 grid1%dampfacn, grid1%dampfac, &
-                grid1%u_force, grid1%v_force, grid1%forcing_tau, &                             
+                grid1%u_force, grid1%v_force, grid1%forcing_tau, &     
+                grid1%w_subs, &                        
 				grid1%u,grid1%v,grid1%w,&
 				grid1%zu,grid1%zv,grid1%zw,&
 				grid1%tu,grid1%tv,grid1%tw,&
@@ -282,7 +284,7 @@
 				nm1%ice_flag, &
 				nm1%hm_flag, &
 				nm1%theta_flag, &
-				nm1%damping_layer,  nm1%forcing, &
+				nm1%damping_layer,  nm1%forcing, nm1%divergence, &
 				grid1%nq, grid1%nprec, grid1%ncat, &
 				mp1%dims,mp1%id, world_process, mp1%rank, mp1%ring_comm, &
 				mp1%sub_horiz_comm,mp1%sub_comm)

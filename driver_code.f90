@@ -21,7 +21,7 @@
 	!>@param[in] dampfacn,dampfac
 	!>@param[in] pref,prefn
 	!>@param[inout] ubar,vbar,wbar,thbar,qbar
-	!>@param[in] u_force, v_force, forcing_tau
+	!>@param[in] u_force, v_force, forcing_tau, w_subs
 	!>@param[inout] ut,vt,wt: prognostics
 	!>@param[inout] zut,zvt,zwt: prognostics - previous time-step
 	!>@param[inout] tut,tvt,twt: prognostics - temp storage
@@ -53,7 +53,8 @@
 	!>@param[in] hm_flag: flag for hallett-mossop (not always used)
 	!>@param[in] theta_flag: flag for adjusting theta
 	!>@param[in] damping_layer: flag for damping layer
-	!>@param[in] forcing: flag for large-scale forcing
+	!>@param[in] forcing: flag for large-scale forcing of horizontal winds
+	!>@param[in] divergence: flag for large-scale divergence
 	!>@param[in] nq,nprec,ncat: number of q-variables
 	!>@param[in] dims,id, world_process, ring_comm, sub_horiz_comm: mpi variables
 	!>@param[in] sub_vert_comm: mpi variables
@@ -66,6 +67,7 @@
 				dxn,dyn,dzn, &
 				ubar,vbar,wbar,thbar,qbar,dampfacn,dampfac, &
                 u_force,v_force,forcing_tau, &
+                w_subs, &
 				ut,vt,wt,&
 				zut,zvt,zwt,&
 				tut,tvt,twt,&
@@ -88,7 +90,7 @@
 				viscous, &
 				advection_scheme, kord, monotone, &
 				moisture, microphysics_flag, ice_flag, hm_flag, theta_flag, &
-				damping_layer,forcing, nq, nprec, ncat, &
+				damping_layer,forcing, divergence, nq, nprec, ncat, &
 				dims,id, world_process, rank, ring_comm,sub_horiz_comm,sub_vert_comm)
 		use nrtype
 		use mpi_module, only : exchange_full, exchange_along_dim
@@ -103,7 +105,8 @@
 		implicit none
 		logical, intent(inout) :: new_file
 		logical, intent(in) :: viscous, monotone, moisture, &
-		                    damping_layer, forcing, theta_flag, ice_flag, hm_flag
+		                    damping_layer, forcing, theta_flag, ice_flag, hm_flag, &
+		                    divergence
 		logical, intent(inout) :: micro_init
 		integer(i4b), intent(in) :: ntim,ip,jp,kp, ipp,jpp,kpp, &
 						l_h,r_h, ipstart, jpstart, kpstart, &
@@ -122,7 +125,7 @@
 		real(sp), dimension(1-l_h:jpp+r_h), intent(in) :: y,yn,dy,dyn
 		real(sp), dimension(1-l_h:kpp+r_h), intent(in) :: z,zn,dz,dzn, theta, thetan, &
 														rhoa, rhoan,lamsq, lamsqn, &
-														u_force, v_force
+														u_force, v_force, w_subs
 		real(sp), dimension(1-l_h:kpp+r_h), intent(inout) :: ubar,vbar,wbar,thbar,qbar
 		real(sp), dimension(1-l_h:kpp+r_h), intent(in) :: dampfacn,dampfac
 		real(sp), dimension(1-l_h:kpp+r_h), intent(in) :: pref,prefn
@@ -149,7 +152,7 @@
 			intent(inout) :: q,sq,viss
 
 		real(sp), &
-			dimension(1:kpp,1:jpp,1:ipp,1:nprec), &
+			dimension(1:kpp,1-l_h:jpp+r_h,1-l_h:ipp+r_h,1:nprec), &
 			intent(inout) :: precip
 					
         character(len=20), intent(in), dimension(nq) :: q_name
@@ -167,19 +170,29 @@
 		time_last_output=-output_interval
 		output_time=output_interval
 		rank2=dims(1)*dims(2)*dims(3)
+		if(id>=rank2) return 
+
 		q1=0._sp
 		q2=0._sp
 		
+		
 		! associate pointers - for efficiency, when swapping arrays in leap-frog scheme
-		u => ut   ! current time-step
-		v => vt
-		w => wt
-		zu => zut ! previous time-step
-		zv => zvt
-		zw => zwt
-		tu => tut ! next-time-step
-		tv => tvt
-		tw => twt
+		u => ut;   v => vt;   w => wt   ! current time-step
+		zu => zut; zv => zvt; zw => zwt ! previous time-step		
+		tu => tut; tv => tvt; tw => twt ! next-time-step
+		
+		
+        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        if(coords(3)==0) then
+            zw(0,:,:)=-zw(1,:,:); zu(1,:,:)=0._sp; zv(1,:,:)=0._sp
+        endif
+        
+        if(coords(3)==(dims(3)-1)) then
+            zw(kpp,:,:)=-zw(kpp-1,:,:); zw(kpp+1,:,:)=0._sp
+            zu(kpp,:,:)=0._sp
+            zv(kpp,:,:)=0._sp
+        endif
+        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 		
 
 		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -229,6 +242,8 @@
 	                ubar,vbar,wbar,thbar,qbar,u,v,w,th,q)
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 			
+			
+			
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 			! calculate divergence - test                                                !
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -236,15 +251,20 @@
 	            ipp,jpp,kpp,dx,dxn,dy,dyn,dz,dzn,rhoa,rhoan,l_h,r_h,u,v,w,div)
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 			
+			
+			
+			
+			
 				
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-			! calculate sources of momentum and pressure                                 !
+			! calculate sources of momentum, theta, q, pressure                          !
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 			call sources(ring_comm, id, rank2, dims,coords, &
 				dt,x,y,z,zn,dx,dy,dz,dxn,dyn,dzn,ipp,jpp,kpp,l_h,r_h,&
 				nq, &
 				ubar,vbar,wbar,thbar,qbar, dampfacn,dampfac, &
 				u_force,v_force,forcing_tau, &
+				w_subs, &
 				zu,zv,zw, &
 				u,v,w,su,sv,sw, &
 				q,sq,viss, &
@@ -252,8 +272,11 @@
 				th,sth, strain,vism,vist, &
 				theta,thetan,rhoa,rhoan,lamsq,lamsqn, &
 				z0,z0th, &
-				viscous, moisture,damping_layer, forcing)
+				viscous, moisture,damping_layer, forcing, divergence)
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+
+
 
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 			! set halos																	 !
@@ -262,6 +285,9 @@
 								r_h,r_h,r_h,r_h,r_h,r_h, psrc,0._sp, 0._sp, &
 								dims,coords)
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!		
+
+
+
 
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 			! find pressure perturbation                                                 !
@@ -279,6 +305,10 @@
 			call exchange_along_dim(ring_comm, id, kpp, jpp, ipp, &
 								r_h,r_h,r_h,r_h,r_h,r_h, p,0._sp, 0._sp, dims,coords)
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!		
+            
+            
+            
+            
             
             if((advection_scheme == 0) .or. (advection_scheme == 1)) then
                 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -382,6 +412,9 @@
 
 
 
+
+
+
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 			! microphysics                                                               !
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -404,7 +437,7 @@
                                         zn(:),thetan,rhoa,rhoan,w(:,:,:), &
                                         micro_init,hm_flag,1.e-14_sp, &
                                         ice_flag, theta_flag, &
-                                        sub_vert_comm,id,dims,coords)		
+                                        ring_comm,sub_vert_comm,id,dims,coords)		
                     case default
                         print *,'not coded'
                         stop
@@ -414,44 +447,35 @@
 
 
 
-            u=0.99*u+0.01*zu
-            v=0.99*v+0.01*zv
-            w=0.99*w+0.01*zw
+			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+			! time-smoothing                                                             !
+			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+            u=0.99_sp*u+0.01_sp*zu
+            v=0.99_sp*v+0.01_sp*zv
+            w=0.99_sp*w+0.01_sp*zw
+			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+
 
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 			! swap pointers (for efficiency)                                             !
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 			if(modulo(n,3).eq.1) then
-				u => tut
-				v => tvt
-				w => twt
-				zu => ut
-				zv => vt
-				zw => wt
-				tu => zut
-				tv => zvt
-				tw => zwt
+				u => tut;  v => tvt;  w => twt
+				zu => ut;  zv => vt;  zw => wt
+				tu => zut; tv => zvt; tw => zwt
 			else if(modulo(n,3).eq.2) then
-				u => zut
-				v => zvt
-				w => zwt
-				zu => tut
-				zv => tvt
-				zw => twt
-				tu => ut
-				tv => vt
-				tw => wt
+				u => zut;  v => zvt;  w => zwt
+				zu => tut; zv => tvt; zw => twt
+				tu => ut;  tv => vt;  tw => wt
 			else if(modulo(n,3).eq.0) then
-				u => ut
-				v => vt
-				w => wt
-				zu => zut
-				zv => zvt
-				zw => zwt
-				tu => tut
-				tv => tvt
-				tw => twt
+				u => ut;   v => vt;   w => wt
+				zu => zut; zv => zvt; zw => zwt
+				tu => tut; tv => tvt; tw => twt
 			endif
+            ! u,v,w are now the values on the current time-step in the next iteration
+            ! zu,zv,zw are now the values on the previous time-step in the next iteration
+            ! tu,tv,tw are now the values on the future time-step in the next iteration
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 			
 
@@ -477,6 +501,8 @@
                 u(kpp,:,:)=0._sp
                 v(kpp,:,:)=0._sp
             endif
+
+
 		enddo
 		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 

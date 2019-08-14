@@ -4,12 +4,17 @@
 	nm1%viscous_dissipation=.true.,
 	nm1%damping_layer=.true.,
 	nm1%forcing=.true.,
+	nm1%divergence=.false., ! flag for large-scale subsidence - sets the vertical wind
+	                        ! so that divergence of horizontal winds should equal 
+	                        ! that specified
 	nm1%ptol=1.e-8,         ! tolerance for pressure solver
 	                        ! please note for mass conservation 1.e-8 required
 	                        ! for simulations with dy=200, dz=100, dt=5s
-	nm1%damping_thickness=7000.,
+	nm1%damping_thickness=5000.,
 	nm1%damping_tau=1000.,
-	nm1%forcing_tau=500.,
+	nm1%forcing_tau=125.,
+	nm1%divergence_val=7.e-6,
+	nm1%divergence_hgt=2000.,
 	nm1%z0=1.e-4,
 	nm1%z0th=1.e-4,
 	nm1%restart=.false.,
@@ -29,7 +34,7 @@
 	nm1%aero_nmlfile='pamm/namelist.in',     ! filename of aerosol profile namelist
 	nm1%aero_prof_flag=.false.,              ! flag to read in a profile of aerosol
 	nm1%drop_num_init=.true.,       ! only works for microphysics_flag=2,3
-	nm1%drop_num=5000.e6,            ! initial drop number concentration
+	nm1%drop_num=2000.e6,            ! initial drop number concentration
 	nm1%output_interval=10.,
 	nm1%rotation_period_hours=24.,
 	nm1%moisture=.true.,
@@ -46,8 +51,8 @@
  	nm1%tsurf=290.9,
  	nm1%adiabatic_prof=.true.,
  	nm1%adiabatic_frac=1.,
- 	nm1%t_cbase=285.,
- 	nm1%t_ctop=280,
+ 	nm1%t_cbase=281.,
+ 	nm1%t_ctop=273, !273, 265
  	nm1%rh_above=0.9,
  	nm1%th_grad=0.005,
     nm1%n_levels = 7/

@@ -24,6 +24,7 @@
         type mpi_faces_v
         	integer(i4b) :: s_bottom, r_bottom
         	integer(i4b) :: s_top, r_top
+        	integer(i4b) :: id
         end type mpi_faces_v
         
         type mpi_edges
@@ -102,7 +103,7 @@
 		implicit none
 		integer(i4b), intent(in) :: ip, jp, kp
 		
-		integer(i4b) :: error
+		integer(i4b) :: error, dummy
 		integer(i4b), dimension(3) :: coords_t
 		
 		! define an integer:
@@ -212,11 +213,15 @@
             !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
             ! Find ids for sending and receiving 6 faces                                 !
             !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+            call MPI_CART_SHIFT( mp1%sub_comm, 0, 0, &
+                                mp1%face_v%id, dummy, error)
+
             call MPI_CART_SHIFT( mp1%sub_comm, 0, 1, &
                                 mp1%face_v%s_bottom, mp1%face_v%s_top, error)
-                            
+            mp1%face_v%id=mp1%id
             mp1%face_v%r_top   = mp1%face_v%s_bottom
             mp1%face_v%r_bottom= mp1%face_v%s_top
+            
             !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         endif
 		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -513,7 +518,7 @@
 		tag1=10
 		count=0
 		! receive from the top of the lower cell:
-        if(mp1%face_v%r_top /= id) then
+        if(mp1%face%r_top /= mp1%face_v%id) then
 		    count=count+1
             call MPI_IRecv(bot_buf, &!array(1-d_h:0,1:jpp,1:ipp), &
                 (ipp*jpp)*d_h, MPI_REAL8, mp1%face_v%r_top, &
@@ -521,7 +526,7 @@
         endif
 		tag1=11
 		! receive from the bottom of upper cell:
-		if(mp1%face_v%r_bottom /= id) then
+		if(mp1%face%r_bottom /= mp1%face_v%id) then
 		    count=count+1
             call MPI_IRecv(top_buf, & !array(kpp+1:kpp+u_h,1:jpp,1:ipp), &
                 (ipp*jpp)*u_h, MPI_REAL8, mp1%face_v%r_bottom, &
@@ -529,7 +534,7 @@
         endif
         tag1=10
 		! send to the top:
-		if(mp1%face_v%s_top /= id) then
+		if(mp1%face%s_top /= mp1%face_v%id) then
 		    count=count+1
             call MPI_Isend(array(kpp+1-d_h:kpp,1:jpp,1:ipp), &
                 (ipp*jpp)*d_h, MPI_REAL8, mp1%face_v%s_top, &
@@ -537,7 +542,7 @@
         endif
 		tag1=11
 		! send to the bottom:
-		if(mp1%face_v%s_bottom /= id) then
+		if(mp1%face%s_bottom /= mp1%face_v%id) then
 		    count=count+1
             call MPI_Isend(array(1:u_h,1:jpp,1:ipp), &
                 (ipp*jpp)*u_h, MPI_REAL8, mp1%face_v%s_bottom, &
@@ -910,7 +915,7 @@
 					mp1%edge%s_ts_we,mp1%edge%r_ts_we)
 
 		! tn_we
-		call exchange_edges(comm3d, id,count,40,ipp,bn_we,request,status, &
+		call exchange_edges(comm3d, id,count,40,ipp,tn_we,request,status, &
 		            array,kpp,jpp,ipp,d_h,u_h,s_h,n_h,w_h, e_h, &
 					kpp+1-d_h,   kpp,     jpp+1-s_h,  jpp, 1, ipp, &
 					1-d_h,       0,       1-s_h,      0,   1, ipp, &
@@ -1022,7 +1027,7 @@
         array(kpp+1,jpp+1,1:ipp)=bs_we
         array(kpp+1,1-s_h,1:ipp)=bn_we
         array(1-d_h,jpp+1,1:ipp)=ts_we
-        array(1-d_h,1-s_h,1:ipp)=bn_we
+        array(1-d_h,1-s_h,1:ipp)=tn_we
 
         array(kpp+1,1:jpp,ipp+1)=bw_sn
         array(kpp+1,1:jpp,1-w_h)=be_sn
