@@ -1104,14 +1104,15 @@
 	!>@param[in] mass_ice: mass of a single ice crystal (override)
 	!>@param[in] ice_flag: ice microphysics
 	!>@param[in] theta_flag: whether to alter theta
-	!>@param[in] comm_vert,id,dims,coords: MPI variables
+	!>@param[in] comm,comm_vert,id,dims,coords: MPI variables
     subroutine p_microphysics_3d(nq,ncat,n_mode,cst,cen,inc,iqc, inr,iqr,ini,iqi,iai, &
                     cat_am,cat_c, cat_r, &
                     ip,jp,kp,l_h,r_h,dt,dz,dzn,q,precip,th,prefn, z,thetan,rhoa,rhoan,w, &
     				micro_init,hm_flag, mass_ice, ice_flag, theta_flag, &
-    				comm_vert,id,dims,coords)
+    				comm,comm_vert,id,dims,coords)
     use mpi
 	use advection_s_3d, only : mpdata_vec_vert_3d, mpdata_vert_3d
+	use mpi_module
 #endif
     implicit none
     ! arguments:
@@ -1122,7 +1123,7 @@
     integer(i4b), dimension(ncat), intent(in) :: cst,cen
     real(sp), intent(in) :: dt
     real(sp), dimension(-l_h+1:kp+r_h,-l_h+1:jp+r_h,-l_h+1:ip+r_h,nq), intent(inout) :: q
-    real(sp), dimension(1:kp,1:jp,1:ip,1), intent(inout) :: precip
+    real(sp), dimension(1:kp,1-l_h:jp+r_h,1-l_h:ip+r_h,1), intent(inout) :: precip
     real(sp), dimension(-l_h+1:kp+r_h,-l_h+1:jp+r_h,-l_h+1:ip+r_h), intent(inout) :: &
     					th
     real(sp), dimension(-l_h+1:kp+r_h), intent(in) :: z, dz, dzn, rhoa,rhoan, thetan, &
@@ -1133,13 +1134,12 @@
     real(sp), intent(in) :: mass_ice
 
 	! locals
-	integer(i4b) :: i,j,n, error
-    real(sp), dimension(-l_h+1:kp+r_h) :: rho
+	integer(i4b) :: i,j,n, error,n1
 #if MPI_PAMM == 1
 	real(sp), dimension(-l_h+1:kp+r_h,-l_h+1:jp+r_h,-l_h+1:ip+r_h) :: & 
 	                vqr, vqc
 	integer(i4b), dimension(2) :: n_step,n_step_o,n_step_g
-    integer(i4b), intent(in) :: id, comm_vert
+    integer(i4b), intent(in) :: id, comm,comm_vert
     integer(i4b), dimension(3), intent(in) :: coords, dims
     real(sp), dimension(nq) :: lbc,ubc
     logical, dimension(2) :: adv_lg, adv_l=[.false.,.false.], adv_l_o=[.false.,.false.]
@@ -1150,7 +1150,6 @@
     ubc=0._sp
 #endif
 	
-    
 	do i=1,ip
 	    do j=1,jp
 #if MPI_PAMM == 0 
@@ -1158,15 +1157,17 @@
 		                cat_am,cat_c, cat_r, &
 		                kp,l_h,dt,dz,dzn,q(:,j,i,:),precip(:,j,i,:),th(:,j,i),&
 		                    prefn, &
-							z(:),thetan,rho(:),rhoan(:),w(:,j,i), &
+							z(:),thetan,rhoa(:),rhoan(:),w(:,j,i), &
     						micro_init,hm_flag, mass_ice, ice_flag, theta_flag)
 #else
+
     		call p_microphysics_1d(nq,ncat,n_mode,cst,cen,inc,iqc,inr,iqr, ini,iqi,iai, &
 		                cat_am,cat_c, cat_r, &
 		                kp,l_h,dt,dz,dzn,q(:,j,i,:),precip(:,j,i,:),th(:,j,i),&
 		                    prefn, &
-							z(:),thetan,rho(:),rhoan(:),w(:,j,i), &
+							z(:),thetan,rhoa(:),rhoan(:),w(:,j,i), &
 							vqc(:,j,i),vqr(:,j,i),n_step, adv_l, &
+							coords, &
     						micro_init,hm_flag, mass_ice, ice_flag, theta_flag)
     		n_step_o=max(n_step,n_step_o)
 
@@ -1182,9 +1183,33 @@
 	call mpi_allreduce(n_step_o(1:2),n_step_g(1:2),2,MPI_INTEGER,MPI_MAX, comm_vert,error)
 #endif
     
+    
+    
+    
+    
+
 
 #if MPI_PAMM == 1
+    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    ! full exchange needed                                                               !
+    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    call exchange_full(comm, id, kp, jp, ip, r_h,r_h,r_h,r_h,r_h,r_h, &
+                            th,0._sp,0._sp,dims,coords)
+    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    ! full exchange needed                                                               !
+    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    do n1=1,nq
+        call exchange_full(comm, id, kp, jp, ip, r_h,r_h,r_h,r_h,r_h,r_h, &
+                                q(:,:,:,n1),lbc(n1),ubc(n1),dims,coords)
+    enddo
+    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+
     if(adv_lg(1)) then
+        call exchange_along_z(comm_vert, id, kp, jp, ip, r_h,r_h,r_h,r_h,r_h,r_h, &
+                                vqc(:,:,:),0._sp,0._sp,dims,coords)
         do n=1,n_step_g(1)
             call mpdata_vec_vert_3d(dt/real(n_step_g(1),sp),dz,dzn,&
                     rhoa,rhoan, &
@@ -1194,9 +1219,20 @@
                     1,.false., .false.,comm_vert, id, &
                     dims,coords)
         enddo
+        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        ! full exchange needed                                                           !
+        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        do n1=cst(cat_c),cen(cat_c)
+            call exchange_full(comm, id, kp, jp, ip, r_h,r_h,r_h,r_h,r_h,r_h, &
+                                    q(:,:,:,n1),lbc(n1),ubc(n1),dims,coords)
+        enddo
+        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     endif       
-     if(adv_lg(2)) then
+    if(adv_lg(2)) then
+        call exchange_along_z(comm_vert, id, kp, jp, ip, r_h,r_h,r_h,r_h,r_h,r_h, &
+                                vqr(:,:,:),0._sp,0._sp,dims,coords)
         do n=1,n_step_g(2)
+
             call mpdata_vec_vert_3d(dt/real(n_step_g(2),sp),dz,dzn,&
                     rhoa,rhoan, &
                     ip,jp,kp,cen(cat_r)-cst(cat_r)+1,l_h,r_h,&
@@ -1204,8 +1240,17 @@
                     lbc(cst(cat_r):cen(cat_r)),ubc(cst(cat_r):cen(cat_r)), &
                     1,.false., .false.,comm_vert, id, &
                     dims,coords) 
+
         enddo
-     endif       
+        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        ! full exchange needed                                                           !
+        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        do n1=cst(cat_r),cen(cat_r)
+            call exchange_full(comm, id, kp, jp, ip, r_h,r_h,r_h,r_h,r_h,r_h, &
+                                    q(:,:,:,n1),lbc(n1),ubc(n1),dims,coords)
+        enddo
+        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    endif       
 #endif
 	end subroutine p_microphysics_3d
 	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -1259,8 +1304,9 @@
     real(sp), dimension(-o_halo+1:kp+o_halo,-o_halo+1:ip+o_halo,nq), intent(inout) :: q
     real(sp), dimension(1:kp,1:ip,1), intent(inout) :: precip
     real(sp), dimension(-o_halo+1:kp+o_halo,-o_halo+1:ip+o_halo), intent(inout) :: &
-    					theta, p, rho
-    real(sp), dimension(-o_halo+1:kp+o_halo), intent(in) :: z, dz, dzn, rhon, theta_ref
+    					theta, p,rho
+    real(sp), dimension(-o_halo+1:kp+o_halo), intent(in) :: z, dz, dzn, &
+                    rhon, theta_ref
     real(sp), dimension(-o_halo+1:kp+o_halo,-o_halo+1:ip+o_halo), intent(in) :: w
     logical, intent(in) :: hm_flag, theta_flag
     logical , intent(inout) :: micro_init
@@ -1273,6 +1319,7 @@
     real(sp), dimension(-o_halo+1:kp+o_halo,-o_halo+1:ip+o_halo) :: vqc,vqr
     integer(i4b), dimension(2) :: n_step, n_step_o
     logical, dimension(2) :: adv_l=[.false.,.false.]
+    integer(i4b), dimension(3) :: coords
     
     n_step_o=1
 #endif
@@ -1291,7 +1338,7 @@
 		                cat_am,cat_c, cat_r, &
 		                kp,o_halo,dt,dz,dzn,q(:,i,:),precip(:,i,:),theta(:,i),p(:,i), &
 							z(:),theta_ref,rho(:,i),rhon(:),w(:,i), &
-							vqc(:,i),vqr(:,i), n_step, adv_l, &
+							vqc(:,i),vqr(:,i), n_step, adv_l, coords,&
     						micro_init,hm_flag, mass_ice, .false., theta_flag)
     	n_step_o=max(n_step_o,n_step)
 #endif	
@@ -1327,7 +1374,7 @@
 	!>@param[inout] p: pressure
 	!>@param[inout] z: vertical levels 
 	!>@param[inout] theta: potential temperature 
-	!>@param[inout] rho: density 
+	!>@param[in] rho: density 
 	!>@param[in] rhon: density
 	!>@param[in] u: vertical wind 
 	!>@param[inout] micro_init: boolean to initialise microphysics 
@@ -1362,10 +1409,11 @@
 	!>@param[inout] p: pressure
 	!>@param[inout] z: vertical levels 
 	!>@param[inout] theta: potential temperature 
-	!>@param[inout] rho: density 
+	!>@param[in] rho: density 
 	!>@param[in] rhon: density
 	!>@param[in] u: vertical wind 
 	!>@param[inout] vqr,vqc, n_step, adv_l
+	!>@param[in] coords
 	!>@param[inout] micro_init: boolean to initialise microphysics 
 	!>@param[in] hm_flag: switch hm-process on and off
 	!>@param[in] mass_ice: mass of a single ice crystal (override)
@@ -1373,8 +1421,8 @@
 	!>@param[in] theta_flag: whether to alter theta
     subroutine p_microphysics_1d(nq,ncat,n_mode,cst,cen, inc, iqc, inr,iqr,ini,iqi,iai,&
                             cat_am,cat_c, cat_r, &
-                            kp,o_halo,dt,dz,dzn,q,precip,th,p, z,theta,rho,rhon,u, &
-                            vqc,vqr,n_step, adv_l, &
+                            kp,o_halo,dt,dz,dzn,q,precip,th,p, z,theta,rhoa,rhon,u, &
+                            vqc,vqr,n_step, adv_l, coords,&
     						micro_init,hm_flag, mass_ice,ice_flag, theta_flag)
 #endif
 
@@ -1390,8 +1438,9 @@
     real(sp), intent(in) :: dt
     real(sp), dimension(-o_halo+1:kp+o_halo,nq), intent(inout) :: q
     real(sp), dimension(1:kp,1), intent(inout) :: precip
-    real(sp), dimension(-o_halo+1:kp+o_halo), intent(inout) :: th, rho
-    real(sp), dimension(-o_halo+1:kp+o_halo), intent(in) :: dz, z, dzn, rhon, theta,p
+    real(sp), dimension(-o_halo+1:kp+o_halo), intent(inout) :: th
+    real(sp), dimension(-o_halo+1:kp+o_halo), intent(in) :: dz, z, dzn, rhoa, &
+                                                    rhon, theta,p
     real(sp), dimension(-o_halo+1:kp+o_halo), intent(in) :: u
     logical, intent(in) :: hm_flag, ice_flag, theta_flag
     logical , intent(inout) :: micro_init
@@ -1401,6 +1450,7 @@
 #if MPI_PAMM == 1
     integer(i4b), dimension(2), intent(inout) :: n_step
 	logical, intent(inout), dimension(2) :: adv_l
+    integer(i4b), dimension(3), intent(in) :: coords
 #else
     integer(i4b), dimension(2) :: n_step
 	logical, dimension(2) :: adv_l
@@ -1408,7 +1458,8 @@
     real(sp) :: temp, qtot,qaut, a, b, ab_ice, ab_liq, ice_dep,snow_dep,graup_dep, &
     			nu_ice, nu_snow, nu_graup, diff1, ktherm1, tc, nu_vis, sc, nu_rain, rain_evap, &
     			sb_aut, sb_acr, sb_cwaut, sb_cwacr, sb_raut, sb_rsel, sb_cwsel
-    			
+    
+    real(sp), dimension(-o_halo+1:kp+o_halo) :: rho
     real(sp), dimension(kp) :: smr, smr_i
     
     real(sp), dimension(kp) :: &
@@ -1457,8 +1508,9 @@
     real(sp) :: pgwet ! amount of liquid that graupel can freeze without shedding
     								
 
-    real(sp), dimension(kp) :: n_r, lam_r, n_i, lam_i, n_s, lam_s, n_g, lam_g, lam_c, n_c
-    real(sp), dimension(kp) :: rho_fac
+    real(sp), dimension(1-o_halo:kp+o_halo) :: n_r, lam_r, n_i, lam_i, n_s, &
+                                                 lam_s, n_g, lam_g, lam_c, n_c
+    real(sp), dimension(1-o_halo:kp+o_halo) :: rho_fac
 	real(sp), dimension(1-o_halo:kp+o_halo) :: vnr, vnc
 #if MPI_PAMM == 0
 	real(sp), dimension(1-o_halo:kp+o_halo) :: vqr, vqs, vqg, vqi, vns, vng, vni, &
@@ -1543,40 +1595,40 @@
     ! some commonly used variables that depend on prognostics                            !
     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     t=(theta+th)*(p/1.e5_sp)**(ra/cp) ! temperature
-    rho=p / (ra*t) ! air density    
-    rho_fac=(rho0/rho(1:kp))**0.5_sp
+    rho=rhoa !p / (ra*t) ! air density    
+    rho_fac=(rho0/rho(:))**0.5_sp
     ! rain n0, lambda
-    lam_r=(max(q(1:kp,cst(cat_r)),1._sp)*cr*gam2r / &
-            (max(q(1:kp,cst(cat_r)+1),1.e-10_sp)*gam1r))**(1._sp/dr)
-    n_r=rho(1:kp)*max(q(1:kp,cst(cat_r)),0._sp)*lam_r**(1._sp+alpha_r) / gam1r
+    lam_r=(max(q(:,cst(cat_r)),1._sp)*cr*gam2r / &
+            (max(q(:,cst(cat_r)+1),1.e-10_sp)*gam1r))**(1._sp/dr)
+    n_r=rho(:)*max(q(:,cst(cat_r)),0._sp)*lam_r**(1._sp+alpha_r) / gam1r
     ! cloud n0, lambda    
-    lam_c=(max(q(1:kp,inc),1._sp)*cc*gam2c / (max(q(1:kp,iqc),1.e-10_sp)*gam1c))**(1._sp/1._sp)
-    n_c=rho(1:kp)*max(q(1:kp,inc),0._sp)*lam_c**(1._sp+alpha_c) / gam1c
+    lam_c=(max(q(:,inc),1._sp)*cc*gam2c / (max(q(:,iqc),1.e-10_sp)*gam1c))**(1._sp/1._sp)
+    n_c=rho(:)*max(q(:,inc),0._sp)*lam_c**(1._sp+alpha_c) / gam1c
     
     if(ice_flag) then
         ! ice n0, lambda
-        lam_i=(max(q(1:kp,ini),1._sp)*ci*gam2i / (max(q(1:kp,iqi),1.e-10_sp)*gam1i))**(1._sp/di)
-        n_i=rho(1:kp)*max(q(1:kp,ini),0._sp)*lam_i**(1._sp+alpha_i) / gam1i
+        lam_i=(max(q(:,ini),1._sp)*ci*gam2i / (max(q(:,iqi),1.e-10_sp)*gam1i))**(1._sp/di)
+        n_i=rho(:)*max(q(:,ini),0._sp)*lam_i**(1._sp+alpha_i) / gam1i
     endif
     
     ! precipitation
-	precip(1:kp,1)=cr*n_r*(a_r*chi_rain/(lam_r**(alpha_r+b_r+dr+1._sp)) - &
-					u(1:kp)*chi_rain1/(lam_r**(alpha_r+dr+1._sp))) &
+	precip(1:kp,1)=cr*n_r(1:kp)*(a_r*chi_rain/(lam_r(1:kp)**(alpha_r+b_r+dr+1._sp)) - &
+					u(1:kp)*chi_rain1/(lam_r(1:kp)**(alpha_r+dr+1._sp))) &
 					/rho(1:kp) *3600._sp
     
     ! fall speeds
     ! rain
-    vqr(1:kp)=min(max(fall_q_r*rho_fac * lam_r**(1._sp+alpha_r+dr) / &
+    vqr(:)=min(max(fall_q_r*rho_fac * lam_r**(1._sp+alpha_r+dr) / &
     	(lam_r+f_r)**(1._sp+alpha_r+dr+b_r), 0._sp),10._sp)
     
-    vnr(1:kp)=max(fall_n_r*rho_fac * lam_r**(1._sp+alpha_r) / &
+    vnr(:)=max(fall_n_r*rho_fac * lam_r**(1._sp+alpha_r) / &
     	(lam_r+f_r)**(1._sp+alpha_r+b_r), 0._sp)
     
     ! cloud
-    vqc(1:kp)=min(max(fall_q_c*rho_fac * lam_c**(1._sp+alpha_c+1._sp) / &
+    vqc(:)=min(max(fall_q_c*rho_fac * lam_c**(1._sp+alpha_c+1._sp) / &
     	(lam_c+f_c)**(1._sp+alpha_c+1._sp+b_c), 1.e-3_sp), 10._sp)
     
-    vnc(1:kp)=max(fall_n_c*rho_fac * lam_c**(1._sp+alpha_c) / &
+    vnc(:)=max(fall_n_c*rho_fac * lam_c**(1._sp+alpha_c) / &
     	(lam_c+f_c)**(1._sp+alpha_c+b_c), 1.e-3_sp)
     ! coalescence efficiencies
     egi_dry=0.2_sp*exp(0.08*(t(1:kp)-ttr))
@@ -1643,7 +1695,15 @@
 		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         ! activation of cloud drops                                                      !
 		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+#if MPI_PAMM == 1
+        if(coords(3)==0) then
+            k1=max(k-1,1)
+        else
+            k1=k-1
+        endif
+#else
         k1=max(k-1,1)
+#endif
 	    if((q(k,iqc) .gt. qsmall) .and. (q(k1,iqc) .le. qsmall)) then
 	    
     	    kk=k
@@ -1976,6 +2036,10 @@
 
 
 
+
+
+
+
 		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 		! evaporation of rain                                                            !
 		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -2216,7 +2280,7 @@
 		where(isnan(vqc))
 			vqc=0._sp
 		end where
-		vqc(kp+1:kp+o_halo)=vqc(kp)
+		vqc(kp+1:kp+o_halo)=vqc(kp+o_halo)
 		n_step(1)=max(ceiling(maxval(vqc(-o_halo+1:kp+o_halo)*dt/dz*2._sp)),1)
 		vqc(1-o_halo:kp+o_halo-1)=-vqc(-o_halo+2:kp+o_halo)
 #if MPI_PAMM == 0
@@ -2234,7 +2298,7 @@
 		where(isnan(vqr))
 			vqr=0._sp
 		end where
-		vqr(kp+1:kp+o_halo)=vqr(kp)
+		vqr(kp+1:kp+o_halo)=vqr(kp+o_halo)
 		n_step(2)=max(ceiling(maxval(vqr(-o_halo+1:kp+o_halo)*dt/dz*2._sp)),1)
 		vqr(1-o_halo:kp+o_halo-1)=-vqr(-o_halo+2:kp+o_halo)
 #if MPI_PAMM == 0
