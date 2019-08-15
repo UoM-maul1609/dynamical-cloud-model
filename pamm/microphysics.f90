@@ -2123,40 +2123,42 @@
 		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 		! deposition & sublimation onto ice                                              !
 		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!	
-		if ((t(k).le.ttr) .and. ice_flag.and.(q(k,iqi).gt.qsmall)) then
-			nu_ice=2._sp*pi*n_i(k) / rho(k) * &
-					(nu_i1 / lam_i(k)**(2._sp+alpha_i) + &
-					(a_i/nu_vis)**0.5_sp*sc**(1._sp/3._sp)* &
-					(rho(k)*rho0)**0.25_sp*nu_i2 / &
-					(lam_i(k)+0.5_sp*f_i)**(0.5_sp*b_i+alpha_i+2.5_sp))
-			
-			ab_ice=ls**2 / (ktherm1*rv*t(k)**2) + 1._sp/(rho(k)*smr_i(k)*diff1)
+		if ((t(k).le.ttr) .and. ice_flag) then
+		    if(q(k,iqi).gt.qsmall) then
+                nu_ice=2._sp*pi*n_i(k) / rho(k) * &
+                        (nu_i1 / lam_i(k)**(2._sp+alpha_i) + &
+                        (a_i/nu_vis)**0.5_sp*sc**(1._sp/3._sp)* &
+                        (rho(k)*rho0)**0.25_sp*nu_i2 / &
+                        (lam_i(k)+0.5_sp*f_i)**(0.5_sp*b_i+alpha_i+2.5_sp))
+            
+                ab_ice=ls**2 / (ktherm1*rv*t(k)**2) + 1._sp/(rho(k)*smr_i(k)*diff1)
 
-			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-			! chen and lamb                                                              !
-			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-			vol=q(k,iqi+2)
-            if(vol.gt.0._sp) then
-                phi=min(max(q(k,iqi+1) / q(k,ini),1.e-5_sp),100._sp)
-    			nu_ice=nu_ice*chen_and_lamb_cap_fac(phi)
+                !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+                ! chen and lamb                                                          !
+                !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+                vol=q(k,iqi+2)
+                if(vol.gt.0._sp) then
+                    phi=min(max(q(k,iqi+1) / q(k,ini),1.e-5_sp),100._sp)
+                    nu_ice=nu_ice*chen_and_lamb_cap_fac(phi)
             
-                ! non chen and lamb bit        
-                ice_dep=(q(k,1)/smr_i(k)-1._sp) / (rho(k)*ab_ice)*nu_ice
+                    ! non chen and lamb bit        
+                    ice_dep=(q(k,1)/smr_i(k)-1._sp) / (rho(k)*ab_ice)*nu_ice
             
-                if(q(k,1).gt.smr_i(k)) then
-                    pisub(k)=0._sp
-                    pidep(k)=max(ice_dep,0._sp)
-                else
-                    pidep(k)=0._sp
-                    pisub(k)=-min(ice_dep,0._sp)
+                    if(q(k,1).gt.smr_i(k)) then
+                        pisub(k)=0._sp
+                        pidep(k)=max(ice_dep,0._sp)
+                    else
+                        pidep(k)=0._sp
+                        pisub(k)=-min(ice_dep,0._sp)
+                    endif
+                    !!!
+                
+                        
+                    call chen_and_lamb_prop((pidep(k)-pisub(k))*dt,gamma_t(k), &
+                        vol,phi, dep_density(k))
+                    q(k,iqi+2)=vol
+                    q(k,iqi+1)=phi*q(k,ini)
                 endif
-			    !!!
-			    
-						
-                call chen_and_lamb_prop((pidep(k)-pisub(k))*dt,gamma_t(k), &
-                    vol,phi, dep_density(k))
-                q(k,iqi+2)=vol
-                q(k,iqi+1)=phi*q(k,ini)
             endif
             !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 		endif
