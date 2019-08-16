@@ -1372,7 +1372,7 @@
 	!>@param[inout] p: pressure
 	!>@param[inout] z: vertical levels 
 	!>@param[inout] theta: potential temperature 
-	!>@param[in] rho: density 
+	!>@param[in] rhoa: density 
 	!>@param[in] rhon: density
 	!>@param[in] u: vertical wind 
 	!>@param[inout] micro_init: boolean to initialise microphysics 
@@ -1382,7 +1382,7 @@
 	!>@param[in] theta_flag: whether to alter theta
     subroutine p_microphysics_1d(nq,ncat,n_mode,cst,cen, inc, iqc, inr,iqr, ini,iqi,iai,&
                             cat_am,cat_c, cat_r, &
-                            kp,o_halo,dt,dz,dzn,q,precip,th,p, z,theta,rho,rhon,u, &
+                            kp,o_halo,dt,dz,dzn,q,precip,th,p, z,theta,rhoa,rhon,u, &
     						micro_init,hm_flag, mass_ice,ice_flag, theta_flag)
 #else
 	!>@author
