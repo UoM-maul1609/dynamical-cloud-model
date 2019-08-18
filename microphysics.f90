@@ -1257,9 +1257,9 @@
 
             call mpdata_vec_vert_3d(dt/real(n_step_g(3),sp),dz,dzn,&
                     rhoa,rhoan, &
-                    ip,jp,kp,cen(cat_r)-cst(cat_r)+1,l_h,r_h,&
-                    vqr,q(:,:,:,cst(cat_r):cen(cat_r)),&
-                    lbc(cst(cat_r):cen(cat_r)),ubc(cst(cat_r):cen(cat_r)), &
+                    ip,jp,kp,cen(cat_i)-cst(cat_i)+1,l_h,r_h,&
+                    vqi,q(:,:,:,cst(cat_i):cen(cat_i)),&
+                    lbc(cst(cat_i):cen(cat_i)),ubc(cst(cat_i):cen(cat_i)), &
                     1,.false., .false.,comm_vert, id, &
                     dims,coords) 
 
@@ -1934,9 +1934,8 @@
                 call ice_nucleation_aerosol(nin_c,din_c, &
                     n_mix, &    ! number
                     sig_aer1(n_mode), &  ! sigma 
-                    d_aer1(n_mode), t(k) )     ! d
+                    d_aer1(n_mode), t(k) ,q(k  ,ini))     ! d
              
-            
                 ! increase ice crystal number
                 q(k  ,ini)=q(k  ,ini)+nin_c
                 ! increase ice crystal mass
@@ -2033,7 +2032,7 @@
                 call ice_nucleation_aerosol(nin_r,din_r, &
                     n_mix, &    ! number
                     sig_aer1(n_mode), &  ! sigma 
-                    d_aer1(n_mode), t(k) )     ! d
+                    d_aer1(n_mode), t(k), q(k  ,ini) )     ! d
             
                 ! increase in ice crystal number
                 q(k  ,ini)=q(k  ,ini)+nin_r
@@ -2701,16 +2700,16 @@
 	!>Paul J. Connolly, The University of Manchester
 	!>@brief calculate the number of active INPs and the threshold diameter for 
 	!> activation
-	!>@param[in] n_aer,sig_aer,d_aer,T
+	!>@param[in] n_aer,sig_aer,d_aer,T,icen
 	!>@param[inout] nin,din
     subroutine ice_nucleation_aerosol(nin,din, &
                 n_aer, &    ! number
                 sig_aer, &  ! sigma 
-                d_aer, t )     ! d
+                d_aer, t ,icen)     ! d
     use nrtype
     implicit none
     real(sp), intent(inout) :: nin, din
-    real(sp), intent(in) :: n_aer,sig_aer,d_aer, t
+    real(sp), intent(in) :: n_aer,sig_aer,d_aer, t,icen
 
     real(sp) :: naer05, x, arg
 
@@ -2718,6 +2717,8 @@
     naer05=ln_part_mom(0,0.5e-6_sp,n_aer,sig_aer,d_aer)
     ! source function
     nin=demott_2010(t,naer05)
+    ! limit nucleation
+    nin=max(nin-icen,0._sp)
 
     ! deplete aerosol up to this diameter - using erfinv
     ! limit the argument so that it is not equal to -1 or +1
