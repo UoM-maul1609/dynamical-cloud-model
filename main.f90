@@ -265,7 +265,7 @@
 				grid1%div, &
 				grid1%strain, grid1%vism, grid1%vist, &
 				nm1%z0,nm1%z0th, nm1%ptol, &
-				grid1%c_s,grid1%c_e,grid1%cat_am,grid1%cat_c,grid1%cat_r, &
+				grid1%c_s,grid1%c_e,grid1%cat_am,grid1%cat_c,grid1%cat_r, grid1%cat_i, &
 				grid1%n_mode,grid1%inc,grid1%iqc, grid1%inr,grid1%iqr, &
 				grid1%ini,grid1%iqi,grid1%iai, &
 				grid1%q_name, grid1%q,grid1%sq,grid1%viss, &

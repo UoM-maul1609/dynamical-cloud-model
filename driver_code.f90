@@ -31,7 +31,7 @@
 	!>@param[in] z0,z0th - roughness lengths 
 	!>@param[in] ptol - tolerance for pressure solver
 	!>@param[in] c_s, c_e: start and end indices for a category
-	!>@param[in] cat_am,cat_c, cat_r: category index for cloud and rain
+	!>@param[in] cat_am,cat_c, cat_r,cat_i: category index for cloud and rain and ice
 	!>@param[in] n_mode,inc,iqc,inr,iqr,ini, iqi, iai
 	!>@param[in] q_name: name of q-variables
 	!>@param[inout] q,sq,viss - for clouds and subgrid
@@ -75,7 +75,7 @@
 				su,sv,sw,psrc, &
 				div, &
 				strain, vism, vist, z0,z0th, ptol, &
-				c_s, c_e, cat_am,cat_c,cat_r, &
+				c_s, c_e, cat_am,cat_c,cat_r, cat_i,&
 				n_mode,inc,iqc, inr,iqr, ini, iqi, iai, &
 				q_name, q,sq,viss, &
 				precip, &
@@ -117,7 +117,7 @@
 		character (len=*), intent(in) :: outputfile
 		real(sp), intent(in) :: output_interval, dt, z0,z0th, ptol, forcing_tau
         integer(i4b), dimension(ncat), intent(in) :: c_s, c_e
-        integer(i4b), intent(in) :: cat_am,cat_c, cat_r, n_mode,inc,iqc,inr,iqr, &
+        integer(i4b), intent(in) :: cat_am,cat_c, cat_r, cat_i,n_mode,inc,iqc,inr,iqr, &
                                 ini, iqi, iai
 		
 		real(sp), intent(inout) :: thbase, thtop
@@ -430,7 +430,7 @@
                         call p_microphysics_3d(nq,ncat,n_mode,c_s,c_e, inc, iqc,&
                                         inr,iqr,ini,iqi,&
                                         iai, &
-                                        cat_am,cat_c, cat_r, &
+                                        cat_am,cat_c, cat_r, cat_i,&
                                         ipp,jpp,kpp,l_h,r_h,dt,dz,&
                                         dzn,q(:,:,:,:),precip(:,:,:,:),&
                                         th(:,:,:),prefn, &
