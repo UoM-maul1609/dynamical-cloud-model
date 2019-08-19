@@ -54,6 +54,7 @@
  	nm1%t_cbase=281.,
  	nm1%t_ctop=273, !273, 265
  	nm1%rh_above=0.9,
+ 	nm1%th_jump=0.,
  	nm1%th_grad=0.005,
     nm1%n_levels = 7/
 &sounding_vars

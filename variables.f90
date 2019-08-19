@@ -79,7 +79,7 @@
             			dx, dy, dz, &
             			damping_thickness, damping_tau, forcing_tau, &
             			divergence_val,divergence_hgt, &
-            			adiabatic_frac,t_cbase,t_ctop,rh_above,th_grad
+            			adiabatic_frac,t_cbase,t_ctop,rh_above,th_jump,th_grad
             real(sp) :: psurf,tsurf,z0,z0th, ptol=1.e-8_sp, drop_num
             integer(i4b) :: n_levels
         end type namelist_input

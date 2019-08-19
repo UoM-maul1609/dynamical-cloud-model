@@ -97,7 +97,7 @@
 	!>@param[in] iqv,iqc,inc,drop_num_init, num_drop: moisture variables
 	!>@param[in] n_levels
 	!>@params[inout] q_read,z_read,theta_read, psurf,tsurf - sounding variables
-	!>@params[in] adiabatic_prof,adiabatic_frac,t_cbase,t_ctop, rh_above, th_grad
+	!>@params[in] adiabatic_prof,adiabatic_frac,t_cbase,t_ctop, rh_above, th_jump,th_grad
 	!>@param[in] l_h,r_h - halo for arrays
 	!>@param[inout] thbase, thtop
 	!>@param[in] coords,dims - dimensions of cartesian topology
@@ -136,7 +136,7 @@
 			n_levels, &
 			q_read, &
 			z_read, theta_read,psurf,tsurf, &
-			adiabatic_prof,adiabatic_frac,t_cbase,t_ctop, rh_above, th_grad,&
+			adiabatic_prof,adiabatic_frac,t_cbase,t_ctop, rh_above, th_jump, th_grad,&
 			l_h,r_h, &
 			thbase,thtop, &
 			coords,dims, id, comm3d)
@@ -180,7 +180,7 @@
 		real(sp), dimension(n_levels), target, intent(inout) :: z_read,theta_read
 		real(sp), dimension(nq,n_levels), target, intent(inout) :: q_read
 		real(sp), intent(in) :: psurf, tsurf,damping_thickness,damping_tau, &
-		    adiabatic_frac,t_cbase,t_ctop,rh_above,th_grad
+		    adiabatic_frac,t_cbase,t_ctop,rh_above,th_jump,th_grad
 		integer(i4b), dimension(3), intent(inout) :: coords
 		integer(i4b), dimension(3), intent(in) :: dims
 		integer(i4b), intent(in) :: id, comm3d
@@ -588,7 +588,7 @@
             
             ! if we are assuming adiabatic cloud, etc
             call setup_adiabatic_profile(l_h,r_h,kpp, psurf,tsurf,t_cbase,t_ctop, &
-                                        rho_surf, rh_above, th_grad,&
+                                        rho_surf, rh_above, th_jump, th_grad,&
                                         adiabatic_frac, theta_flag, &
                                         pref,tref,theta,rhoa,qv1d,qc1d,z,dz,&
                                         prefn,trefn,thetan,rhoan,zn,dzn, &
@@ -826,7 +826,7 @@
 	!>@brief
 	!>adiabatic profile:                                        
     subroutine setup_adiabatic_profile(l_h,r_h,kpp, psurf,tsurf,t_cbase,t_ctop, &
-                                        rho_surf, rh_above, th_grad,&
+                                        rho_surf, rh_above, th_jump, th_grad,&
                                         adiabatic_frac, theta_flag, &
                                         pref,tref,theta,rhoa,qv1d,qc1d,z,dz,&
                                         prefn,trefn,thetan,rhoan,zn,dzn, &
@@ -836,7 +836,7 @@
         implicit none
         logical, intent(in) :: theta_flag
         integer(i4b), intent(in) :: l_h,r_h,kpp
-        real(sp), intent(in) :: psurf,tsurf,t_cbase,t_ctop,rh_above, th_grad, &
+        real(sp), intent(in) :: psurf,tsurf,t_cbase,t_ctop,rh_above, th_jump,th_grad, &
                             adiabatic_frac
         real(sp), intent(inout) :: rho_surf
         real(sp), dimension(1-l_h:kpp+r_h), intent(in) :: z,zn,dz,dzn
@@ -1019,7 +1019,7 @@
         ! constant rh                                                                    !
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         z_glob=zct
-        t_glob=(t_ctop)*(1.e5_sp/pct)**(ra/cp) ! potential temperature at cloud top
+        t_glob=(t_ctop+th_jump)*(1.e5_sp/pct)**(ra/cp) ! potential temperature at cloud top
         hmin=1.e-2_sp
         th_grad_glob=th_grad
         do k=1-l_h,kpp+r_h
@@ -1215,7 +1215,7 @@
         ! constant rh                                                                    !
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         z_glob=zct
-        t_glob=(t_ctop)*(1.e5_sp/pct)**(ra/cp) ! potential temperature at cloud top
+        t_glob=(t_ctop+th_jump)*(1.e5_sp/pct)**(ra/cp) ! potential temperature at cloud top
         hmin=1.e-2_sp
         th_grad_glob=th_grad
         do k=1-l_h,kpp+r_h
