@@ -82,8 +82,8 @@
             			initially_geostrophic, &
             			viscous_dissipation, &
             			dissipate_h, nudge, restart, &
-            			monotone, neumann
-            integer(i4b) :: ip, jp, kp, subgrid_model, advection_scheme, kord
+            			monotone
+            integer(i4b) :: ip, jp, kp, subgrid_model, advection_scheme, kord, neumann
             real(sp) :: vis, &
             			runtime, dt, output_interval, &
             			rotation_period_hours, &

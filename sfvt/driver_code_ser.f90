@@ -47,10 +47,10 @@
 
 		implicit none
 		logical, intent(inout) :: new_file
-		logical, intent(in) :: viscous, monotone, neumann
+		logical, intent(in) :: viscous, monotone
 		integer(i4b), intent(in) :: ntim,nq,ip,kp, ipp,kpp, &
 						l_h,r_h, ipstart, kpstart, &
-						advection_scheme, kord
+						advection_scheme, kord, neumann
 		character (len=*), intent(in) :: outputfile
 		real(sp), intent(in) :: output_interval, dt
 		real(sp), dimension(1-l_h:ipp+r_h), intent(in) :: x,dx, dxn
@@ -243,10 +243,10 @@
 
 		implicit none
 		logical, intent(inout) :: new_file
-		logical, intent(in) :: viscous, monotone, neumann
+		logical, intent(in) :: viscous, monotone
 		integer(i4b), intent(in) :: ntim,nq,kp, kpp, &
 						l_h,r_h, kpstart, &
-						advection_scheme, kord
+						advection_scheme, kord, neumann
 		character (len=*), intent(in) :: outputfile
 		real(sp), intent(in) :: output_interval, dt
 		real(sp), dimension(1-l_h:kpp+r_h), intent(in) :: z,dz,dzn,&
