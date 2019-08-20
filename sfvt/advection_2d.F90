@@ -39,7 +39,7 @@
 		intent(inout) :: psi
 	real(sp), dimension(-l_h+1:ip+r_h), intent(in) :: dxn
 	real(sp), dimension(-l_h+1:kp+r_h), intent(in) :: dzn, rhoa, rhoan
-	logical, intent(in) :: neumann
+	integer(i4b), intent(in) :: neumann
 	
 	! locals
 	real(sp), dimension(kp,ip) :: fx_r, fx_l, fz_r, fz_l
@@ -70,9 +70,12 @@
 !$omp end simd
 	
     ! neumann boundary condition top and bottom
-    if(neumann) then
+    if(neumann==1) then
         fz_l(1,:)=fz_r(1,:)
         fz_r(kp,:)=fz_l(kp,:)    
+    elseif(neumann==2) then
+        fz_l(1,:)=-fz_r(1,:)
+        fz_r(kp,:)=-fz_l(kp,:)    
     endif
 
 	! could do a loop here and transport
@@ -110,7 +113,7 @@
 						neumann,dims,coords)
 #else
 	subroutine mpdata_2d(dt,dx,dz,dxn,dzn,&
-						rhoa,rhoan, ip,kp,l_h,r_h,u,w,psi_in,kord,neumann,monotone)
+						rhoa,rhoan, ip,kp,l_h,r_h,u,w,psi_in,kord,monotone,neumann)
 #endif
 	use nrtype
 #ifdef MPI
@@ -134,7 +137,8 @@
 		intent(inout), target :: psi_in
 	real(sp), dimension(-l_h+1:ip+r_h), intent(in) :: dx, dxn
 	real(sp), dimension(-l_h+1:kp+r_h), intent(in) :: dz, dzn, rhoa, rhoan
-	logical, intent(in) :: monotone,neumann
+	logical, intent(in) :: monotone
+	integer(i4b), intent(in) :: neumann
 	
 	! locals
 	real(sp) :: u_div1, u_div3, u_j_bar1, u_j_bar3, &
@@ -579,7 +583,8 @@
 		intent(inout), target :: psi_in
 	real(sp), dimension(-l_h+1:ip+r_h), intent(in) :: dx, dxn
 	real(sp), dimension(-l_h+1:kp+r_h), intent(in) :: dz, dzn, rhoa,rhoan
-	logical, intent(in) :: monotone, neumann
+	logical, intent(in) :: monotone
+	integer(i4b), intent(in) :: neumann
 	
 	! locals
 	real(sp) :: u_div1, u_div3, u_j_bar1, u_j_bar3, &

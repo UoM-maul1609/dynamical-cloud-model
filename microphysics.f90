@@ -1215,7 +1215,7 @@
                     ip,jp,kp,cen(cat_c)-cst(cat_c)+1,l_h,r_h,&
                     vqc,q(:,:,:,cst(cat_c):cen(cat_c)),&
                     lbc(cst(cat_c):cen(cat_c)),ubc(cst(cat_c):cen(cat_c)), &
-                    1,.false., .false.,comm_vert, id, &
+                    1,.false., 2,comm_vert, id, &
                     dims,coords)
         enddo
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -1237,7 +1237,7 @@
                     ip,jp,kp,cen(cat_r)-cst(cat_r)+1,l_h,r_h,&
                     vqr,q(:,:,:,cst(cat_r):cen(cat_r)),&
                     lbc(cst(cat_r):cen(cat_r)),ubc(cst(cat_r):cen(cat_r)), &
-                    1,.false., .false.,comm_vert, id, &
+                    1,.false., 2,comm_vert, id, &
                     dims,coords) 
 
         enddo
@@ -1260,7 +1260,7 @@
                     ip,jp,kp,cen(cat_i)-cst(cat_i)+1,l_h,r_h,&
                     vqi,q(:,:,:,cst(cat_i):cen(cat_i)),&
                     lbc(cst(cat_i):cen(cat_i)),ubc(cst(cat_i):cen(cat_i)), &
-                    1,.false., .false.,comm_vert, id, &
+                    1,.false., 2,comm_vert, id, &
                     dims,coords) 
 
         enddo
@@ -2397,7 +2397,7 @@
             call mpdata_vec_1d(dt/real(n_step(1),sp),dz,dzn,&
                             rho,rhon,kp,cen(cat_c)-cst(cat_c)+1,o_halo,o_halo,&
                             vqc(-o_halo+1:kp+o_halo),&
-                            q(:,cst(cat_c):cen(cat_c)),1,.false.,.false.)		
+                            q(:,cst(cat_c):cen(cat_c)),1,.false.,0)		
         enddo
 #endif	
 	endif
@@ -2415,7 +2415,7 @@
             call mpdata_vec_1d(dt/real(n_step(2),sp),dz,dzn,&
                             rho,rhon,kp,cen(cat_r)-cst(cat_r)+1,o_halo,o_halo,&
                             vqr(-o_halo+1:kp+o_halo),&
-                            q(:,cst(cat_r):cen(cat_r)),1,.false.,.false.)		
+                            q(:,cst(cat_r):cen(cat_r)),1,.false.,0)		
         enddo
 #endif	
 	endif
@@ -2434,7 +2434,7 @@
                 call mpdata_vec_1d(dt/real(n_step(3),sp),dz,dzn,&
                                 rho,rhon,kp,cen(cat_i)-cst(cat_i)+1,o_halo,o_halo,&
                                 vqi(-o_halo+1:kp+o_halo),&
-                                q(:,cst(cat_i):cen(cat_i)),1,.false.,.false.)		
+                                q(:,cst(cat_i):cen(cat_i)),1,.false.,0)		
             enddo
 #endif	
         endif
