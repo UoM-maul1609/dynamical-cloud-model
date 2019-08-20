@@ -1851,7 +1851,7 @@
                 ln_part_mom(3,dcrit2(n_mode),n_mix, &
                             sig_aer1(n_mode),d_aer1(n_mode))
                             
-            q(k,cst(cat_am))=q(k,cst(cat_am))-dummy1 !n_mix
+            q(k,cst(cat_am))=q(k,cst(cat_am))*(1._sp-min(dummy1/n_mix,1._sp))
             do i=1,n_mode-1 ! deplete aerosol
                 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
                 ! add to aerosol particles in cloud water                                !
@@ -2213,6 +2213,27 @@
         ! end rain auto-conversion                                                       !		
 		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
+
+		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+		! ice aggregation see Ferrier (1994)                                             !
+		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+		if(ice_flag) then
+            riaci(k)=max(iice*n_i(k)**2._sp*eii(k) *rho_fac(k) / &
+                    lam_i(k)**(4._sp+2.*sp*alpha_i+b_i),0._sp)
+        endif
+		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+		! end ice aggregation                                                            !
+		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+		! melting of ice                                                                 !
+		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+		if((t(k).gt.ttr).and.ice_flag) then
+			pimlt(k)=q(k,iqi)*dt+(pidep(k)-pisub(k))*dt ! ice melts instantaneously
+        endif
+		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+		! end melting of ice                                                             !
+		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     enddo
     
     
@@ -2221,8 +2242,11 @@
     ! update variables
     ! vapour mass
     q(1:kp,1)=q(1:kp,1)+(pgsub+pssub+pisub-(psdep+pidep+piprm+pgdep))*dt
-    ! ice mass
-    if(ice_flag) q(1:kp,iqi)=q(1:kp,iqi)+(pidep-pisub)*dt
+    ! ice mass and number
+    if(ice_flag) then 
+        q(1:kp,iqi)=q(1:kp,iqi)+(pidep-pisub)*dt
+        q(1:kp,ini)=q(1:kp,ini)-(riaci)*dt
+    endif
 
     		
     ! liquid mass 
@@ -2286,7 +2310,6 @@
 
 
     do k=1,kp
-
         if((prevp(k) .gt. 0._sp)) then
             !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
             ! add up the total number of aerosol in rain - all modes
@@ -2366,10 +2389,91 @@
     enddo
     
 
+    ! metling ice!
+    do k=1,kp
+        if((pimlt(k) .gt. 0._sp)) then
+            !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+            ! add up the total number of aerosol in ice - all modes
+            !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+            dummy1=0._sp
+            do i=1,n_mode-1
+                dummy1=dummy1+q(k,iai+(i-1)*3)
+            enddo
+            !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 
-    t(1:kp)=t(1:kp)-lv/cp*prevp*dt+lf/cp*pifrw*dt+lf/cp*pgfr*dt+ls/cp*(pidep-pisub)*dt
+            
+            !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+            ! calculate the number conc. of ice melted
+            !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+            dummy2=pimlt(k)*(q(k,cst(cat_i))/(qsmall+q(k,cst(cat_i)+1)))*dt
+            dummy2=min(dummy2,q(k,cst(cat_i)))
+            !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+
+
+
+
+            if(dummy2 .lt. qsmall) cycle
+
+
+
+        
+            !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+            ! add melted ice particles to mixed-mode aerosol
+            !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+            q(k,cst(cat_am))=q(k,cst(cat_am))+dummy2 ! total number of the mixed-mode
+
+            do i=1,n_mode-1
+                !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+                ! add aerosol in melting ice water back to aerosol
+                !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+                ! this is number in aerosol, plus number in ice 
+                !  (scaled by fraction in composition category)
+                ! aer_in_ice * ice_num_evap / ice_num
+                q(k,cst(cat_am)+(i-1)*3+1)      = &
+                    q(k,cst(cat_am)+(i-1)*3+1)   + &
+                    q(k,iai+(i-1)*3) * &
+                    min(dummy2/(q(k,cst(cat_i))+qsmall),1._sp)
+                    
+                ! this is surface area going into aerosol
+                q(k,cst(cat_am)+(i-1)*3+2)    = &
+                    q(k,cst(cat_am)+(i-1)*3+2) +&
+                    q(k,iai+(i-1)*3+1) * &
+                    min(dummy2/(q(k,cst(cat_i))+qsmall),1._sp)
+                ! this is mass going into aerosol
+                q(k,cst(cat_am)+(i-1)*3+3)    = &
+                    q(k,cst(cat_am)+(i-1)*3+3) +&
+                    q(k,iai+(i-1)*3+2) * &
+                    min(dummy2/(q(k,cst(cat_i))+qsmall),1._sp)
+                
+                ! aerosol in ice
+                q(k,iai+(i-1)*3)=q(k,iai+(i-1)*3)* &
+                    (1._sp - min(dummy2/(q(k,cst(cat_i))+qsmall),1._sp))
+                    
+                q(k,iai+(i-1)*3+1)=q(k,iai+(i-1)*3+1)* &
+                    (1._sp - min(dummy2/(q(k,cst(cat_i))+qsmall),1._sp))
+                    
+                q(k,iai+(i-1)*3+2)=q(k,iai+(i-1)*3+2)* &
+                    (1._sp - min(dummy2/(q(k,cst(cat_i))+qsmall),1._sp))
+                    
+            enddo
+            ! ice properties
+            q(k,cst(cat_i):cen(cat_i)) = q(k,cst(cat_i):cen(cat_i)) * &
+                (1._sp - min(dummy2/(q(k,cst(cat_i))+qsmall),1._sp ))
+            !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+            if(t(k) > ttr) q(k,cst(cat_i):cen(cat_i))=0._sp
+        endif
+        
+    enddo
+    
+
+
+    t(1:kp)=t(1:kp)-lv/cp*prevp*dt+lf/cp*pifrw*dt+lf/cp*pgfr*dt+ls/cp*(pidep-pisub)*dt- &
+                lf/cp*pimlt*dt
     q(1:kp,cst(cat_r)+1)=q(1:kp,cst(cat_r)+1)-prevp*dt
+    
     q(1:kp,1)=q(1:kp,1)+(prevp)*dt
 
     q=max(q,0._sp)	
