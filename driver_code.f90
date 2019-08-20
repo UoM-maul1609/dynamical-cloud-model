@@ -336,7 +336,7 @@
 			select case (advection_scheme)
 				case (0)
 					call first_order_upstream_3d(dt,dxn,dyn,dzn,rhoa,rhoan, &
-						ipp,jpp,kpp,l_h,r_h,u,v,w,th,.true.,dims,coords)
+						ipp,jpp,kpp,l_h,r_h,u,v,w,th,1,dims,coords)
                     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
                     ! set halos													   		 !
                     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!		
@@ -346,12 +346,12 @@
 				case (1)
 					call mpdata_3d(dt,dx,dy,dz,dxn,dyn,dzn,rhoa,rhoan, &
 						ipp,jpp,kpp,l_h,r_h,u,v,w,th,t1,t2, &
-						kord,monotone,.true.,ring_comm,id, &
+						kord,monotone,1,ring_comm,id, &
 						dims,coords)						
 				case(2)
 					call mpdata_3d_add(dt,dx,dy,dz,dxn,dyn,dzn,rhoa,rhoan, &
 						ipp,jpp,kpp,l_h,r_h,u,v,w,th,thetan,thbase,thtop, &
-						kord,monotone,.true.,ring_comm,id, &
+						kord,monotone,1,ring_comm,id, &
 						dims,coords)
 				case default
 					print *,'not coded'
@@ -372,7 +372,7 @@
                                 ipp,jpp,kpp,c_e(nqc)-c_s(nqc)+1, &
                                 l_h,r_h,u,v,w,q(:,:,:,c_s(nqc):c_e(nqc)), &
                                 q1(c_s(nqc):c_e(nqc)),q2(c_s(nqc):c_e(nqc)), &
-                                kord,monotone,.false.,ring_comm,id, &
+                                kord,monotone,1,ring_comm,id, &
                                 dims,coords)						
                         enddo
                     case default
