@@ -726,18 +726,25 @@
 	
 	! locals
 	real(sp), dimension(kp,jp,ip) :: fz_r, fz_l
+	real(sp) :: wkji,wkm1ji
 	integer(i4b) :: i,j,k
 
 !$omp simd	
 	do i=1,ip
 		do j=1,jp
 			do k=1,kp
-				fz_r(k,j,i)=( (w(k,j,i)+abs(w(k,j,i)))*rhoan(k)*psi(k,j,i)+ &
-					(w(k,j,i)-abs(w(k,j,i)))*rhoan(k+1)*psi(k+1,j,i) )*dt/ &
+			    wkji=w(k,j,i)
+			    if((coords(3)==0).and.(k==1).and.(neumann==2)) then
+    			    wkm1ji=w(k,j,i)
+    			else
+    			    wkm1ji=w(k-1,j,i)
+    			endif
+				fz_r(k,j,i)=( (wkji+abs(wkji))*rhoan(k)*psi(k,j,i)+ &
+					(wkji-abs(wkji))*rhoan(k+1)*psi(k+1,j,i) )*dt/ &
 					(2._sp*dzn(k)*rhoa(k))
 		
-				fz_l(k,j,i)=( (w(k-1,j,i)+abs(w(k-1,j,i)))*rhoan(k-1)*psi(k-1,j,i)+ &
-					(w(k-1,j,i)-abs(w(k-1,j,i)))*rhoan(k)*psi(k,j,i) )*dt/ &
+				fz_l(k,j,i)=( (wkm1ji+abs(wkm1ji))*rhoan(k-1)*psi(k-1,j,i)+ &
+					(wkm1ji-abs(wkm1ji))*rhoan(k)*psi(k,j,i) )*dt/ &
 					(2._sp*dzn(k-1)*rhoa(k))
 			enddo
 		enddo
@@ -751,13 +758,6 @@
         endif
         if(coords(3)==(dims(3)-1)) then
             fz_r(kp,:,:)=fz_l(kp,:,:)    
-        endif
-    elseif(neumann==2) then
-        if(coords(3)==0) then
-            fz_l(1,:,:)=-fz_r(1,:,:)
-        endif
-        if(coords(3)==(dims(3)-1)) then
-            fz_r(kp,:,:)=-fz_l(kp,:,:)    
         endif
     endif
     	
