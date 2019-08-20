@@ -54,10 +54,10 @@
 
 		implicit none
 		logical, intent(inout) :: new_file
-		logical, intent(in) :: viscous, monotone, neumann
+		logical, intent(in) :: viscous, monotone
 		integer(i4b), intent(in) :: ntim,nq,ip,jp,kp, ipp,jpp,kpp, &
 						l_h,r_h, ipstart, jpstart, kpstart, &
-						advection_scheme, kord
+						advection_scheme, kord, neumann
 		integer(i4b), intent(in) :: id, world_process, ring_comm, rank
 		integer(i4b), dimension(3), intent(in) :: coords, dims
 		character (len=*), intent(in) :: outputfile

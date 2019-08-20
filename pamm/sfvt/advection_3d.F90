@@ -47,7 +47,7 @@
 	real(sp), dimension(-l_h+1:jp+r_h), intent(in) :: dyn
 	real(sp), dimension(-l_h+1:kp+r_h), intent(in) :: dzn, rhoa, rhoan
 	integer(i4b), dimension(3), intent(in) :: dims, coords
-	logical, intent(in) :: neumann
+	integer(i4b), intent(in) :: neumann
 	
 	! locals
 	real(sp), dimension(kp,jp,ip) :: fx_r, fx_l, fy_r, fy_l, fz_r, fz_l
@@ -87,12 +87,19 @@
 !$omp end simd
 
     ! neumann boundary condition top and bottom
-    if(neumann) then
+    if(neumann==1) then
         if(coords(3)==0) then
             fz_l(1,:,:)=fz_r(1,:,:)
         endif
         if(coords(3)==(dims(3)-1)) then
             fz_r(kp,:,:)=fz_l(kp,:,:)    
+        endif
+    elseif(neumann==2) then
+        if(coords(3)==0) then
+            fz_l(1,:,:)=-fz_r(1,:,:)
+        endif
+        if(coords(3)==(dims(3)-1)) then
+            fz_r(kp,:,:)=-fz_l(kp,:,:)    
         endif
     endif
     	
@@ -150,7 +157,8 @@
 	real(sp), dimension(-l_h+1:ip+r_h), intent(in) :: dx, dxn
 	real(sp), dimension(-l_h+1:jp+r_h), intent(in) :: dy, dyn
 	real(sp), dimension(-l_h+1:kp+r_h), intent(in) :: dz, dzn, rhoa, rhoan
-	logical, intent(in) :: monotone,neumann
+	logical, intent(in) :: monotone
+	integer(i4b), intent(in) :: neumann
 	
 	! locals
 	integer(i4b) :: k
@@ -228,7 +236,9 @@
 	real(sp), dimension(-l_h+1:ip+r_h), intent(in) :: dx, dxn
 	real(sp), dimension(-l_h+1:jp+r_h), intent(in) :: dy, dyn
 	real(sp), dimension(-l_h+1:kp+r_h), intent(in) :: dz, dzn, rhoa, rhoan
-	logical, intent(in) :: monotone, neumann
+	logical, intent(in) :: monotone
+	integer(i4b), intent(in) :: neumann
+	
 	
 	! locals
 	real(sp) :: u_div1, u_div2, u_div3, u_j_bar1, u_j_bar2, u_j_bar3, &
@@ -712,7 +722,7 @@
 		intent(inout) :: psi
 	real(sp), dimension(-l_h+1:kp+r_h), intent(in) :: dzn, rhoa, rhoan
 	integer(i4b), dimension(3), intent(in) :: dims, coords
-	logical, intent(in) :: neumann
+	integer(i4b), intent(in) :: neumann
 	
 	! locals
 	real(sp), dimension(kp,jp,ip) :: fz_r, fz_l
@@ -735,12 +745,19 @@
 !$omp end simd
 
     ! neumann boundary condition top and bottom
-    if(neumann) then
+    if(neumann==1) then
         if(coords(3)==0) then
             fz_l(1,:,:)=fz_r(1,:,:)
         endif
         if(coords(3)==(dims(3)-1)) then
             fz_r(kp,:,:)=fz_l(kp,:,:)    
+        endif
+    elseif(neumann==2) then
+        if(coords(3)==0) then
+            fz_l(1,:,:)=-fz_r(1,:,:)
+        endif
+        if(coords(3)==(dims(3)-1)) then
+            fz_r(kp,:,:)=-fz_l(kp,:,:)    
         endif
     endif
     	
@@ -797,7 +814,8 @@
 		intent(inout), target :: psi_in
 	real(sp), intent(inout) :: lbc, ubc
 	real(sp), dimension(-l_h+1:kp+r_h), intent(in) :: dz, dzn, rhoa, rhoan
-	logical, intent(in) :: monotone, neumann
+	logical, intent(in) :: monotone
+	integer(i4b), intent(in) :: neumann
 	
 	! locals
 	real(sp) :: u_div3, u_j_bar3, &
@@ -1204,7 +1222,8 @@
 	real(sp), dimension(-l_h+1:ip+r_h), intent(in) :: dx, dxn
 	real(sp), dimension(-l_h+1:jp+r_h), intent(in) :: dy, dyn
 	real(sp), dimension(-l_h+1:kp+r_h), intent(in) :: dz, dzn, rhoa, rhoan
-	logical, intent(in) :: monotone, neumann
+	logical, intent(in) :: monotone
+	integer(i4b), intent(in) :: neumann
 	
 	! locals
 	real(sp) :: u_div1, u_div2, u_div3, u_j_bar1, u_j_bar2, u_j_bar3, &
@@ -1712,7 +1731,8 @@
 		intent(inout), target :: psi_in
 	real(sp), intent(inout), dimension(nq) :: lbc, ubc
 	real(sp), dimension(-l_h+1:kp+r_h), intent(in) :: dz, dzn, rhoa, rhoan
-	logical, intent(in) :: monotone, neumann
+	logical, intent(in) :: monotone
+	integer(i4b), intent(in) :: neumann
 	
 	! locals
 	real(sp) :: u_div3, u_j_bar3, &
