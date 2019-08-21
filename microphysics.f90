@@ -2218,12 +2218,22 @@
 		! ice aggregation see Ferrier (1994)                                             !
 		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 		if(ice_flag) then
-            riaci(k)=max(iice*n_i(k)**2._sp*eii(k) *rho_fac(k) / &
+		    ! collisions
+		    dummy1=max(iice*n_i(k)**2._sp*rho_fac(k) / &
                     lam_i(k)**(4._sp+2.*sp*alpha_i+b_i),0._sp)
+            ! aggregation rate
+            riaci(k)=eii(k)*dummy1
+            q(k,ini)=q(k,ini)+dummy1*(1._sp-eii(K))*3._sp*dt
         endif
 		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 		! end ice aggregation                                                            !
 		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+
+
+
+
+
 
 		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 		! melting of ice                                                                 !
@@ -2432,19 +2442,19 @@
                 ! this is number in aerosol, plus number in ice 
                 !  (scaled by fraction in composition category)
                 ! aer_in_ice * ice_num_evap / ice_num
-                q(k,cst(cat_am)+(i-1)*3+1)      = &
-                    q(k,cst(cat_am)+(i-1)*3+1)   + &
+                q(k,cst(cat_r)+(i-1)*3+2)      = &
+                    q(k,cst(cat_r)+(i-1)*3+2)   + &
                     q(k,iai+(i-1)*3) * &
                     min(dummy2/(q(k,cst(cat_i))+qsmall),1._sp)
                     
-                ! this is surface area going into aerosol
-                q(k,cst(cat_am)+(i-1)*3+2)    = &
-                    q(k,cst(cat_am)+(i-1)*3+2) +&
+                ! this is surface area going into rain aerosol
+                q(k,cst(cat_r)+(i-1)*3+3)    = &
+                    q(k,cst(cat_r)+(i-1)*3+3) +&
                     q(k,iai+(i-1)*3+1) * &
                     min(dummy2/(q(k,cst(cat_i))+qsmall),1._sp)
-                ! this is mass going into aerosol
-                q(k,cst(cat_am)+(i-1)*3+3)    = &
-                    q(k,cst(cat_am)+(i-1)*3+3) +&
+                ! this is mass going into rain aerosol
+                q(k,cst(cat_r)+(i-1)*3+4)    = &
+                    q(k,cst(cat_r)+(i-1)*3+4) +&
                     q(k,iai+(i-1)*3+2) * &
                     min(dummy2/(q(k,cst(cat_i))+qsmall),1._sp)
                 
@@ -2459,6 +2469,10 @@
                     (1._sp - min(dummy2/(q(k,cst(cat_i))+qsmall),1._sp))
                     
             enddo
+            ! add the number of ice and mass to the rain
+            q(k,cst(cat_r))=q(k,cst(cat_r))+dummy2
+            ! mass already added
+!             q(k,cst(cat_r)+1)=q(k,cst(cat_r)+1)+pimlt(k)*dt
             ! ice properties
             q(k,cst(cat_i):cen(cat_i)) = q(k,cst(cat_i):cen(cat_i)) * &
                 (1._sp - min(dummy2/(q(k,cst(cat_i))+qsmall),1._sp ))
