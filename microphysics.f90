@@ -2173,10 +2173,10 @@
             
                     if(q(k,1).gt.smr_i(k)) then
                         pisub(k)=0._sp
-                        pidep(k)=max(ice_dep,0._sp)
+                        pidep(k)=min(max(ice_dep,0._sp),q(k,1)-smr_i(k))
                     else
                         pidep(k)=0._sp
-                        pisub(k)=-min(ice_dep,0._sp)
+                        pisub(k)=min(-min(ice_dep,0._sp),q(k,iqi)/dt)
                     endif
                     !!!
                 
@@ -2215,15 +2215,35 @@
 
 
 		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+		! collection of cloud by ice                                                     !
+		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+		if ((t(k).le.ttr).and.ice_flag) then
+		    if((q(k,iqc).gt.qsmall) .and. (q(k,iqi).gt.qsmall)) then
+                piacw(k)=max(mass_iacw * n_i(k)* eiw *q(k,iqc)*rho_fac(k) / &
+                        (lam_i(k)+f_i)**(3._sp+b_i+alpha_i),0._sp)
+                
+                dummy1=q(k,iqi) ! total mass of particle
+                
+                piacw(k)=max(min(piacw(k),q(k,iqc)/dt),0._sp)
+                
+            endif
+		endif
+		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+
+
+		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 		! ice aggregation see Ferrier (1994)                                             !
 		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-		if(ice_flag) then
+		if(ice_flag.and.(t(k).lt.ttr)) then
 		    ! collisions
 		    dummy1=max(iice*n_i(k)**2._sp*rho_fac(k) / &
                     lam_i(k)**(4._sp+2.*sp*alpha_i+b_i),0._sp)
             ! aggregation rate
             riaci(k)=eii(k)*dummy1
-            q(k,ini)=q(k,ini)+dummy1*(1._sp-eii(K))*3._sp*dt
+            dummy2=dummy1*(1._sp-eii(K))*3._sp*dt
+            q(k,ini)=q(k,ini)+dummy2
+            q(k,iqi+3)=q(k,iqi+3)+dummy2 ! update the number of monomers
         endif
 		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 		! end ice aggregation                                                            !
@@ -2239,7 +2259,8 @@
 		! melting of ice                                                                 !
 		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 		if((t(k).gt.ttr).and.ice_flag) then
-			pimlt(k)=q(k,iqi)*dt+(pidep(k)-pisub(k))*dt ! ice melts instantaneously
+			pimlt(k)=q(k,iqi)/dt+ &
+			    (pidep(k)-pisub(k)+piacw(k)) ! ice melts instantaneously
         endif
 		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 		! end melting of ice                                                             !
@@ -2255,12 +2276,14 @@
     ! ice mass and number
     if(ice_flag) then 
         q(1:kp,iqi)=q(1:kp,iqi)+(pidep-pisub)*dt
+        q(1:kp,iqi+4)=q(1:kp,iqi)+(-pisub)*dt
         q(1:kp,ini)=q(1:kp,ini)-(riaci)*dt
     endif
 
     		
-    ! liquid mass 
-    q(1:kp,iqc)=q(1:kp,iqc)-((pgacw+praut+psacw+pracw+piacw+pihal+picnt+pifrw))*dt
+    ! liquid mass - riming not done here
+    q(1:kp,iqc)=q(1:kp,iqc)-((pgacw+praut+psacw+pracw+pihal+picnt+pifrw))*dt
+    
 
 
     ! rain number
@@ -2270,7 +2293,7 @@
     ! rain mass
     q(1:kp,cst(cat_r)+1)=q(1:kp,cst(cat_r)+1)+(pgmlt+praut+pgshd+pracw+psmlt+pimlt- &
     			(pgacr+pgfr+psacr+piacr_g+piacr_s))*dt
-    ! treat rain evaporation separately - 
+    ! treat rain evaporation separately - adjust
     prevp=min(prevp,q(1:kp,cst(cat_r)+1)/dt) 
     
 
@@ -2429,10 +2452,6 @@
 
 
         
-            !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-            ! add melted ice particles to mixed-mode aerosol
-            !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-            q(k,cst(cat_am))=q(k,cst(cat_am))+dummy2 ! total number of the mixed-mode
 
             do i=1,n_mode-1
                 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -2459,14 +2478,14 @@
                     min(dummy2/(q(k,cst(cat_i))+qsmall),1._sp)
                 
                 ! aerosol in ice
-                q(k,iai+(i-1)*3)=q(k,iai+(i-1)*3)* &
-                    (1._sp - min(dummy2/(q(k,cst(cat_i))+qsmall),1._sp))
-                    
-                q(k,iai+(i-1)*3+1)=q(k,iai+(i-1)*3+1)* &
-                    (1._sp - min(dummy2/(q(k,cst(cat_i))+qsmall),1._sp))
-                    
-                q(k,iai+(i-1)*3+2)=q(k,iai+(i-1)*3+2)* &
-                    (1._sp - min(dummy2/(q(k,cst(cat_i))+qsmall),1._sp))
+!                 q(k,iai+(i-1)*3)=q(k,iai+(i-1)*3)* &
+!                     (1._sp - min(dummy2/(q(k,cst(cat_i))+qsmall),1._sp))
+!                     
+!                 q(k,iai+(i-1)*3+1)=q(k,iai+(i-1)*3+1)* &
+!                     (1._sp - min(dummy2/(q(k,cst(cat_i))+qsmall),1._sp))
+!                     
+!                 q(k,iai+(i-1)*3+2)=q(k,iai+(i-1)*3+2)* &
+!                     (1._sp - min(dummy2/(q(k,cst(cat_i))+qsmall),1._sp))
                     
             enddo
             ! add the number of ice and mass to the rain
@@ -2481,11 +2500,53 @@
         endif
         
     enddo
-    
 
-
+ 
+    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    ! trial and error shows that riming can sometimes cause problems if it warms above 
+    ! ttr. So adjust temperature in two places
+    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     t(1:kp)=t(1:kp)-lv/cp*prevp*dt+lf/cp*pifrw*dt+lf/cp*pgfr*dt+ls/cp*(pidep-pisub)*dt- &
-                lf/cp*pimlt*dt
+                lf/cp*(pimlt)*dt
+    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+
+
+    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    ! do the riming here                                                                 !
+    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    if(ice_flag) then
+        do k=1,kp
+            if((q(k,iqc).lt.qsmall).or.(t(k).gt.ttr)) cycle
+
+            dummy1=q(k,iqc)
+            
+            ! limit riming so 0.1 times liquid water or to a temperature 
+            ! that will not raise above the melting point
+            piacw(k)=max(min(piacw(k),dummy1/dt*0.1_sp,(ttr-t(k))*cp/lf)/dt*0.5_sp,0._sp)
+            ! riming
+            q(k,iqi)=q(k,iqi)+piacw(k)*dt
+            q(k,iqi+4)=q(k,iqi+4)+piacw(k)*dt
+
+            ! and the aerosol
+            ! increase ice aerosol
+            q(k,iai:cen(cat_i))=q(k,iai:cen(cat_i))+ &
+                q(k,cst(cat_c)+2:cen(cat_c))*piacw(k)*dt/dummy1
+            ! reduce cloud props
+            q(k,cst(cat_c):cen(cat_c))=q(k,cst(cat_c):cen(cat_c))* &
+                max(1._sp- piacw(k)*dt/dummy1,0._sp)
+        enddo
+    endif
+    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+
+    
+    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    ! adjust temperature due to riming                                                   !
+    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    t(1:kp)=t(1:kp)+lf/cp*(piacw)*dt
+    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
     q(1:kp,cst(cat_r)+1)=q(1:kp,cst(cat_r)+1)-prevp*dt
     
     q(1:kp,1)=q(1:kp,1)+(prevp)*dt
