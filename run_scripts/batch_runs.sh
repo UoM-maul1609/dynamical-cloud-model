@@ -14,7 +14,7 @@ for (( i=0;i<$ELEMENTS1;i++)); do
         sed -e "s/rh_above=0.9/rh_above=${ARRAY1[${i}]}/" namelist_kelvin_helmholtz.in > /tmp/namelist.tmp
         sed -e "s/th_jump=0./th_jump=${ARRAY2[${j}]}/" /tmp/namelist.tmp > /tmp/namelist.run
         
-        mpiexec -n 42 ../main.exe /tmp/namelist.run > std.out
+        mpiexec -n 42 ../main.exe /tmp/namelist.run > /tmp/std.out
 
         mv /tmp/output.nc /tmp/output_${i}_${j}_theta_on.nc
         
@@ -25,7 +25,7 @@ for (( i=0;i<$ELEMENTS1;i++)); do
         sed -e "s/theta_flag=.true./theta_flag=.false./" /tmp/namelist.run > /tmp/namelist.tmp2
         sed -e "s/t_ctop=273./t_ctop=265./" /tmp/namelist.tmp2 > /tmp/namelist.run2
         
-        mpiexec -n 42 ../main.exe /tmp/namelist.run2 > std.out
+        mpiexec -n 42 ../main.exe /tmp/namelist.run2 > /tmp/std.out
 
         mv /tmp/output.nc /tmp/output_${i}_${j}_theta_off.nc
  			
