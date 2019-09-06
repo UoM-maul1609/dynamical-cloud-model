@@ -103,7 +103,7 @@
                         grid1%cat_c, grid1%cat_r,grid1%cat_i)    
 
                     nm1%nq=grid1%nq
-                        
+                    nm1%nprec=grid1%nprec
                 case default
                     print *, 'error'
                     stop

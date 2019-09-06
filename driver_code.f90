@@ -220,7 +220,7 @@
 							l_h,r_h, &
 							time, x,y,z,rhoa, thetan, &
 							u,v,w,th,p,div, &
-							q_name,q,nq, moisture, &
+							q_name,q,nq, precip, nprec,moisture, &
 							id, world_process, rank2, ring_comm)
 				!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
@@ -431,6 +431,7 @@
                                         inr,iqr,ini,iqi,&
                                         iai, &
                                         cat_am,cat_c, cat_r, cat_i,&
+                                        nprec, &
                                         ipp,jpp,kpp,l_h,r_h,dt,dz,&
                                         dzn,q(:,:,:,:),precip(:,:,:,:),&
                                         th(:,:,:),prefn, &
@@ -546,6 +547,7 @@
 	!>@param[in] u,v,w,th,p,div: prognostic variables
 	!>@param[in] q_name: name of q-variables
 	!>@param[in] q
+	!>@param[in] precip, nprec
 	!>@param[in] moisture: flag for moisture
 	!>@param[in] id: id
 	!>@param[in] world_process: world_process
@@ -556,7 +558,7 @@
 					time, &
 					x,y,z,rhoa, thetan, &
 					u,v,w,th,p,div, &
-					q_name,q,nq, &
+					q_name,q,nq, precip, nprec,&
 					moisture, &
 				    id, world_process, rank, ring_comm)
 	
@@ -569,7 +571,7 @@
 		logical, intent(inout) :: new_file
 		character (len=*), intent(in) :: outputfile
 		integer(i4b), intent(in) :: n, ip, ipp, ipstart, jp, jpp, jpstart, &
-									kp, kpp, kpstart, l_h,r_h, nq
+									kp, kpp, kpstart, l_h,r_h, nq,nprec
 		real(sp), intent(in) :: time
 		real(sp), dimension(1-l_h:ipp+r_h), intent(in) :: x
 		real(sp), dimension(1-l_h:jpp+r_h), intent(in) :: y
@@ -589,11 +591,13 @@
 
         character(len=20), intent(in), dimension(nq) :: q_name
         real(sp), dimension(1-l_h:kpp+r_h,1-r_h:jpp+r_h,1-r_h:ipp+r_h,nq), intent(in) :: q
+        real(sp), dimension(1:kpp,1-r_h:jpp+r_h,1-r_h:ipp+r_h,1:nprec), &
+            intent(in) :: precip
 		logical, intent(in) :: moisture
 		integer(i4b), intent(in) :: id ,world_process, rank, ring_comm
 	
 		integer(i4b) :: ncid, x_dimid, nx_dimid, ny_dimid, nz_dimid, &
-						error, varid,a_dimid, id_go, lq_dimid,nq_dimid
+						error, varid,a_dimid, id_go, lq_dimid,nq_dimid,nprec_dimid
 		integer(i4b) :: i, tag1
 		logical :: var
 
@@ -624,6 +628,7 @@
 			call check( nf90_def_dim(ncid, "kp", kp, nz_dimid) )
 			if(moisture) then
                 call check( nf90_def_dim(ncid, "nq", nq, nq_dimid) )
+                call check( nf90_def_dim(ncid, "nprec", nprec, nprec_dimid) )
                 call check( nf90_def_dim(ncid, "l_q_names", 20, lq_dimid) )
             endif
 
@@ -761,6 +766,15 @@
                 call check( nf90_put_att(ncid, a_dimid, &
                            "units", "kg or number per kg") )
             
+                ! define variable: precip
+                call check( nf90_def_var(ncid, "precip", nf90_float, &
+                    (/nprec_dimid, nz_dimid, ny_dimid, nx_dimid,x_dimid/), varid) )
+                ! get id to a_dimid
+                call check( nf90_inq_varid(ncid, "precip", a_dimid) )
+                ! units
+                call check( nf90_put_att(ncid, a_dimid, &
+                           "units", "mm hr-1 or number per m-2 s-1") )
+            
             endif
 
 			! exit define mode
@@ -893,6 +907,14 @@
                 reshape( &
                 reshape(q(1:kpp,1:jpp,1:ipp,1:nq),[nq,ipp,jpp,kpp],order=[4,3,2,1]), &
                     [nq,kpp,jpp,ipp],order=[1,4,3,2]), &
+                        start = (/1,kpstart,jpstart,ipstart,n/)))
+                        	
+            call check( nf90_inq_varid(ncid, "precip", varid ) )
+            call check( nf90_put_var(ncid, varid, &
+                reshape( &
+                reshape(precip(1:kpp,1:jpp,1:ipp,1:nprec),[nprec,ipp,jpp,kpp],&
+                    order=[4,3,2,1]), &
+                    [nprec,kpp,jpp,ipp],order=[1,4,3,2]), &
                         start = (/1,kpstart,jpstart,ipstart,n/)))	
 		endif
 		
