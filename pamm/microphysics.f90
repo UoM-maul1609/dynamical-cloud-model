@@ -97,7 +97,8 @@
 				nu_r1,nu_r2,nu_i1, nu_i2, nu_s1, nu_s2, nu_g1, nu_g2, &
 				mass_imm, num_imm, q0sat, &
 				chi_rain, chi_cloud, chi_ice, chi_snow, chi_graupel, &
-				chi_rain1, chi_cloud1, chi_ice1, chi_snow1, chi_graupel1
+				chi_rain1, chi_cloud1, chi_ice1, chi_snow1, chi_graupel1, &
+				chi_num_ice, chi_num_ice1
 				
 	! Seifert and Beheng autoconversion
 	real(sp) :: kc, kr, xstar
@@ -412,8 +413,12 @@
         inc=(n_mode-1)*6+3
         iqc=(n_mode-1)*6+4       
         
-        nprec=1
-
+        if(ice_flag) then
+            nprec=2
+        else
+            nprec=1
+        endif
+        
         iqv=1
         
         cat_am=(n_mode-1)+2
@@ -1018,12 +1023,14 @@
 	chi_rain=gamma(1._sp+alpha_r+b_r+dr)
 	chi_cloud=gamma(1._sp+alpha_c+b_c+1._sp)
 	chi_ice=gamma(1._sp+alpha_i+b_i+di)
+	chi_num_ice=gamma(1._sp+alpha_i+b_i)
 	chi_snow=gamma(1._sp+alpha_s+b_s+ds)
 	chi_graupel=gamma(1._sp+alpha_g+b_g+dg)
 	
 	chi_rain1=gamma(1._sp+alpha_r+dr)
 	chi_cloud1=gamma(1._sp+alpha_c+1._sp)
 	chi_ice1=gamma(1._sp+alpha_i+di)
+	chi_num_ice1=gamma(1._sp+alpha_i)
 	chi_snow1=gamma(1._sp+alpha_s+ds)
 	chi_graupel1=gamma(1._sp+alpha_g+dg)
 	
@@ -1048,6 +1055,7 @@
 	!>@param[in] inr, iqr: index of rain number, index of rain mass
 	!>@param[in] ini, iqi,iai: index of ice number, index of ice mass, and ice aerosol
 	!>@param[in] cat_am,cat_c, cat_r, cat_i: category index for cloud and rain and ice
+	!>@param[in] nprec
 	!>@param[in] ip,jp: number of horizontal levels
 	!>@param[in] kp: number of vertical levels
 	!>@param[in] dt: time-step
@@ -1068,6 +1076,7 @@
 	!>@param[in] theta_flag: whether to alter theta
     subroutine p_microphysics_3d(nq,ncat,n_mode,cst,cen,inc,iqc, inr,iqr,ini,iqi,iai, &
                     cat_am,cat_c, cat_r, cat_i,&
+                    nprec, &
                     ip,jp,kp,l_h,r_h,dt,dz,dzn,q,precip,th,prefn, z,thetan,rhoa,rhoan,w, &
     				micro_init,hm_flag, mass_ice, ice_flag, theta_flag)
 #else
@@ -1084,6 +1093,7 @@
 	!>@param[in] inr, iqr: index of rain number, index of rain mass
 	!>@param[in] ini, iqi,iai: index of ice number, index of ice mass, and ice aerosol
 	!>@param[in] cat_am,cat_c, cat_r, cat_i: category index for cloud and rain and ice
+	!>@param[in] nprec
 	!>@param[in] ip,jp: number of horizontal levels
 	!>@param[in] kp: number of vertical levels
 	!>@param[in] dt: time-step
@@ -1105,6 +1115,7 @@
 	!>@param[in] comm,comm_vert,id,dims,coords: MPI variables
     subroutine p_microphysics_3d(nq,ncat,n_mode,cst,cen,inc,iqc, inr,iqr,ini,iqi,iai, &
                     cat_am,cat_c, cat_r, cat_i,&
+                    nprec, &
                     ip,jp,kp,l_h,r_h,dt,dz,dzn,q,precip,th,prefn, z,thetan,rhoa,rhoan,w, &
     				micro_init,hm_flag, mass_ice, ice_flag, theta_flag, &
     				comm,comm_vert,id,dims,coords)
@@ -1117,11 +1128,11 @@
     integer(i4b), intent(in) :: nq, ncat, n_mode, ip,jp,kp, inc, iqc, inr,iqr,&
         ini,iqi,iai, &
         cat_am,&
-        cat_c, cat_r,cat_i,l_h,r_h
+        cat_c, cat_r,cat_i,l_h,r_h, nprec
     integer(i4b), dimension(ncat), intent(in) :: cst,cen
     real(sp), intent(in) :: dt
     real(sp), dimension(-l_h+1:kp+r_h,-l_h+1:jp+r_h,-l_h+1:ip+r_h,nq), intent(inout) :: q
-    real(sp), dimension(1:kp,1-l_h:jp+r_h,1-l_h:ip+r_h,1), intent(inout) :: precip
+    real(sp), dimension(1:kp,1-l_h:jp+r_h,1-l_h:ip+r_h,nprec), intent(inout) :: precip
     real(sp), dimension(-l_h+1:kp+r_h,-l_h+1:jp+r_h,-l_h+1:ip+r_h), intent(inout) :: &
     					th
     real(sp), dimension(-l_h+1:kp+r_h), intent(in) :: z, dz, dzn, rhoa,rhoan, thetan, &
@@ -1153,7 +1164,7 @@
 	    do j=1,jp
 #if MPI_PAMM == 0 
     		call p_microphysics_1d(nq,ncat,n_mode,cst,cen,inc,iqc, inr,iqr, ini,iqi,iai,&
-		                cat_am,cat_c, cat_r, cat_i,&
+		                cat_am,cat_c, cat_r, cat_i,nprec,&
 		                kp,l_h,dt,dz,dzn,q(:,j,i,:),precip(:,j,i,:),th(:,j,i),&
 		                    prefn, &
 							z(:),thetan,rhoa(:),rhoan(:),w(:,j,i), &
@@ -1161,7 +1172,7 @@
 #else
 
     		call p_microphysics_1d(nq,ncat,n_mode,cst,cen,inc,iqc,inr,iqr, ini,iqi,iai, &
-		                cat_am,cat_c, cat_r, cat_i, &
+		                cat_am,cat_c, cat_r, cat_i,nprec, &
 		                kp,l_h,dt,dz,dzn,q(:,j,i,:),precip(:,j,i,:),th(:,j,i),&
 		                    prefn, &
 							z(:),thetan,rhoa(:),rhoan(:),w(:,j,i), &
@@ -1295,6 +1306,7 @@
 	!>@param[in] inr, iqr: index of rain number, index of rain mass
 	!>@param[in] ini, iqi,iai: index of ice number, index of ice mass, and ice aerosol
 	!>@param[in] cat_am,cat_c, cat_r,cat_i: category index for cloud and rain and ice
+	!>@param[in] nprec
 	!>@param[in] ip: number of horizontal levels
 	!>@param[in] kp: number of vertical levels
 	!>@param[in] dt: time-step
@@ -1313,18 +1325,18 @@
 	!>@param[in] mass_ice: mass of a single ice crystal (override)
 	!>@param[in] theta_flag: whether to alter theta
     subroutine p_microphysics_2d(nq,ncat,n_mode,cst,cen,inc,iqc,inr,iqr,ini,iqi,iai, &
-                    cat_am,cat_c, cat_r, cat_i,&
+                    cat_am,cat_c, cat_r, cat_i,nprec, &
                     ip,kp,o_halo,dt,dz,dzn,q,precip,theta,p, z,theta_ref,rho,rhon,w, &
     						micro_init,hm_flag, mass_ice, theta_flag)
     implicit none
     ! arguments:
     integer(i4b), intent(in) :: nq, ncat, n_mode, ip,kp, o_halo, inc, iqc, inr,iqr, &
         ini,iqi,iai, &
-        cat_am,cat_c, cat_r, cat_i
+        cat_am,cat_c, cat_r, cat_i,nprec
     integer(i4b), dimension(ncat), intent(in) :: cst,cen
     real(sp), intent(in) :: dt
     real(sp), dimension(-o_halo+1:kp+o_halo,-o_halo+1:ip+o_halo,nq), intent(inout) :: q
-    real(sp), dimension(1:kp,1:ip,1), intent(inout) :: precip
+    real(sp), dimension(1:kp,1:ip,1:nprec), intent(inout) :: precip
     real(sp), dimension(-o_halo+1:kp+o_halo,-o_halo+1:ip+o_halo), intent(inout) :: &
     					theta, p,rho
     real(sp), dimension(-o_halo+1:kp+o_halo), intent(in) :: z, dz, dzn, &
@@ -1351,13 +1363,13 @@
 	do i=1,ip
 #if MPI_PAMM == 0 
 		call p_microphysics_1d(nq,ncat,n_mode,cst,cen,inc,iqc,inr,iqr,ini,iqi,iai, &
-		                cat_am,cat_c, cat_r, cat_i,&
+		                cat_am,cat_c, cat_r, cat_i,nprec,&
 		                kp,o_halo,dt,dz,dzn,q(:,i,:),precip(:,i,:),theta(:,i),p(:,i), &
 							z(:),theta_ref,rho(:,i),rhon(:),w(:,i), &
     						micro_init,hm_flag, mass_ice, .false., theta_flag)
 #else
 		call p_microphysics_1d(nq,ncat,n_mode,cst,cen,inc,iqc,inr,iqr, ini,iqi,iai,&
-		                cat_am,cat_c, cat_r, cat_i, &
+		                cat_am,cat_c, cat_r, cat_i,nprec, &
 		                kp,o_halo,dt,dz,dzn,q(:,i,:),precip(:,i,:),theta(:,i),p(:,i), &
 							z(:),theta_ref,rho(:,i),rhon(:),w(:,i), &
 							vqc(:,i),vqr(:,i),vqi(:,i), n_step, adv_l, coords,&
@@ -1386,6 +1398,7 @@
 	!>@param[in] inr, iqr: index of rain number, index of rain mass
 	!>@param[in] ini, iqi,iai: index of ice number, index of ice mass, and ice aerosol
 	!>@param[in] cat_am,cat_c, cat_r, cat_i: category index for cloud and rain and ice
+	!>@param[in] nprec
 	!>@param[in] kp: number of vertical levels
 	!>@param[in] dt: time-step
 	!>@param[in] dz: dz, dzn
@@ -1405,7 +1418,7 @@
 	!>@param[in] ice_flag: ice microphysics
 	!>@param[in] theta_flag: whether to alter theta
     subroutine p_microphysics_1d(nq,ncat,n_mode,cst,cen, inc, iqc, inr,iqr, ini,iqi,iai,&
-                            cat_am,cat_c, cat_r, cat_i, &
+                            cat_am,cat_c, cat_r, cat_i,nprec, &
                             kp,o_halo,dt,dz,dzn,q,precip,th,p, z,theta,rhoa,rhon,u, &
     						micro_init,hm_flag, mass_ice,ice_flag, theta_flag)
 #else
@@ -1421,6 +1434,7 @@
 	!>@param[in] inr, iqr: index of rain number, index of rain mass
 	!>@param[in] ini, iqi,iai: index of ice number, index of ice mass, and ice aerosol
 	!>@param[in] cat_am,cat_c, cat_r, cat_i: category index for cloud and rain and ice
+	!>@param[in] nprec
 	!>@param[in] kp: number of vertical levels
 	!>@param[in] dt: time-step
 	!>@param[in] dz: dz, dzn
@@ -1442,7 +1456,7 @@
 	!>@param[in] ice_flag: ice microphysics
 	!>@param[in] theta_flag: whether to alter theta
     subroutine p_microphysics_1d(nq,ncat,n_mode,cst,cen, inc, iqc, inr,iqr,ini,iqi,iai,&
-                            cat_am,cat_c, cat_r, cat_i,&
+                            cat_am,cat_c, cat_r, cat_i,nprec,&
                             kp,o_halo,dt,dz,dzn,q,precip,th,p, z,theta,rhoa,rhon,u, &
                             vqc,vqr,vqi,n_step, adv_l, coords,&
     						micro_init,hm_flag, mass_ice,ice_flag, theta_flag)
@@ -1455,11 +1469,11 @@
     ! arguments:
     integer(i4b), intent(in) :: nq, ncat,n_mode, kp, o_halo, inc, iqc,inr,iqr,&
                              ini,iqi,iai, &
-                            cat_am,cat_c, cat_r, cat_i
+                            cat_am,cat_c, cat_r, cat_i,nprec
     integer(i4b), dimension(ncat), intent(in) :: cst,cen
     real(sp), intent(in) :: dt
     real(sp), dimension(-o_halo+1:kp+o_halo,nq), intent(inout) :: q
-    real(sp), dimension(1:kp,1), intent(inout) :: precip
+    real(sp), dimension(1:kp,nprec), intent(inout) :: precip
     real(sp), dimension(-o_halo+1:kp+o_halo), intent(inout) :: th
     real(sp), dimension(-o_halo+1:kp+o_halo), intent(in) :: dz, z, dzn, rhoa, &
                                                     rhon, theta,p
@@ -1636,6 +1650,11 @@
         ! ice
         vqi(:)=min(max(fall_q_i*rho_fac * lam_i**(1._sp+alpha_i+di) / &
             (lam_i+f_i)**(1._sp+alpha_i+di+b_i), 0._sp), 10._sp)
+
+        ! precipitation
+        precip(1:kp,2)=n_i(1:kp)*(a_i*chi_num_ice/(lam_i(1:kp)**(alpha_i+b_i+1._sp)) - &
+                        u(1:kp)*chi_num_ice1/(lam_i(1:kp)**(alpha_i+1._sp))) &
+                        /rho(1:kp)
     endif
     
     ! precipitation
