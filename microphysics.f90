@@ -2254,19 +2254,19 @@
 		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 		! ice aggregation see Ferrier (1994)                                             !
 		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-		if(ice_flag.and.(t(k).lt.ttr)) then
+		if(ice_flag.and.(t(k).lt.ttr).and.(lam_i(k).lt.1.e5_sp)) then
 		    ! collisions
 		    dummy1=max(iice*n_i(k)**2._sp*rho_fac(k) / &
-                    max(lam_i(k),1.e5_sp)**(4._sp+2.*sp*alpha_i+b_i),0._sp)
+                    lam_i(k)**(4._sp+2.*sp*alpha_i+b_i),0._sp)
                         
             
             ! aggregation rate
             riaci(k)=eii(k)*dummy1
             
-            !dummy2=dummy1*(1._sp-eii(K))*100._sp*dt
+            dummy2=min(dummy1*(1._sp-eii(K))*3._sp*dt,q(k,ini)*0.1_sp)
 
-            !q(k,ini)=q(k,ini)+dummy2
-            !q(k,iqi+3)=q(k,iqi+3)+dummy2 ! update the number of monomers
+            q(k,ini)=q(k,ini)+dummy2
+            q(k,iqi+3)=q(k,iqi+3)+dummy2 ! update the number of monomers
             
             
             
