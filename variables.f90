@@ -70,7 +70,7 @@
             			hm_flag=.false.,ice_flag=.false., &
             			adiabatic_prof=.false.,divergence
             integer(i4b) :: nq,ip, jp, kp, subgrid_model, advection_scheme, kord, &
-                        microphysics_flag,nprec
+                        microphysics_flag,nprec, ice_nuc_flag=1
             real(sp) :: vis, &
             			runtime, dt, output_interval, &
             			rotation_period_hours, &
@@ -80,7 +80,8 @@
             			damping_thickness, damping_tau, forcing_tau, &
             			divergence_val,divergence_hgt, &
             			adiabatic_frac,t_cbase,t_ctop,rh_above,th_jump,th_grad
-            real(sp) :: psurf,tsurf,z0,z0th, ptol=1.e-8_sp, drop_num
+            real(sp) :: psurf,tsurf,z0,z0th, ptol=1.e-8_sp, drop_num, &
+                        j_stochastic=0.5e-9_sp
             integer(i4b) :: n_levels
         end type namelist_input
 

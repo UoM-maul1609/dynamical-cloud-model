@@ -55,6 +55,7 @@
 	!>@param[in] damping_layer: flag for damping layer
 	!>@param[in] forcing: flag for large-scale forcing of horizontal winds
 	!>@param[in] divergence: flag for large-scale divergence
+	!>@param[in] j_stochastic, ice_nuc_flag
 	!>@param[in] nq,nprec,ncat: number of q-variables
 	!>@param[in] dims,id, world_process, ring_comm, sub_horiz_comm: mpi variables
 	!>@param[in] sub_vert_comm: mpi variables
@@ -90,7 +91,9 @@
 				viscous, &
 				advection_scheme, kord, monotone, &
 				moisture, microphysics_flag, ice_flag, hm_flag, theta_flag, &
-				damping_layer,forcing, divergence, nq, nprec, ncat, &
+				damping_layer,forcing, divergence, &
+				j_stochastic, ice_nuc_flag, &
+				nq, nprec, ncat, &
 				dims,id, world_process, rank, ring_comm,sub_horiz_comm,sub_vert_comm)
 		use nrtype
 		use mpi_module, only : exchange_full, exchange_along_dim
@@ -107,6 +110,7 @@
 		logical, intent(in) :: viscous, monotone, moisture, &
 		                    damping_layer, forcing, theta_flag, ice_flag, hm_flag, &
 		                    divergence
+		integer(i4b), intent(in) :: ice_nuc_flag
 		logical, intent(inout) :: micro_init
 		integer(i4b), intent(in) :: ntim,ip,jp,kp, ipp,jpp,kpp, &
 						l_h,r_h, ipstart, jpstart, kpstart, &
@@ -115,7 +119,8 @@
 		    sub_vert_comm,rank
 		integer(i4b), dimension(3), intent(in) :: coords, dims
 		character (len=*), intent(in) :: outputfile
-		real(sp), intent(in) :: output_interval, dt, z0,z0th, ptol, forcing_tau
+		real(sp), intent(in) :: output_interval, dt, z0,z0th, ptol, forcing_tau, &
+		                        j_stochastic
         integer(i4b), dimension(ncat), intent(in) :: c_s, c_e
         integer(i4b), intent(in) :: cat_am,cat_c, cat_r, cat_i,n_mode,inc,iqc,inr,iqr, &
                                 ini, iqi, iai
@@ -438,6 +443,7 @@
                                         zn(:),thetan,rhoa,rhoan,w(:,:,:), &
                                         micro_init,hm_flag,1.e-14_sp, &
                                         ice_flag, theta_flag, &
+                                        j_stochastic, ice_nuc_flag, &
                                         ring_comm,sub_vert_comm,id,dims,coords)		
                     case default
                         print *,'not coded'

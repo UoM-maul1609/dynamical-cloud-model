@@ -285,6 +285,7 @@
 				nm1%hm_flag, &
 				nm1%theta_flag, &
 				nm1%damping_layer,  nm1%forcing, nm1%divergence, &
+				nm1%j_stochastic, nm1%ice_nuc_flag, &
 				grid1%nq, grid1%nprec, grid1%ncat, &
 				mp1%dims,mp1%id, world_process, mp1%rank, mp1%ring_comm, &
 				mp1%sub_horiz_comm,mp1%sub_comm)
