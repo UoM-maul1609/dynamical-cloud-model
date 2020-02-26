@@ -28,7 +28,7 @@ main.exe	:  main.$(OBJ) variables.$(OBJ)  parallel_tridag.$(OBJ) mpi_module.$(OB
 	$(FOR2) $(FFLAGSOMP)main.exe main.$(OBJ) variables.$(OBJ)  parallel_tridag.$(OBJ) \
 			 mpi_module.$(OBJ) \
 			 initialisation.$(OBJ) -lm pts_lib.a \
-		     $(DEBUG)
+		     ${NETCDFLIB} -I ${NETCDFMOD} ${NETCDF_LIB} $(DEBUG)	 
 # 	$(FOR2) $(FFLAGSOMP)main.exe main.$(OBJ) variables.$(OBJ)  parallel_tridag.$(OBJ) \
 # 			 mpi_module.$(OBJ) \
 # 			 initialisation.$(OBJ) -lm model_lib.a \
