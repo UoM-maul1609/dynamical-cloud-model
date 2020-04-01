@@ -81,7 +81,8 @@
 						egw=1._sp, eiw=1._sp, egs_wet=1._sp, egi_wet=1._sp
 	
 	! variables used in various process rates:
-	real(sp) :: gam1r,gam2r,gam1c, gam2c, gam1i,gam2i, gam1s, gam2s,gam1g,gam2g, &
+	real(sp) :: gam1r,gam2r,gam3r,gam1c, gam2c, gam3c, &
+	            gam1i,gam2i, gam1s, gam2s,gam1g,gam2g, &
 				fall_q_r, fall_q_c, fall_q_s, fall_q_g, fall_n_r, fall_n_s, fall_n_g, &
 				fall_q_i, fall_n_i, fall_n_c, &
 				phi_r, mass_iacr,num_iacr, mass_sacw_i, mass_iacw, &
@@ -897,9 +898,12 @@
 	! used to calculate intercept and slopes
 	gam1r=gamma(1._sp+alpha_r)
 	gam2r=gamma(1._sp+alpha_r+dr)
+	gam3r=gamma(5._sp+alpha_r)
 	gam1c=gamma(1._sp+alpha_c)
 	gam2c=gamma(1._sp+alpha_c+1._sp) ! note the 1, instead of dc - drop distribution
 	                                ! is a mass distribution
+	gam3c=gamma(4._sp/dc+alpha_c+1._sp) ! note different to rain 
+	                                    !because cloud is a mass distribution
 	gam1i=gamma(1._sp+alpha_i)
 	gam2i=gamma(1._sp+alpha_i+di)
 	gam1s=gamma(1._sp+alpha_s)
@@ -1578,7 +1582,7 @@
 	            n_mix,s_mix,m_mix, nin_c, din_c,nin_r,din_r, n_tot, s_tot, m_tot
 	
 	real(sp), dimension(1-o_halo:kp+o_halo) :: gamma_t,dep_density
-	real(sp) :: phi,vol
+	real(sp) :: phi,vol, nfrag=0._sp, lam_freeze, n0_freeze
 	
     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     ! initialise some variables that do not depend on prognostics                        !
@@ -1973,19 +1977,34 @@
                     d_aer1(n_mode), t(k) ,q(k  ,ini), &
                     j_stochastic,dt,ice_nuc_flag)     ! d
 
-             
-                ! increase ice crystal number
-                q(k  ,ini)=q(k  ,ini)+nin_c
-                ! increase ice crystal mass
-                dummy1=nin_c/q(k  ,inc)*q(k, iqc)
-                q(k  ,iqi)=q(k  ,iqi)+dummy1
                 
+                
+                !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+                ! drop fragmentation                                                     !
+                !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+                nfrag=0._sp
+                dummy1=nin_c/q(k  ,inc)*q(k, iqc) ! mass of cloud water frozen
+                if(t(k).lt.268._sp) then
+                    lam_freeze=(q(k,  inc)/dummy1*gam2c/gam1c)
+                    n0_freeze = q(k,  inc)/gam1c*lam_freeze**(alpha_c+1)
+                    ! lawson et al
+                    nfrag = 2.5e13_sp*n0_freeze/(cc**(4._sp/dc))* &
+                        gam3c/(lam_freeze**(4._sp/dc+1._sp+alpha_c))
+                endif
+                !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+                
+                
+                ! increase ice crystal number
+                q(k  ,ini)=q(k  ,ini)+nfrag
+                ! increase ice crystal mass - added divided by number of cloud, 
+                                ! multiplied by mass of cloud
+                q(k  ,iqi)=q(k  ,iqi)+dummy1
                 ! increase ice crystal shape factor
-                q(k  ,iqi+1)=q(k  ,iqi+1)+nin_c
+                q(k  ,iqi+1)=q(k  ,iqi+1)+nin_c+nfrag
                 ! increase ice crystal volume factor
                 q(k  ,iqi+2)=q(k  ,iqi+2)+dummy1/rhoi
                 ! increase ice crystal monomers
-                q(k  ,iqi+3)=q(k  ,iqi+3)+nin_c
+                q(k  ,iqi+3)=q(k  ,iqi+3)+nin_c+nfrag
                 
                 
                 ! deplete cloudnc
@@ -2073,18 +2092,32 @@
                     d_aer1(n_mode), t(k), q(k  ,ini) , &
                     j_stochastic, dt, ice_nuc_flag)     ! d
             
+                !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+                ! drop fragmentation                                                     !
+                !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+                nfrag=0._sp
+                dummy1=nin_r/q(k  ,inr)*q(k, iqr) ! mass of rain water frozen
+                if(t(k).lt.268._sp) then
+                    lam_freeze=(q(k,  inr)/dummy1*gam2r/gam1r)**(1._sp/dr)
+                    n0_freeze = q(k,  inr)/gam1r*lam_freeze**(alpha_r+1)
+                    ! lawson et al
+                    nfrag = 2.5e13_sp*n0_freeze* &
+                        gam3r/(lam_freeze**(5._sp+alpha_r))
+                endif
+                !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+
                 ! increase in ice crystal number
-                q(k  ,ini)=q(k  ,ini)+nin_r
+                q(k  ,ini)=q(k  ,ini)+nin_r+nfrag
                 ! increase in ice crystal mass
-                dummy1=nin_r/q(k  ,inr)*q(k, iqr)
                 q(k  ,iqi)=q(k  ,iqi)+dummy1
                 
                 ! increase ice crystal shape factor
-                q(k  ,iqi+1)=q(k  ,iqi+1)+nin_r
+                q(k  ,iqi+1)=q(k  ,iqi+1)+nin_r+nfrag
                 ! increase ice crystal volume factor
                 q(k  ,iqi+2)=q(k  ,iqi+2)+dummy1/rhoi
                 ! increase ice crystal monomers
-                q(k  ,iqi+3)=q(k  ,iqi+3)+nin_r
+                q(k  ,iqi+3)=q(k  ,iqi+3)+nin_r+nfrag
 
 
                 ! deplete rain
@@ -2283,6 +2316,7 @@
             ! aggregation rate
             riaci(k)=eii(k)*dummy1
             
+            ! Vardiman approximate - 3 particles for every collision that doesn't aggregate
             dummy2=min(dummy1*(1._sp-eii(K))*3._sp*dt,q(k,ini)*0.1_sp)
 
             q(k,ini)=q(k,ini)+dummy2
