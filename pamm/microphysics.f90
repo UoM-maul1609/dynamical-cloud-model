@@ -1177,7 +1177,8 @@
 		                kp,l_h,dt,dz,dzn,q(:,j,i,:),precip(:,j,i,:),th(:,j,i),&
 		                    prefn, &
 							z(:),thetan,rhoa(:),rhoan(:),w(:,j,i), &
-    						micro_init,hm_flag, mass_ice, ice_flag, theta_flag, &
+    						micro_init,hm_flag, mass_ice, ice_flag, &
+    						.true.,.true.,theta_flag, &
     						j_stochastic,ice_nuc_flag)
 #else
 
@@ -1188,7 +1189,8 @@
 							z(:),thetan,rhoa(:),rhoan(:),w(:,j,i), &
 							vqc(:,j,i),vqr(:,j,i),vqi(:,j,i),n_step, adv_l, &
 							coords, &
-    						micro_init,hm_flag, mass_ice, ice_flag, theta_flag, &
+    						micro_init,hm_flag, mass_ice, ice_flag, &
+    						.true.,.true.,theta_flag, &
     						j_stochastic,ice_nuc_flag)
     		n_step_o=max(n_step,n_step_o)
 
@@ -1334,12 +1336,16 @@
 	!>@param[inout] micro_init: boolean to initialise microphysics 
 	!>@param[in] hm_flag: switch hm-process on and off
 	!>@param[in] mass_ice: mass of a single ice crystal (override)
+	!>@param[in] ice_flag: ice on /off
+	!>@param[in] wr_flag: warm rain on /off
+	!>@param[in] rm_flag: riming on /off
 	!>@param[in] theta_flag: whether to alter theta
 	!>@param[in] j_stochastic, ice_nuc_flag
     subroutine p_microphysics_2d(nq,ncat,n_mode,cst,cen,inc,iqc,inr,iqr,ini,iqi,iai, &
                     cat_am,cat_c, cat_r, cat_i,nprec, &
                     ip,kp,o_halo,dt,dz,dzn,q,precip,theta,p, z,theta_ref,rho,rhon,w, &
-    						micro_init,hm_flag, mass_ice, theta_flag, &
+    						micro_init,hm_flag, mass_ice, ice_flag, &
+    						wr_flag, rm_flag, theta_flag, &
     						j_stochastic,ice_nuc_flag)
     implicit none
     ! arguments:
@@ -1355,7 +1361,7 @@
     real(sp), dimension(-o_halo+1:kp+o_halo), intent(in) :: z, dz, dzn, &
                     rhon, theta_ref
     real(sp), dimension(-o_halo+1:kp+o_halo,-o_halo+1:ip+o_halo), intent(in) :: w
-    logical, intent(in) :: hm_flag, theta_flag
+    logical, intent(in) :: hm_flag, ice_flag, wr_flag, rm_flag, theta_flag
     integer(i4b), intent(in) :: ice_nuc_flag
     logical , intent(inout) :: micro_init
     real(sp), intent(in) :: mass_ice, j_stochastic
@@ -1380,7 +1386,8 @@
 		                cat_am,cat_c, cat_r, cat_i,nprec,&
 		                kp,o_halo,dt,dz,dzn,q(:,i,:),precip(:,i,:),theta(:,i),p(:,i), &
 							z(:),theta_ref,rho(:,i),rhon(:),w(:,i), &
-    						micro_init,hm_flag, mass_ice, .false., theta_flag, &
+    						micro_init,hm_flag, mass_ice, ice_flag, &
+    						wr_flag,rm_flag,theta_flag, &
     						j_stochastic,ice_nuc_flag)
 #else
 		call p_microphysics_1d(nq,ncat,n_mode,cst,cen,inc,iqc,inr,iqr, ini,iqi,iai,&
@@ -1388,7 +1395,8 @@
 		                kp,o_halo,dt,dz,dzn,q(:,i,:),precip(:,i,:),theta(:,i),p(:,i), &
 							z(:),theta_ref,rho(:,i),rhon(:),w(:,i), &
 							vqc(:,i),vqr(:,i),vqi(:,i), n_step, adv_l, coords,&
-    						micro_init,hm_flag, mass_ice, .false., theta_flag, &
+    						micro_init,hm_flag, mass_ice, ice_flag, &
+    						wr_flag,rm_flag,theta_flag, &
     						j_stochastic,ice_nuc_flag)
     	n_step_o=max(n_step_o,n_step)
 #endif	
@@ -1432,12 +1440,15 @@
 	!>@param[in] hm_flag: switch hm-process on and off
 	!>@param[in] mass_ice: mass of a single ice crystal (override)
 	!>@param[in] ice_flag: ice microphysics
+	!>@param[in] wr_flag: warm rain
+	!>@param[in] rm_flag: riming flag
 	!>@param[in] theta_flag: whether to alter theta
 	!>@param[in] j_stochastic, ice_nuc_flag
     subroutine p_microphysics_1d(nq,ncat,n_mode,cst,cen, inc, iqc, inr,iqr, ini,iqi,iai,&
                             cat_am,cat_c, cat_r, cat_i,nprec, &
                             kp,o_halo,dt,dz,dzn,q,precip,th,p, z,theta,rhoa,rhon,u, &
-    						micro_init,hm_flag, mass_ice,ice_flag, theta_flag, &
+    						micro_init,hm_flag, mass_ice,ice_flag, &
+    						wr_flag, rm_flag, theta_flag, &
     						j_stochastic,ice_nuc_flag)
 #else
 	!>@author
@@ -1472,13 +1483,16 @@
 	!>@param[in] hm_flag: switch hm-process on and off
 	!>@param[in] mass_ice: mass of a single ice crystal (override)
 	!>@param[in] ice_flag: ice microphysics
+	!>@param[in] wr_flag: warm rain
+	!>@param[in] rm_flag: riming flag
 	!>@param[in] theta_flag: whether to alter theta
 	!>@param[in] j_stochastic, ice_nuc_flag
     subroutine p_microphysics_1d(nq,ncat,n_mode,cst,cen, inc, iqc, inr,iqr,ini,iqi,iai,&
                             cat_am,cat_c, cat_r, cat_i,nprec,&
                             kp,o_halo,dt,dz,dzn,q,precip,th,p, z,theta,rhoa,rhon,u, &
                             vqc,vqr,vqi,n_step, adv_l, coords,&
-    						micro_init,hm_flag, mass_ice,ice_flag, theta_flag, &
+    						micro_init,hm_flag, mass_ice,ice_flag, &
+    						wr_flag, rm_flag, theta_flag, &
     						j_stochastic,ice_nuc_flag)
 #endif
 
@@ -1498,7 +1512,7 @@
     real(sp), dimension(-o_halo+1:kp+o_halo), intent(in) :: dz, z, dzn, rhoa, &
                                                     rhon, theta,p
     real(sp), dimension(-o_halo+1:kp+o_halo), intent(in) :: u
-    logical, intent(in) :: hm_flag, ice_flag, theta_flag
+    logical, intent(in) :: hm_flag, ice_flag, wr_flag, rm_flag, theta_flag
     integer(i4b), intent(in) :: ice_nuc_flag
     logical , intent(inout) :: micro_init
     real(sp), intent(in) :: mass_ice, j_stochastic
@@ -2271,16 +2285,18 @@
 		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 		! warm rain autoconversion based on Seifert and Beheng (2006)                    !
 		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-		call seifert_beheng(sb_aut,sb_acr, sb_cwaut, sb_cwacr, sb_raut, &
-		            sb_rsel, sb_cwsel, q(k,cst(cat_c)+1),q(k,cst(cat_c)),&
-		            q(k,cst(cat_r)+1),q(k,cst(cat_r)),rho(k),dt)
-		praut(k)=sb_aut
-		pracw(k)=sb_acr
-		rcwaut(k)=sb_cwaut
-		rcwacr(k)=sb_cwacr
-		rraut(k)=sb_raut
-		rrsel(k)=sb_rsel
-		rcwsel(k)=sb_cwsel
+		if (wr_flag) then
+            call seifert_beheng(sb_aut,sb_acr, sb_cwaut, sb_cwacr, sb_raut, &
+                        sb_rsel, sb_cwsel, q(k,cst(cat_c)+1),q(k,cst(cat_c)),&
+                        q(k,cst(cat_r)+1),q(k,cst(cat_r)),rho(k),dt)
+            praut(k)=sb_aut
+            pracw(k)=sb_acr
+            rcwaut(k)=sb_cwaut
+            rcwacr(k)=sb_cwacr
+            rraut(k)=sb_raut
+            rrsel(k)=sb_rsel
+            rcwsel(k)=sb_cwsel
+        endif
 		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         ! end rain auto-conversion                                                       !		
 		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -2595,7 +2611,7 @@
     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     ! do the riming here                                                                 !
     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    if(ice_flag) then
+    if(ice_flag.and.rm_flag) then
         do k=1,kp
             if((q(k,iqc).lt.qsmall).or.(t(k).gt.ttr)) cycle
 
@@ -2615,6 +2631,24 @@
             ! reduce cloud props
             q(k,cst(cat_c):cen(cat_c))=q(k,cst(cat_c):cen(cat_c))* &
                 max(1._sp- piacw(k)*dt/dummy1,0._sp)
+                
+                
+            
+            !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+            ! h-m process                                                                !
+            !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+            if((t(k).gt.(ttr-2.0_sp)).or.(t(k).lt.(ttr-9.0_sp))) cycle
+
+            if(hm_flag) then
+                dummy1=max(hm_rate*piacw(k)*hm_func(t(k)),0._sp)*dt
+                ! increase ice number
+                q(k,ini) = q(k,ini) + dummy1
+                ! increase phi
+                q(k,iqi+1) = q(k,iqi+1) + dummy1
+                ! increase monomers
+                q(k,iqi+3) = q(k,iqi+3) + dummy1
+            endif
+            !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         enddo
     endif
     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
