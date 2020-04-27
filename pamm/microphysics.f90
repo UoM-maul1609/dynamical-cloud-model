@@ -2269,7 +2269,7 @@
                         
                     call chen_and_lamb_prop((pidep(k)-pisub(k))*dt,gamma_t(k), &
                         vol,phi, dep_density(k))
-                    vol=max(vol,(q(k,iqi)-q(k,iqi+4))/rhoi)
+                    vol=min(max(vol,(q(k,iqi)-q(k,iqi+4))/rhoi),(q(k,iqi)-q(k,iqi+4))/10._sp)
                     q(k,iqi+2)=vol
                     q(k,iqi+1)=phi*q(k,ini)
                 endif
@@ -2374,7 +2374,55 @@
     if(ice_flag) then 
         q(1:kp,iqi)=q(1:kp,iqi)+(pidep-pisub)*dt
         q(1:kp,iqi+4)=q(1:kp,iqi+4)+(-pisub)*dt
-        q(1:kp,ini)=q(1:kp,ini)-(riaci)*dt
+        
+        ! add the aerosol in ice into the mixed-mode aerosol
+        do k=1,kp
+            q(k,ini)=q(k,ini)-(riaci(k))*dt
+            if(q(k,iqi)<qsmall) then
+                dummy2=q(k,ini)
+                q(k,ini)=0._sp
+                q(k,ini+2:ini+5)=0._sp ! all properties, except aerosol
+            
+            
+            
+            
+                q(k,cst(cat_am))=q(k,cst(cat_am))+dummy2 ! total number of the mixed-mode
+                do i=1,n_mode-1
+                    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+                    ! add aerosol in sublimating ice water back to aerosol
+                    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+                    ! this is number in aerosol, plus number in rain 
+                    !  (scaled by fraction in composition category)
+                    ! aer_in_rain * rain_num_evap / rain_num
+                    q(k,cst(cat_am)+(i-1)*3+1)      = &
+                        q(k,cst(cat_am)+(i-1)*3+1)   + &
+                        q(k,cst(cat_i)+(i-1)*3+6)
+                    
+                    ! this is surface area going into aerosol
+                    q(k,cst(cat_am)+(i-1)*3+2)    = &
+                        q(k,cst(cat_am)+(i-1)*3+2) +&
+                        q(k,cst(cat_i)+(i-1)*3+7) 
+                        
+                    ! this is mass going into aerosol
+                    q(k,cst(cat_am)+(i-1)*3+3)    = &
+                        q(k,cst(cat_am)+(i-1)*3+3) +&
+                        q(k,cst(cat_i)+(i-1)*3+8) 
+                
+                    ! aerosol in ice
+                    q(k,cst(cat_i)+(i-1)*3+6)=0._sp
+                    
+                    q(k,cst(cat_i)+(i-1)*3+7)=0._sp
+                    
+                    q(k,cst(cat_i)+(i-1)*3+8)=0._sp
+                    
+                enddo
+                
+            
+            endif
+            
+            
+        enddo
     endif
 
     		
