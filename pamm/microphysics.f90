@@ -1997,8 +1997,8 @@
                 ! drop fragmentation                                                     !
                 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
                 nfrag=0._sp
-                dummy1=nin_c/q(k  ,inc)*q(k, iqc) ! mass of cloud water frozen
-                if(t(k).lt.268._sp) then
+                dummy1=nin_c/(q(k  ,inc)+qsmall)*q(k, iqc) ! mass of cloud water frozen
+                if(t(k).lt.268._sp .and. (dummy1.gt.qsmall)) then
                     lam_freeze=(q(k,  inc)/dummy1*gam2c/gam1c)
                     n0_freeze = q(k,  inc)/gam1c*lam_freeze**(alpha_c+1)
                     ! lawson et al
@@ -2009,7 +2009,7 @@
                 
                 
                 ! increase ice crystal number
-                q(k  ,ini)=q(k  ,ini)+nfrag
+                q(k  ,ini)=q(k  ,ini)+nin_c+nfrag
                 ! increase ice crystal mass - added divided by number of cloud, 
                                 ! multiplied by mass of cloud
                 q(k  ,iqi)=q(k  ,iqi)+dummy1
@@ -2110,8 +2110,8 @@
                 ! drop fragmentation                                                     !
                 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
                 nfrag=0._sp
-                dummy1=nin_r/q(k  ,inr)*q(k, iqr) ! mass of rain water frozen
-                if(t(k).lt.268._sp) then
+                dummy1=nin_r/(q(k  ,inr)+qsmall)*q(k, iqr) ! mass of rain water frozen
+                if(t(k).lt.268._sp .and. (dummy1.gt.qsmall)) then
                     lam_freeze=(q(k,  inr)/dummy1*gam2r/gam1r)**(1._sp/dr)
                     n0_freeze = q(k,  inr)/gam1r*lam_freeze**(alpha_r+1)
                     ! lawson et al
@@ -2136,7 +2136,7 @@
 
                 ! deplete rain
                 !q(k  ,iqr)=q(k  ,iqr)-dummy1
-                q(k,  inr)=q(k,inr)-nin_r
+                !q(k,  inr)=q(k,inr)-nin_r
                 pgfr(k)=pgfr(k)+dummy1/dt
                 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
             
@@ -2251,7 +2251,7 @@
                 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
                 vol=q(k,iqi+2)
                 if(vol.gt.0._sp) then
-                    phi=min(max(q(k,iqi+1) / q(k,ini),1.e-5_sp),100._sp)
+                    phi=min(max(q(k,iqi+1) / (q(k,ini)+qsmall),1.e-5_sp),100._sp)
                     nu_ice=nu_ice*chen_and_lamb_cap_fac(phi)
             
                     ! non chen and lamb bit        
@@ -2259,7 +2259,7 @@
             
                     if(q(k,1).gt.smr_i(k)) then
                         pisub(k)=0._sp
-                        pidep(k)=min(max(ice_dep,0._sp),q(k,1)-smr_i(k))
+                        pidep(k)=min(max(ice_dep,0._sp),(q(k,1)-smr_i(k))/dt)
                     else
                         pidep(k)=0._sp
                         pisub(k)=min(-min(ice_dep,0._sp),q(k,iqi)/dt)
@@ -2269,6 +2269,7 @@
                         
                     call chen_and_lamb_prop((pidep(k)-pisub(k))*dt,gamma_t(k), &
                         vol,phi, dep_density(k))
+                    vol=max(vol,(q(k,iqi)-q(k,iqi+4))/rhoi)
                     q(k,iqi+2)=vol
                     q(k,iqi+1)=phi*q(k,ini)
                 endif
@@ -2323,24 +2324,24 @@
 		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 		! ice aggregation see Ferrier (1994)                                             !
 		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-		if(ice_flag.and.(t(k).lt.ttr).and.(lam_i(k).lt.1.e5_sp)) then
-		    ! collisions
-		    dummy1=max(iice*n_i(k)**2._sp*rho_fac(k) / &
-                    lam_i(k)**(4._sp+2.*sp*alpha_i+b_i),0._sp)
-                        
-            
-            ! aggregation rate
-            riaci(k)=eii(k)*dummy1
-            
-            ! Vardiman approximate - 3 particles for every collision that doesn't aggregate
-            dummy2=min(dummy1*(1._sp-eii(K))*3._sp*dt,q(k,ini)*0.1_sp)
-
-            q(k,ini)=q(k,ini)+dummy2
-            q(k,iqi+3)=q(k,iqi+3)+dummy2 ! update the number of monomers
-            
-            
-            
-        endif
+! 		if(ice_flag.and.(t(k).lt.ttr).and.(lam_i(k).lt.1.e5_sp)) then
+! 		    ! collisions
+! 		    dummy1=max(iice*n_i(k)**2._sp*rho_fac(k) / &
+!                     lam_i(k)**(4._sp+2.*sp*alpha_i+b_i),0._sp)
+!                         
+!             
+!             ! aggregation rate
+!             riaci(k)=eii(k)*dummy1
+!             
+!             ! Vardiman approximate - 3 particles for every collision that doesn't aggregate
+!             dummy2=min(dummy1*(1._sp-eii(K))*3._sp*dt,q(k,ini)*0.1_sp)
+! 
+!             q(k,ini)=q(k,ini)+dummy2
+!             q(k,iqi+3)=q(k,iqi+3)+dummy2 ! update the number of monomers
+!             
+!             
+!             
+!         endif
 		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 		! end ice aggregation                                                            !
 		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -2372,7 +2373,7 @@
     ! ice mass and number
     if(ice_flag) then 
         q(1:kp,iqi)=q(1:kp,iqi)+(pidep-pisub)*dt
-        q(1:kp,iqi+4)=q(1:kp,iqi)+(-pisub)*dt
+        q(1:kp,iqi+4)=q(1:kp,iqi+4)+(-pisub)*dt
         q(1:kp,ini)=q(1:kp,ini)-(riaci)*dt
     endif
 
