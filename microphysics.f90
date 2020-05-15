@@ -2336,9 +2336,11 @@
             ! Vardiman approximate - 3 particles for every collision that doesn't aggregate
             dummy2=min(dummy1*(1._sp-eii(K))*3._sp*dt,q(k,ini)*0.1_sp)
 
+            phi=min(max(q(k,iqi+1) / (q(k,ini)+qsmall),1.e-5_sp),100._sp) 
+                                                            ! calculate old shape
             q(k,ini)=q(k,ini)+dummy2
             q(k,iqi+3)=q(k,iqi+3)+dummy2 ! update the number of monomers
-            
+            q(k,iqi+1)=phi*q(k,ini)   ! update shape variable
             
             
         endif
