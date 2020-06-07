@@ -7,7 +7,7 @@
 	nm1%divergence=.false., ! flag for large-scale subsidence - sets the vertical wind
 	                        ! so that divergence of horizontal winds should equal 
 	                        ! that specified
-	nm1%radiation=.true.,   ! flag for radiation calculations
+	nm1%radiation=.false.,   ! flag for radiation calculations
 	nm1%ptol=1.e-8,         ! tolerance for pressure solver
 	                        ! please note for mass conservation 1.e-8 required
 	                        ! for simulations with dy=200, dz=100, dt=5s
