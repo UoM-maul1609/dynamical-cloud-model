@@ -61,9 +61,11 @@
             character (len=200) :: outputfile='output'
             character (len=200) :: bam_nmlfile='input'
             character (len=200) :: aero_nmlfile='input'
+            character (len=200) :: rad_nmlfile='input'
             logical :: add_random_height_noise, &
             			initially_geostrophic, &
             			viscous_dissipation, &
+            			radiation, &
             			dissipate_h, nudge, restart, &
             			monotone, moisture, &
             			damping_layer,forcing, aero_prof_flag,drop_num_init, theta_flag, &

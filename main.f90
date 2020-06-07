@@ -40,6 +40,8 @@
         use drivers
         use p_micro_module, only : read_in_pamm_bam_namelist, p_initialise_aerosol, &
                 p_initialise_aerosol_3d
+        use radiation, only : allocate_and_set_radiation, nm2, radg1
+        use pts
         
         implicit none
         real(sp) :: var
@@ -49,6 +51,7 @@
         ! namelist for run variables                                           !
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         namelist /run_vars/ nm1
+        namelist /rad_vars/ nm2
         namelist /sounding_vars/ nm1,q_read,theta_read,z_read
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
@@ -202,6 +205,39 @@
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 
+        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        ! Radiation                                                            !
+        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        if(nm1%radiation) then
+            open(8,file=nm1%rad_nmlfile,status='old', recl=80, delim='apostrophe')
+            read(8,nml=rad_vars)
+            close(8)
+            !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+            ! Allocate and initialise radiation arrays                         !
+            !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+            call allocate_and_set_radiation(nm2%start_year, nm2%start_mon, &
+              nm2%start_day, nm2%start_hour,nm2%start_min, nm2%start_sec, &
+              grid1%ip,grid1%jp,grid1%kp,&
+              radg1%ns,radg1%nl,nm2%ns,nm2%nl, &
+              radg1%ntot, &
+              nm2%albedo,nm2%emissivity, radg1%albedo, radg1%emiss, &
+              nm2%lat_ref,nm2%lon_ref, radg1%lat, radg1%lon, &
+              nm2%lambda_read_s,nm2%lambda_read_l, &
+              nm2%lambda_s_low, nm2%lambda_s_high, &
+              nm2%lambda_l_low, nm2%lambda_l_high, &
+              radg1%lambda,radg1%lambda_low,radg1%lambda_high, radg1%delta_lambda, &
+              radg1%sflux_l, radg1%b_s_g, &
+              radg1%ext_s_g, radg1%flux_u, radg1%flux_d, radg1%rad_power,  &
+              grid1%l_halo, grid1%r_halo, grid1%rhoan, grid1%thetan, &
+              radg1%nprocv,radg1%mvrecv, &
+              radg1%tdstart,radg1%tdend,radg1%a,radg1%b,radg1%c,radg1%r,radg1%u, &
+              grid1%coords,mp1%dims, mp1%id, mp1%sub_comm)
+            !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! 
+        endif
+        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+
+
 
 
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -240,6 +276,17 @@
 		call block_ring(MPI_COMM_WORLD,mp1%id,world_process,mp1%rank)
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
+        
+        if((mp1%id < mp1%dx * mp1%dy * mp1%dz).and.(nm1%radiation)) then
+            !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+            ! Set up problem                                	   	    	   !
+            !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+            call set_tridag(.false.,pts1%an,pts1%bn,pts1%cn,pts1%rn,&
+                pts1%un,pts1%up,pts1%a,pts1%b,pts1%c,pts1%r,pts1%xsol, &
+                nm1%kp,radg1%tdend,grid1%kpstart, &
+                mp1%coords,mp1%dims, mp1%id, mp1%sub_comm)
+            !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        endif
 
 
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -271,11 +318,11 @@
 				grid1%q_name, grid1%q,grid1%sq,grid1%viss, &
 				grid1%precip, &
 				grid1%theta,grid1%thetan, &
+				grid1%tref,grid1%trefn, &
 				grid1%rhoa,grid1%rhoan, &
 				grid1%pref,grid1%prefn, &
 				grid1%lamsq,grid1%lamsqn, &
 				grid1%thbase,grid1%thtop, &
-				grid1%coords, &
 				grid1%micro_init, &
 				io1%new_file, nm1%outputfile, nm1%output_interval, &
 				nm1%viscous_dissipation, &
@@ -284,13 +331,23 @@
 				nm1%ice_flag, &
 				nm1%hm_flag, &
 				nm1%theta_flag, &
-				nm1%damping_layer,  nm1%forcing, nm1%divergence, &
+				nm1%damping_layer,  nm1%forcing, nm1%divergence, nm1%radiation, &
 				nm1%j_stochastic, nm1%ice_nuc_flag, &
 				grid1%nq, grid1%nprec, grid1%ncat, &
+                    radg1%tdstart,radg1%tdend, &
+                    radg1%a,radg1%b,radg1%c,radg1%r,radg1%u, &
+                    radg1%ntot, radg1%ns, radg1%nl, &
+                    radg1%flux_u, radg1%flux_d, radg1%rad_power, &
+                    radg1%lambda,radg1%lambda_low,radg1%lambda_high, radg1%delta_lambda, &
+                    radg1%sflux_l, radg1%b_s_g, &
+                    nm2%start_year, nm2%start_mon, nm2%start_day,&
+                    nm2%start_hour, nm2%start_min,nm2%start_sec, &
+                    radg1%lat, radg1%lon, radg1%albedo, radg1%emiss,nm2%quad_flag, &
+                    radg1%nprocv,radg1%mvrecv, &
+				grid1%coords, &
 				mp1%dims,mp1%id, world_process, mp1%rank, mp1%ring_comm, &
 				mp1%sub_horiz_comm,mp1%sub_comm)
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-
 
 
 

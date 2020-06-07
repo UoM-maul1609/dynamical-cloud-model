@@ -37,10 +37,10 @@
 	!>@param[inout] q,sq,viss - for clouds and subgrid
 	!>@param[inout] precip - array for precipitation
 	!>@param[in] theta, thetan: reference variables
+	!>@param[in] tref, trefn: reference variables
 	!>@param[in] rhoa, rhoan: reference variables
 	!>@param[in] lamsq, lamsqn: reference variables
 	!>@param[inout] thbase, thtop: bottom and base th
-	!>@param[in] coords: for Cartesian topology
 	!>@param[inout] micro_init: initialise microphysics
 	!>@param[inout] new_file: flag for if this is a new file
 	!>@param[in] outputfile: netcdf output
@@ -55,8 +55,17 @@
 	!>@param[in] damping_layer: flag for damping layer
 	!>@param[in] forcing: flag for large-scale forcing of horizontal winds
 	!>@param[in] divergence: flag for large-scale divergence
+	!>@param[in] radiation: radiation scheme
 	!>@param[in] j_stochastic, ice_nuc_flag
 	!>@param[in] nq,nprec,ncat: number of q-variables
+	!>@param[in] tdstart, tdend: start and end array indices - parallel ts
+	!>@param[inout] a, b, c, r, usol: tridag
+    !>@param[in] nbands, ns, nl: number of bands
+    !>@param[inout] flux_u, flux_d, rad_power
+    !>@param[in] lambda, lambda_low, lambda_high, delta_lambda, sflux_l, b_s_g
+    !>@param[in] start_year, start_mon,start_day,start_hour,start_min,start_sec
+    !>@param[in] lat, lon, albedo, emiss,quad_flag
+	!>@param[in] coords: for Cartesian topology
 	!>@param[in] dims,id, world_process, ring_comm, sub_horiz_comm: mpi variables
 	!>@param[in] sub_vert_comm: mpi variables
     subroutine model_driver(ntim,dt,l_h,r_h, &
@@ -81,19 +90,28 @@
 				q_name, q,sq,viss, &
 				precip, &
 				theta,thetan, &
+				tref,trefn, &
 				rhoa,rhoan, &
 				pref,prefn, &
 				lamsq,lamsqn, &
 				thbase,thtop, &
-				coords, &
 				micro_init, &
 				new_file,outputfile, output_interval, &
 				viscous, &
 				advection_scheme, kord, monotone, &
 				moisture, microphysics_flag, ice_flag, hm_flag, theta_flag, &
-				damping_layer,forcing, divergence, &
+				damping_layer,forcing, divergence, radiation, &
 				j_stochastic, ice_nuc_flag, &
 				nq, nprec, ncat, &
+                    tdstart,tdend, &
+                    a,b,c,r,usol, &
+                    nbands, ns,nl, flux_u, flux_d, rad_power, &
+                    lambda,lambda_low,lambda_high, delta_lambda,&
+                    sflux_l, b_s_g, &
+                    start_year,start_mon, start_day,start_hour,start_min,start_sec, &
+                    lat, lon, albedo, emiss,quad_flag, &
+                    nprocv,mvrecv, &
+				coords, &
 				dims,id, world_process, rank, ring_comm,sub_horiz_comm,sub_vert_comm)
 		use nrtype
 		use mpi_module, only : exchange_full, exchange_along_dim
@@ -106,10 +124,12 @@
         use p_micro_module
 
 		implicit none
+				
+		
 		logical, intent(inout) :: new_file
 		logical, intent(in) :: viscous, monotone, moisture, &
 		                    damping_layer, forcing, theta_flag, ice_flag, hm_flag, &
-		                    divergence
+		                    divergence, radiation
 		integer(i4b), intent(in) :: ice_nuc_flag
 		logical, intent(inout) :: micro_init
 		integer(i4b), intent(in) :: ntim,ip,jp,kp, ipp,jpp,kpp, &
@@ -129,6 +149,7 @@
 		real(sp), dimension(1-l_h:ipp+r_h), intent(in) :: x,xn,dx, dxn
 		real(sp), dimension(1-l_h:jpp+r_h), intent(in) :: y,yn,dy,dyn
 		real(sp), dimension(1-l_h:kpp+r_h), intent(in) :: z,zn,dz,dzn, theta, thetan, &
+		                                                tref,trefn, &
 														rhoa, rhoan,lamsq, lamsqn, &
 														u_force, v_force, w_subs
 		real(sp), dimension(1-l_h:kpp+r_h), intent(inout) :: ubar,vbar,wbar,thbar,qbar
@@ -161,9 +182,28 @@
 			intent(inout) :: precip
 					
         character(len=20), intent(in), dimension(nq) :: q_name
+
+        ! radiation variables		
+		real(sp), dimension(nbands) :: lambda, b_s_g, lambda_low,&
+										lambda_high, delta_lambda, sflux_l
+		real(sp), intent(in), dimension(nprocv) :: mvrecv
+		integer(i4b), intent(in) :: nbands, ns, nl, tdstart,tdend
+		integer(i4b), intent(in) :: nprocv
+		real(sp), intent(inout), dimension(1:tdend) :: a,b,c,r,usol
+		real(sp), dimension(1-r_h:kpp+r_h,1-r_h:jpp+r_h,1-r_h:ipp+r_h,1:nbands) :: &
+						flux_d,flux_u
+		real(sp), dimension(1-r_h:kpp+r_h,1-r_h:jpp+r_h,1-r_h:ipp+r_h) :: &
+						rad_power
+		real(sp), intent(in) :: lat, lon, albedo, emiss
+		integer(i4b), intent(in) :: quad_flag, start_year, start_mon, start_day, &
+									start_hour, start_min, start_sec
+		!-
+		
+
+
 		! locals:		
 		integer(i4b) :: n,n2, cur=1, i,j,k,nqc, error, rank2
-		real(sp) :: time, time_last_output, output_time, a,t1=0._sp,t2=0._sp
+		real(sp) :: time, time_last_output, output_time, t1=0._sp,t2=0._sp
 		real(sp), dimension(nq) :: q1,q2
 		real(sp), dimension(:,:,:), pointer :: u,zu,tu
 		real(sp), dimension(:,:,:), pointer :: v,zv,tv
@@ -223,7 +263,7 @@
 				call output(new_file,outputfile,cur, &
 							ip,ipp,ipstart,jp,jpp,jpstart,kp,kpp,kpstart, &
 							l_h,r_h, &
-							time, x,y,z,rhoa, thetan, &
+							time, x,y,z,rhoa, thetan, trefn, &
 							u,v,w,th,p,div, &
 							q_name,q,nq, precip, nprec,moisture, &
 							id, world_process, rank2, ring_comm)
@@ -275,11 +315,18 @@
 				q,sq,viss, &
 				psrc, &
 				th,sth, strain,vism,vist, &
-				theta,thetan,rhoa,rhoan,lamsq,lamsqn, &
+				theta,thetan,tref, trefn, rhoa,rhoan,lamsq,lamsqn, &
 				z0,z0th, &
-				viscous, moisture,damping_layer, forcing, divergence)
+				viscous, moisture,damping_layer, forcing, divergence, radiation, &
+                sub_vert_comm, time,tdstart,tdend, &
+                a,b,c,r,usol, &
+                nbands, ns,nl, flux_u, flux_d, rad_power, &
+                lambda,lambda_low,lambda_high, delta_lambda,&
+                sflux_l, b_s_g, &
+                start_year,start_mon, start_day,start_hour,start_min,start_sec, &
+                lat, lon, albedo, emiss,quad_flag, &
+                nprocv,mvrecv)
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-
 
 
 
@@ -549,7 +596,7 @@
 	!>@param[in] nq: number of q-variables
 	!>@param[in] l_h,r_h: halo
 	!>@param[in] time: time (s)
-	!>@param[in] x,y,z, rhoa, thetan: grids
+	!>@param[in] x,y,z, rhoa, thetan, trefn: grids
 	!>@param[in] u,v,w,th,p,div: prognostic variables
 	!>@param[in] q_name: name of q-variables
 	!>@param[in] q
@@ -562,7 +609,7 @@
 	subroutine output(new_file,outputfile,n,ip,ipp,ipstart,jp,jpp,jpstart, &
 					kp,kpp,kpstart,l_h,r_h, &
 					time, &
-					x,y,z,rhoa, thetan, &
+					x,y,z,rhoa, thetan, trefn, &
 					u,v,w,th,p,div, &
 					q_name,q,nq, precip, nprec,&
 					moisture, &
@@ -581,7 +628,7 @@
 		real(sp), intent(in) :: time
 		real(sp), dimension(1-l_h:ipp+r_h), intent(in) :: x
 		real(sp), dimension(1-l_h:jpp+r_h), intent(in) :: y
-		real(sp), dimension(1-l_h:kpp+r_h), intent(in) :: z,rhoa, thetan
+		real(sp), dimension(1-l_h:kpp+r_h), intent(in) :: z,rhoa, thetan, trefn
 		real(sp), &
 			dimension(1-r_h:kpp+r_h,1-r_h:jpp+r_h,1-r_h:ipp+r_h), &
 			intent(inout) :: th,p,div
@@ -700,6 +747,15 @@
 						(/nz_dimid/), varid) )
 			! get id to a_dimid
 			call check( nf90_inq_varid(ncid, "thetan", a_dimid) )
+			! units
+			call check( nf90_put_att(ncid, a_dimid, &
+					   "units", "K") )
+
+			! define variable: trefn
+			call check( nf90_def_var(ncid, "trefn", nf90_float, &
+						(/nz_dimid/), varid) )
+			! get id to a_dimid
+			call check( nf90_inq_varid(ncid, "trefn", a_dimid) )
 			! units
 			call check( nf90_put_att(ncid, a_dimid, &
 					   "units", "K") )
@@ -865,6 +921,10 @@
 			! write variable: theta
 			call check( nf90_inq_varid(ncid, "thetan", varid ) )
 			call check( nf90_put_var(ncid, varid, thetan(1:kpp), &
+						start = (/kpstart/)))	
+			! write variable: trefn
+			call check( nf90_inq_varid(ncid, "trefn", varid ) )
+			call check( nf90_put_var(ncid, varid, trefn(1:kpp), &
 						start = (/kpstart/)))	
 		endif
 

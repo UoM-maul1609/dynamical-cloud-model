@@ -7,6 +7,7 @@
 	nm1%divergence=.false., ! flag for large-scale subsidence - sets the vertical wind
 	                        ! so that divergence of horizontal winds should equal 
 	                        ! that specified
+	nm1%radiation=.true.,   ! flag for radiation calculations
 	nm1%ptol=1.e-8,         ! tolerance for pressure solver
 	                        ! please note for mass conservation 1.e-8 required
 	                        ! for simulations with dy=200, dz=100, dt=5s
@@ -32,6 +33,7 @@
 	nm1%ice_flag=.true.,    ! include ice microphysics part of pamm
 	nm1%j_stochastic=0.5e-9,        ! nucleation rate s-1
 	nm1%ice_nuc_flag=1,             ! 1 is for Demott, 2 is for const stochastic 
+	nm1%rad_nmlfile='rtm/namelist.in',       ! filename for radiation namelist
 	nm1%bam_nmlfile='pamm/bam/namelist.in',  ! filename of bam namelist
 	nm1%aero_nmlfile='pamm/namelist.in',     ! filename of aerosol profile namelist
 	nm1%aero_prof_flag=.false.,              ! flag to read in a profile of aerosol
