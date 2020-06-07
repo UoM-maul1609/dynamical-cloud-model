@@ -1,0 +1,14 @@
+Compilation:
+	*you will need mpif90 on your system. Type 'make' to compile.
+Doxygen pages:
+	*self generating documentation (from the source code) can be created by typing
+	 "doxygen fortran.dxg" at the command line.
+	*you can then view the html pages by opening the file at "doxygen/html/index.html"
+Running code:
+	*run the code by typing the following:
+	* single processor: ./main.exe namelist.in
+	* multi processor: mpiexec -n 4 ./main.exe namelist.in
+Contributing development:
+	* at the moment the code is under private repo with no development branches. Contact 
+		the code owner to contribute ideas. 
+	
