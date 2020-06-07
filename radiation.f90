@@ -766,7 +766,7 @@
 								time, nbands,ns,nl,ip,jp,kp,r_h, &
 								tdstart,tdend,a,b,c,r,u, &
 								lambda_low, lambda_high, lambda,b_s_g, sflux_l,&
-								rhoan, thetan, dz,dzn, albedo, emiss, &
+								rhoan, trefn, dz,dzn, albedo, emiss, &
 								quad_flag, flux_u, flux_d, &
 								nprocv,mvrecv, &
 								coords,dims, id, comm3d)
@@ -781,7 +781,7 @@
 			real(sp), intent(in), dimension(nprocv) :: mvrecv
 			real(sp), dimension(nbands), intent(in) :: &
 					lambda_low, lambda_high, lambda, b_s_g, sflux_l
-			real(sp), intent(in), dimension(1-r_h:kp+r_h) :: rhoan, thetan, dz,dzn
+			real(sp), intent(in), dimension(1-r_h:kp+r_h) :: rhoan, trefn, dz,dzn
 			real(sp), intent(inout), &
 					dimension(1-r_h:kp+r_h, 1-r_h:jp+r_h, 1-r_h:ip+r_h,1:nbands) :: &
 					flux_u, flux_d
@@ -832,7 +832,7 @@
             ! calculate planck function at all levels p-points:						     !
             !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
             do k=1,kp+1 
-                call inband_planck(nbands,lambda_low,lambda_high,thetan(k),blt(k,:))
+                call inband_planck(nbands,lambda_low,lambda_high,trefn(k),blt(k,:))
             enddo
             !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
@@ -1028,7 +1028,7 @@
                     if(cos_theta_s > 0._sp) then
                         r(1)=albedo*cos_theta_s*sflux_l(m)*exp(-tau(0)/cos_theta_s)
                     endif
-    				r(1)=r(1)+emiss*pi*blt(1,m)
+    				r(1)=r(1)+emiss*pi*blt(1,m) ! maybe this needs to be for the surface
 				endif
 				
                 
@@ -1070,7 +1070,6 @@
                                 flux_d(k-kstart,j,i,m)=u(2*k)
                             enddo
                             flux_u(kp+1-kstart,j,i,m)=u(2*(kp+1)-1)
-                            
                         enddo
                     enddo
                 else if (coords(3)==(dims(3)-1)) then
@@ -1097,6 +1096,7 @@
                         enddo
                     enddo
                 endif
+                ! bottom and top
                 if((coords(3)==0).and.(coords(3)==(dims(3)-1))) then
                     do i=1,ip	
                         do j=1,jp

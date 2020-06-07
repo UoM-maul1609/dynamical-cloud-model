@@ -104,6 +104,7 @@
 			grid1%p,grid1%th,grid1%rho, &
 			grid1%su,grid1%sv,grid1%sw,grid1%psrc, &
 			grid1%theta,grid1%thetan, &
+			grid1%tref,grid1%trefn, &
 			grid1%rhoa,grid1%rhoan, &
 			grid1%lamsq,grid1%lamsqn, &
 			nm1%cvis, &
@@ -190,6 +191,7 @@
 				grid1%dx, grid1%dy, grid1%dz, &
 				grid1%dxn, grid1%dyn, grid1%dzn, &
 				grid1%theta,grid1%thetan, &
+				grid1%tref,grid1%trefn, &
 				grid1%rhoa,grid1%rhoan, &
 				radg1%lambda,radg1%lambda_low,radg1%lambda_high, radg1%delta_lambda, &
 				radg1%sflux_l, radg1%b_s_g, &

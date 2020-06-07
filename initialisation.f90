@@ -25,7 +25,8 @@
 	!>@param[inout] zu,zv,zw,tu,tv,tw - previous time-step and temporary storage
 	!>@param[inout] su,sv,sw,psrc - grid positions and prognostics
 	!>@param[inout] theta,thetan - reference potential temperatures
-	!>@param[inout] rhoa,rhoan - reference potential temperatures
+	!>@param[inout] tref,trefn - reference temperatures
+	!>@param[inout] rhoa,rhoan - reference densities
 	!>@param[inout] lamsq,lamsqn - mixing length
 	!>@param[in] cvis - smagorinsky parameter
 	!>@param[inout] dx,dy,dz - grid spacing on grid
@@ -46,6 +47,7 @@
 			p,th,rho, &
 			su,sv,sw,psrc, &
 			theta,thetan, &
+			tref,trefn, &
 			rhoa,rhoan, &
 			lamsq,lamsqn, &
 			cvis, &
@@ -73,7 +75,8 @@
 														su,sv,sw,psrc
 		real(sp), dimension(:), allocatable, intent(inout) :: x,y,z,xn,yn,zn,dx,dy,dz, &
 															dxn,dyn,dzn, theta,thetan, &
-															rhoa, rhoan, lamsq, lamsqn
+															rhoa, rhoan, tref, trefn, &
+															lamsq, lamsqn
 
 		real(sp), intent(in) :: dx_nm, dy_nm, dz_nm, cvis
 		real(sp), intent(in) :: dt, runtime
@@ -192,6 +195,8 @@
 		if (AllocateStatus /= 0) STOP "*** Not enough memory ***"
 		allocate( rhoa(1-l_h:kpp+r_h), STAT = AllocateStatus)
 		if (AllocateStatus /= 0) STOP "*** Not enough memory ***"
+		allocate( tref(1-l_h:kpp+r_h), STAT = AllocateStatus)
+		if (AllocateStatus /= 0) STOP "*** Not enough memory ***"
 		allocate( lamsq(1-l_h:kpp+r_h), STAT = AllocateStatus)
 		if (AllocateStatus /= 0) STOP "*** Not enough memory ***"
 		
@@ -204,6 +209,8 @@
 		allocate( thetan(1-l_h:kpp+r_h), STAT = AllocateStatus)
 		if (AllocateStatus /= 0) STOP "*** Not enough memory ***"
 		allocate( rhoan(1-l_h:kpp+r_h), STAT = AllocateStatus)
+		if (AllocateStatus /= 0) STOP "*** Not enough memory ***"
+		allocate( trefn(1-l_h:kpp+r_h), STAT = AllocateStatus)
 		if (AllocateStatus /= 0) STOP "*** Not enough memory ***"
 		allocate( lamsqn(1-l_h:kpp+r_h), STAT = AllocateStatus)
 		if (AllocateStatus /= 0) STOP "*** Not enough memory ***"
@@ -294,6 +301,7 @@
 !			th(:,:,i)=var
 			theta(i)=var
 			rhoa(i)=psolve(1)/(ra*theta(i)*(psolve(1)/psurf)**(ra/cp))
+			tref(i)=theta(i)*(psolve(1)/psurf)**(ra/cp)
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 
@@ -326,6 +334,7 @@
 						min(zn(i),z_read(n_levels)), var,dummy)
 			thetan(i)=var
 			rhoan(i)=psolve(1)/(ra*thetan(i)*(psolve(1)/psurf)**(ra/cp))
+			trefn(i)=thetan(i)*(psolve(1)/psurf)**(ra/cp)
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 		enddo

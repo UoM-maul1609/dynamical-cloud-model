@@ -30,17 +30,19 @@ FFLAGSOMP = -fopenmp-simd $(FFLAGS)
 FFLAGS2 =  $(DEBUG) -O3 -o 
 
 
-main.exe	:  main.$(OBJ) variables.$(OBJ)  radiation.$(OBJ) mpi_module.$(OBJ) \
+main.exe	:  main.$(OBJ) variables.$(OBJ)  mpi_module.$(OBJ) \
 			 initialisation.$(OBJ) driver_code.$(OBJ) rtm_lib.a 
 	$(FOR2) $(FFLAGSOMP)main.exe main.$(OBJ) variables.$(OBJ)  radiation.$(OBJ) \
 			 mpi_module.$(OBJ) \
 			 initialisation.$(OBJ) driver_code.$(OBJ) \
 			 -lm rtm_lib.a \
 		 ${NETCDFLIB} -I ${NETCDFMOD} ${NETCDF_LIB} $(DEBUG)
-rtm_lib.a	:   nrtype.$(OBJ) nr.$(OBJ) nrutil.$(OBJ) locate.$(OBJ) polint.$(OBJ) \
+rtm_lib.a	:   radiation.$(OBJ) \
+                nrtype.$(OBJ) nr.$(OBJ) nrutil.$(OBJ) locate.$(OBJ) polint.$(OBJ) \
 				tridag.$(OBJ) rkqs.$(OBJ) rkck.$(OBJ) odeint.$(OBJ) zbrent.$(OBJ) \
 				random.$(OBJ) pts_code
-	$(AR) rc rtm_lib.a nrutil.$(OBJ) locate.$(OBJ) polint.$(OBJ) tridag.$(OBJ) \
+	$(AR) rc rtm_lib.a radiation.$(OBJ) \
+	            nrutil.$(OBJ) locate.$(OBJ) polint.$(OBJ) tridag.$(OBJ) \
 				rkqs.$(OBJ) rkck.$(OBJ) odeint.$(OBJ) zbrent.$(OBJ) \
 				random.$(OBJ) \
                 $(PTS_DIR)/nrutil.$(OBJ) $(PTS_DIR)/locate.$(OBJ) \

@@ -20,6 +20,7 @@
 	!>@param[inout] flux_u, flux_d, rad_power
 	!>@param[in] x,y,z, dx, dy, dz, dxn, dyn, dzn: grids
 	!>@param[in] theta, thetan: reference variables
+	!>@param[in] tref, trefn: reference variables
 	!>@param[in] rhoa, rhoan: reference variables
 	!>@param[in] lambda, lambda_low, lambda_high, delta_lambda, sflux_l, b_s_g
 	!>@param[in] start_year, start_mon,start_day,start_hour,start_min,start_sec
@@ -40,6 +41,7 @@
 				dx,dy,dz, &
 				dxn,dyn,dzn, &
 				theta,thetan, &
+				tref,trefn, &
 				rhoa,rhoan, &
 				lambda,lambda_low,lambda_high, delta_lambda,&
 				sflux_l, b_s_g, &
@@ -50,7 +52,8 @@
 				new_file,outputfile, output_interval, &
 				dims,id, world_process, rank, ring_comm,sub_comm)
 		use nrtype
-		use mpi_module, only : exchange_full, exchange_along_dim, exchange_fluxes
+		use mpi_module, only : exchange_full, exchange_along_dim, exchange_d_fluxes, &
+		                        exchange_u_fluxes
 		use radiation, only : solve_fluxes
 		use mpi
 
@@ -75,7 +78,7 @@
 		real(sp), dimension(1-l_h:ipp+r_h), intent(in) :: x,dx, dxn
 		real(sp), dimension(1-l_h:jpp+r_h), intent(in) :: y,dy,dyn
 		real(sp), dimension(1-l_h:kpp+r_h), intent(in) :: z,dz,dzn, theta, thetan, &
-														rhoa, rhoan
+														rhoa, rhoan, tref, trefn
 		real(sp), intent(in) :: lat, lon, albedo, emiss
 		integer(i4b), intent(in) :: quad_flag, start_year, start_mon, start_day, &
 									start_hour, start_min, start_sec
@@ -108,15 +111,17 @@
 								time, nbands,ns,nl,ipp,jpp,kpp,r_h, &
 								tdstart,tdend,a,b,c,r,usol, &
 								lambda_low, lambda_high, lambda,b_s_g,sflux_l, &
-								rhoan, thetan, dz,dzn, albedo, emiss, &
+								rhoan, trefn, dz,dzn, albedo, emiss, &
 								quad_flag, flux_u, flux_d, &
 								nprocv,mvrecv, &
 								coords,dims, id, sub_comm)
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 
-		    call exchange_fluxes(ring_comm, id, kpp, jpp, ipp, nbands,&
+		    call exchange_d_fluxes(ring_comm, id, kpp, jpp, ipp, nbands,&
 							r_h,r_h,r_h,r_h,r_h, r_h,  flux_d, dims,coords)
+		    call exchange_u_fluxes(ring_comm, id, kpp, jpp, ipp, nbands,&
+							r_h,r_h,r_h,r_h,r_h, r_h,  flux_u, dims,coords)
 							
 							
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -136,7 +141,7 @@
 				call output(new_file,outputfile,cur, &
 							ip,ipp,ipstart,jp,jpp,jpstart,kp,kpp,kpstart, &
 							l_h,r_h,nbands, &
-							time, x,y,z,rhoa, theta, &
+							time, x,y,z,rhoa, thetan,trefn, &
 							lambda_low, lambda_high,&
 							lambda,sflux_l,flux_u,flux_d,rad_power, &
 							id, world_process, rank2, ring_comm)
@@ -191,7 +196,7 @@
 	!>@param[in] kpstart: start of j index on global grid
 	!>@param[in] l_h,r_h: halo
 	!>@param[in] time: time (s)
-	!>@param[in] x,y,z, rhoa, theta: grids
+	!>@param[in] x,y,z, rhoa, thetan,trefn: grids
 	!>@param[in] lambda_low_lambda_high,lambda, sflux_l
 	!>@param[in] u,v,w,th,p: prognostic variables
 	!>@param[in] id: id
@@ -201,7 +206,7 @@
 	subroutine output(new_file,outputfile,n,ip,ipp,ipstart,jp,jpp,jpstart, &
 					kp,kpp,kpstart,l_h,r_h,nbands, &
 					time, &
-					x,y,z,rhoa, theta, &
+					x,y,z,rhoa, thetan,trefn, &
 					lambda_low, lambda_high,&
 					lambda,sflux_l,flux_u,flux_d,rad_power, &
 				    id, world_process, rank, ring_comm)
@@ -219,7 +224,7 @@
 		real(sp), intent(in) :: time
 		real(sp), dimension(1-l_h:ipp+r_h), intent(in) :: x
 		real(sp), dimension(1-l_h:jpp+r_h), intent(in) :: y
-		real(sp), dimension(1-l_h:kpp+r_h), intent(in) :: z,rhoa, theta
+		real(sp), dimension(1-l_h:kpp+r_h), intent(in) :: z,rhoa, thetan, trefn
 		real(sp), &
 			dimension(1-r_h:kpp+r_h,1-r_h:jpp+r_h,1-r_h:ipp+r_h,1:nbands), &
 			intent(in) :: flux_u, flux_d
@@ -356,10 +361,19 @@
 					   "units", "kg/m3") )
 
 			! define variable: theta
-			call check( nf90_def_var(ncid, "theta", nf90_float, &
+			call check( nf90_def_var(ncid, "thetan", nf90_float, &
 						(/nz_dimid/), varid) )
 			! get id to a_dimid
-			call check( nf90_inq_varid(ncid, "theta", a_dimid) )
+			call check( nf90_inq_varid(ncid, "thetan", a_dimid) )
+			! units
+			call check( nf90_put_att(ncid, a_dimid, &
+					   "units", "K") )
+
+			! define variable: trefn
+			call check( nf90_def_var(ncid, "trefn", nf90_float, &
+						(/nz_dimid/), varid) )
+			! get id to a_dimid
+			call check( nf90_inq_varid(ncid, "trefn", a_dimid) )
 			! units
 			call check( nf90_put_att(ncid, a_dimid, &
 					   "units", "K") )
@@ -466,8 +480,12 @@
 			call check( nf90_put_var(ncid, varid, rhoa(1:kpp), &
 						start = (/kpstart/)))	
 			! write variable: theta
-			call check( nf90_inq_varid(ncid, "theta", varid ) )
-			call check( nf90_put_var(ncid, varid, theta(1:kpp), &
+			call check( nf90_inq_varid(ncid, "thetan", varid ) )
+			call check( nf90_put_var(ncid, varid, thetan(1:kpp), &
+						start = (/kpstart/)))	
+			! write variable: tref
+			call check( nf90_inq_varid(ncid, "trefn", varid ) )
+			call check( nf90_put_var(ncid, varid, trefn(1:kpp), &
 						start = (/kpstart/)))	
 			if(id==world_process) then
 				! write variable: lambda_low

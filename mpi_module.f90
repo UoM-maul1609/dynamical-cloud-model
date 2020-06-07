@@ -24,6 +24,7 @@
         type mpi_faces_v
         	integer(i4b) :: s_bottom, r_bottom
         	integer(i4b) :: s_top, r_top
+        	integer(i4b) :: id
         end type mpi_faces_v
         
         type mpi_edges
@@ -66,7 +67,7 @@
     private
     public :: mpi_define, block_ring, exchange_full, mpi_integer9, mp1, world_process, &
     			mpi_cart_initialise, exchange_along_dim, find_base_top, find_top, &
-    			exchange_fluxes, exchange_along_z
+    			exchange_d_fluxes, exchange_u_fluxes, exchange_along_z
     
 
 	contains
@@ -102,7 +103,7 @@
 		implicit none
 		integer(i4b), intent(in) :: ip, jp, kp
 		
-		integer(i4b) :: error
+		integer(i4b) :: error, dummy
 		integer(i4b), dimension(3) :: coords_t
 		
 		! define an integer:
@@ -212,11 +213,15 @@
             !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
             ! Find ids for sending and receiving 6 faces                                 !
             !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+            call MPI_CART_SHIFT( mp1%sub_comm, 0, 0, &
+                                mp1%face_v%id, dummy, error)
+
             call MPI_CART_SHIFT( mp1%sub_comm, 0, 1, &
                                 mp1%face_v%s_bottom, mp1%face_v%s_top, error)
-                            
+            mp1%face_v%id=mp1%id
             mp1%face_v%r_top   = mp1%face_v%s_bottom
             mp1%face_v%r_bottom= mp1%face_v%s_top
+            
             !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         endif
 		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -362,7 +367,7 @@
 	!>@param[in] comm3d, id, ipp, jpp, kpp, nbands,w_h,e_h,s_h,n_h,d_h,u_h
 	!>@param[inout] array: the array to exchange_halos on
 	!>@param[in] lbc, ubc, dims,coords
-	subroutine exchange_fluxes(comm3d, id, kpp, jpp, ipp, nbands,&
+	subroutine exchange_d_fluxes(comm3d, id, kpp, jpp, ipp, nbands,&
 							d_h,u_h,s_h,n_h,w_h, e_h,  array, dims,coords)
 		implicit none
 		
@@ -386,23 +391,102 @@
 		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 		tag1=11
 		! send to the bottom:
-		call MPI_Issend(array(0,1:jpp,1:ipp,1:nbands), &
-			(ipp*jpp*nbands)*u_h, MPI_REAL8, mp1%face%s_bottom, &
+		call MPI_Issend(array(0:1,1:jpp,1:ipp,1:nbands), &
+			(ipp*jpp*nbands)*(u_h+1), MPI_REAL8, mp1%face%s_bottom, &
 			tag1, comm3d, request(1),error)
 
 		! receive from the bottom of upper cell:
-		call MPI_Recv(array(kpp,1:jpp,1:ipp,1:nbands), &
-			(ipp*jpp*nbands)*u_h, MPI_REAL8, mp1%face%r_bottom, &
+		call MPI_Recv(array(kpp:kpp+1,1:jpp,1:ipp,1:nbands), &
+			(ipp*jpp*nbands)*(u_h+1), MPI_REAL8, mp1%face%r_bottom, &
 			tag1, comm3d, status(:,1),error)
+! 		call MPI_Wait(request(1), status(:,1), error)
+		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+		! message passing for adjacent cells in up / down direction                      !
+		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+		tag1=12
+		! send to the top:
+		call MPI_Issend(array(kpp,1:jpp,1:ipp,1:nbands), &
+			(ipp*jpp*nbands)*(u_h), MPI_REAL8, mp1%face%s_top, &
+			tag1, comm3d, request(2),error)
+
+		! receive from the bottom of upper cell:
+		call MPI_Recv(array(0,1:jpp,1:ipp,1:nbands), &
+			(ipp*jpp*nbands)*(u_h), MPI_REAL8, mp1%face%r_top, &
+			tag1, comm3d, status(:,2),error)
 		call MPI_Wait(request(1), status(:,1), error)
+		call MPI_Wait(request(2), status(:,2), error)
 		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 
 
+	end subroutine exchange_d_fluxes
+	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
+	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+	! exchange along dim for a variable using Cartesian topology                         !
+	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+	!>@author
+	!>Paul J. Connolly, The University of Manchester
+	!>@brief
+	!>define some types to be used in the model
+	!>@param[in] comm3d, id, ipp, jpp, kpp, nbands,w_h,e_h,s_h,n_h,d_h,u_h
+	!>@param[inout] array: the array to exchange_halos on
+	!>@param[in] lbc, ubc, dims,coords
+	subroutine exchange_u_fluxes(comm3d, id, kpp, jpp, ipp, nbands,&
+							d_h,u_h,s_h,n_h,w_h, e_h,  array, dims,coords)
+		implicit none
+		
+		integer(i4b), intent(in) :: comm3d, id, ipp, jpp, kpp, nbands,&
+		     w_h, e_h, s_h,n_h,d_h,u_h
+		real(sp), intent(inout), &
+			 dimension(1-d_h:u_h+kpp,1-s_h:n_h+jpp,1-w_h:e_h+ipp,nbands) :: &
+			 array
+		integer(i4b), dimension(3), intent(in) :: dims,coords
+		
+		! locals:
+		integer(i4b), dimension(12) :: request
+		integer(i4b), dimension(MPI_STATUS_SIZE, 12) :: status
+		integer(i4b) :: error, tag1,num_messages,imess, tag2
+		
+		
 
+			
+		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+		! message passing for adjacent cells in up / down direction                      !
+		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+		tag1=11
+		! send to the bottom:
+		call MPI_Issend(array(1,1:jpp,1:ipp,1:nbands), &
+			(ipp*jpp*nbands)*(u_h), MPI_REAL8, mp1%face%s_bottom, &
+			tag1, comm3d, request(1),error)
 
-	end subroutine exchange_fluxes
+		! receive from the bottom of upper cell:
+		call MPI_Recv(array(kpp+1,1:jpp,1:ipp,1:nbands), &
+			(ipp*jpp*nbands)*(u_h+1), MPI_REAL8, mp1%face%r_bottom, &
+			tag1, comm3d, status(:,1),error)
+! 		call MPI_Wait(request(1), status(:,1), error)
+		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+		! message passing for adjacent cells in up / down direction                      !
+		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+		tag1=12
+		! send to the top:
+		call MPI_Issend(array(kpp,1:jpp,1:ipp,1:nbands), &
+			(ipp*jpp*nbands)*(u_h), MPI_REAL8, mp1%face%s_top, &
+			tag1, comm3d, request(2),error)
+
+		! receive from the bottom of upper cell:
+		call MPI_Recv(array(0,1:jpp,1:ipp,1:nbands), &
+			(ipp*jpp*nbands)*(u_h), MPI_REAL8, mp1%face%r_top, &
+			tag1, comm3d, status(:,2),error)
+		call MPI_Wait(request(1), status(:,1), error)
+		call MPI_Wait(request(2), status(:,2), error)
+		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+	end subroutine exchange_u_fluxes
 	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 	
@@ -506,44 +590,44 @@
 		real(sp), dimension(jpp,ipp) :: top_buf, bot_buf
 		
 		
-
 			
 		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 		! message passing for adjacent cells in up / down direction                      !
 		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 		tag1=10
 		count=0
-		! send to the top:
-		if(mp1%face%s_top /= id) then
-		    count=count+1
-            call MPI_Isend(array(kpp+1-d_h:kpp,1:jpp,1:ipp), &
-                (ipp*jpp)*d_h, MPI_REAL8, mp1%face%s_top, &
-                tag1, comm3d, request(count),error)
-        endif
-
 		! receive from the top of the lower cell:
-        if(mp1%face%r_top /= id) then
+        if(mp1%face%r_top /= mp1%face_v%id) then
 		    count=count+1
             call MPI_IRecv(bot_buf, &!array(1-d_h:0,1:jpp,1:ipp), &
-                (ipp*jpp)*d_h, MPI_REAL8, mp1%face%r_top, &
+                (ipp*jpp)*d_h, MPI_REAL8, mp1%face_v%r_top, &
+                tag1, comm3d, request(count),error)
+        endif
+		tag1=11
+		! receive from the bottom of upper cell:
+		if(mp1%face%r_bottom /= mp1%face_v%id) then
+		    count=count+1
+            call MPI_IRecv(top_buf, & !array(kpp+1:kpp+u_h,1:jpp,1:ipp), &
+                (ipp*jpp)*u_h, MPI_REAL8, mp1%face_v%r_bottom, &
+                tag1, comm3d, request(count),error)
+        endif
+        tag1=10
+		! send to the top:
+		if(mp1%face%s_top /= mp1%face_v%id) then
+		    count=count+1
+            call MPI_Isend(array(kpp+1-d_h:kpp,1:jpp,1:ipp), &
+                (ipp*jpp)*d_h, MPI_REAL8, mp1%face_v%s_top, &
                 tag1, comm3d, request(count),error)
         endif
 		tag1=11
 		! send to the bottom:
-		if(mp1%face%s_bottom /= id) then
+		if(mp1%face%s_bottom /= mp1%face_v%id) then
 		    count=count+1
             call MPI_Isend(array(1:u_h,1:jpp,1:ipp), &
-                (ipp*jpp)*u_h, MPI_REAL8, mp1%face%s_bottom, &
+                (ipp*jpp)*u_h, MPI_REAL8, mp1%face_v%s_bottom, &
                 tag1, comm3d, request(count),error)
         endif
         
-		! receive from the bottom of upper cell:
-		if(mp1%face%r_bottom /= id) then
-		    count=count+1
-            call MPI_IRecv(top_buf, & !array(kpp+1:kpp+u_h,1:jpp,1:ipp), &
-                (ipp*jpp)*u_h, MPI_REAL8, mp1%face%r_bottom, &
-                tag1, comm3d, request(count),error)
-        endif
 		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 
@@ -552,12 +636,12 @@
 		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 		! case where only 1 pe in x or y directions                                      !
 		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-		if ( mp1%face%s_top == -1) then
+		if ( mp1%face_v%s_top == -1) then
 			! adjacent cells:
 			array(kpp+1:kpp+u_h,1-s_h:jpp+n_h,1-w_h:ipp+e_h)=ubc
 			! corner cells - not relevant, because below surface and above lid			
 		endif
-		if ( mp1%face%s_bottom == -1) then
+		if ( mp1%face_v%s_bottom == -1) then
 			! adjacent cells:
 			array(1-d_h:0,1-s_h:jpp+n_h,1-w_h:ipp+e_h)=lbc
 			! corner cells - not relevant, because below surface and above lid			
@@ -576,11 +660,11 @@
 		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         ! write buffers                                                                  !
 		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-		if(mp1%face%s_bottom /= -1) then
+		if(mp1%face_v%s_bottom /= -1) then
             array(0,1:jpp,1:ipp)=bot_buf
         endif
         
-		if(mp1%face%s_top /= -1) then
+		if(mp1%face_v%s_top /= -1) then
             array(kpp+1,1:jpp,1:ipp)=top_buf
         endif
 		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -631,19 +715,28 @@
 		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 		tag1=10
 		count=0
-		! send to the top:
-		if(mp1%face%s_top /= id) then
-		    count=count+1
-            call MPI_Isend(array(kpp+1-d_h:kpp,1:jpp,1:ipp), &
-                (ipp*jpp)*d_h, MPI_REAL8, mp1%face%s_top, &
-                tag1, comm3d, request(count),error)
-        endif
 
 		! receive from the top of the lower cell:
         if(mp1%face%r_top /= id) then
 		    count=count+1
             call MPI_IRecv(bot_buf, &!array(1-d_h:0,1:jpp,1:ipp), &
                 (ipp*jpp)*d_h, MPI_REAL8, mp1%face%r_top, &
+                tag1, comm3d, request(count),error)
+        endif
+        tag1=11
+		! receive from the bottom of upper cell:
+		if(mp1%face%r_bottom /= id) then
+		    count=count+1
+            call MPI_IRecv(top_buf, & !array(kpp+1:kpp+u_h,1:jpp,1:ipp), &
+                (ipp*jpp)*u_h, MPI_REAL8, mp1%face%r_bottom, &
+                tag1, comm3d, request(count),error)
+        endif
+        tag1=10
+		! send to the top:
+		if(mp1%face%s_top /= id) then
+		    count=count+1
+            call MPI_Isend(array(kpp+1-d_h:kpp,1:jpp,1:ipp), &
+                (ipp*jpp)*d_h, MPI_REAL8, mp1%face%s_top, &
                 tag1, comm3d, request(count),error)
         endif
 		tag1=11
@@ -655,13 +748,6 @@
                 tag1, comm3d, request(count),error)
         endif
         
-		! receive from the bottom of upper cell:
-		if(mp1%face%r_bottom /= id) then
-		    count=count+1
-            call MPI_IRecv(top_buf, & !array(kpp+1:kpp+u_h,1:jpp,1:ipp), &
-                (ipp*jpp)*u_h, MPI_REAL8, mp1%face%r_bottom, &
-                tag1, comm3d, request(count),error)
-        endif
 		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 
@@ -673,6 +759,23 @@
 		! message passing for adjacent cells in east / west direction                    !
 		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 		tag1=12
+		! receive from the east of the west cell:
+		if( mp1%face%r_east /= id ) then
+		    count=count+1
+			call MPI_IRecv(west_buf, & !array(1:kpp,1:jpp,1-w_h:0), &
+				(jpp*kpp)*w_h, MPI_REAL8, mp1%face%r_east, &
+				tag1, comm3d, request(count),error)
+		endif
+		tag1=13
+		! receive from the west of east cell:
+		if( mp1%face%r_west /= id ) then
+		    count=count+1
+			call MPI_IRecv(east_buf, & !array(1:kpp,1:jpp,ipp+1:ipp+e_h), &
+				(jpp*kpp)*e_h, MPI_REAL8, mp1%face%r_west, &
+				tag1, comm3d, request(count),error)
+		endif
+		
+		tag1=12
 		! send to the east:
 		if ( mp1%face%s_east /= id ) then 
 		    count=count+1
@@ -681,13 +784,6 @@
 				tag1, comm3d, request(count),error)
 		endif
 
-		! receive from the east of the west cell:
-		if( mp1%face%r_east /= id ) then
-		    count=count+1
-			call MPI_IRecv(west_buf, & !array(1:kpp,1:jpp,1-w_h:0), &
-				(jpp*kpp)*w_h, MPI_REAL8, mp1%face%r_east, &
-				tag1, comm3d, request(count),error)
-		endif
 		tag1=13
 		! send to the west:
 		if ( mp1%face%s_west /= id ) then	
@@ -697,13 +793,6 @@
 				tag1, comm3d, request(count),error)
 		endif
 
-		! receive from the west of east cell:
-		if( mp1%face%r_west /= id ) then
-		    count=count+1
-			call MPI_IRecv(east_buf, & !array(1:kpp,1:jpp,ipp+1:ipp+e_h), &
-				(jpp*kpp)*e_h, MPI_REAL8, mp1%face%r_west, &
-				tag1, comm3d, request(count),error)
-		endif
 		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 
@@ -713,19 +802,27 @@
 		! message passing for adjacent cells in north / south direction                  !
 		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 		tag1=14
-		! send to the north:
-		if ( mp1%face%s_north /= id ) then 
-		    count=count+1
-			call MPI_Isend(array(1:kpp,jpp+1-s_h:jpp,1:ipp), &
-				(ipp*kpp)*s_h, MPI_REAL8, mp1%face%s_north, &
-				tag1, comm3d, request(count),error)
-		endif
-
 		! receive from north of south cell:
 		if( mp1%face%r_north /= id ) then
 		    count=count+1
 			call MPI_IRecv(south_buf, &!array(1:kpp,1-s_h:0,1:ipp), &
 				(ipp*kpp)*s_h, MPI_REAL8, mp1%face%r_north, &
+				tag1, comm3d, request(count),error)
+		endif
+		tag1=15
+		! receive from south of north cell:
+		if( mp1%face%r_south /= id ) then
+		    count=count+1
+			call MPI_IRecv(north_buf, &!array(1:kpp,jpp+1:jpp+n_h,1:ipp), &
+				(ipp*kpp)*n_h, MPI_REAL8, mp1%face%r_south, &
+				tag1, comm3d, request(count),error)
+		endif
+		tag1=14
+		! send to the north:
+		if ( mp1%face%s_north /= id ) then 
+		    count=count+1
+			call MPI_Isend(array(1:kpp,jpp+1-s_h:jpp,1:ipp), &
+				(ipp*kpp)*s_h, MPI_REAL8, mp1%face%s_north, &
 				tag1, comm3d, request(count),error)
 		endif
 		tag1=15
@@ -737,13 +834,6 @@
 				tag1, comm3d, request(count),error)
 		endif
 
-		! receive from south of north cell:
-		if( mp1%face%r_south /= id ) then
-		    count=count+1
-			call MPI_IRecv(north_buf, &!array(1:kpp,jpp+1:jpp+n_h,1:ipp), &
-				(ipp*kpp)*n_h, MPI_REAL8, mp1%face%r_south, &
-				tag1, comm3d, request(count),error)
-		endif
 		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 
@@ -904,7 +994,7 @@
 					mp1%edge%s_ts_we,mp1%edge%r_ts_we)
 
 		! tn_we
-		call exchange_edges(comm3d, id,count,40,ipp,bn_we,request,status, &
+		call exchange_edges(comm3d, id,count,40,ipp,tn_we,request,status, &
 		            array,kpp,jpp,ipp,d_h,u_h,s_h,n_h,w_h, e_h, &
 					kpp+1-d_h,   kpp,     jpp+1-s_h,  jpp, 1, ipp, &
 					1-d_h,       0,       1-s_h,      0,   1, ipp, &
@@ -1016,7 +1106,7 @@
         array(kpp+1,jpp+1,1:ipp)=bs_we
         array(kpp+1,1-s_h,1:ipp)=bn_we
         array(1-d_h,jpp+1,1:ipp)=ts_we
-        array(1-d_h,1-s_h,1:ipp)=bn_we
+        array(1-d_h,1-s_h,1:ipp)=tn_we
 
         array(kpp+1,1:jpp,ipp+1)=bw_sn
         array(kpp+1,1:jpp,1-w_h)=be_sn
@@ -1075,14 +1165,8 @@
 				size1=(s_iu-s_il+1)*(s_ju-s_jl+1)*(s_ku-s_kl+1)
 				size2=(r_iu-r_il+1)*(r_ju-r_jl+1)*(r_ku-r_kl+1)
 
+                buf = array(s_kl,s_jl,s_il)
 				!++++
-				! send:
-				if ( (send /= id) ) then 
-				    count=count+1
-					call MPI_Isend(array(s_kl:s_ku,s_jl:s_ju,s_il:s_iu), &
-						size1, MPI_REAL8, send, &
-						tag1, comm3d, request(count),error)
-				endif
 				! receive:
 				if( (recv /= id) ) then
 				    count=count+1
@@ -1091,7 +1175,16 @@
 						tag1, comm3d, request(count),error)
 					!call MPI_Wait(request1(1), status1(:,1), error)
 				endif	
-				!----						
+				! send:
+				if ( (send /= id) ) then 
+				    count=count+1
+					call MPI_Isend(array(s_kl:s_ku,s_jl:s_ju,s_il:s_iu), &
+						size1, MPI_REAL8, send, &
+						tag1, comm3d, request(count),error)
+				endif
+				!----	
+				
+				
 			end subroutine exchange_corner
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
@@ -1136,14 +1229,11 @@
 				size1=(s_iu-s_il+1)*(s_ju-s_jl+1)*(s_ku-s_kl+1)
 				size2=(r_iu-r_il+1)*(r_ju-r_jl+1)*(r_ku-r_kl+1)
 
+                buf = &
+                    reshape(array(s_kl:s_ku,s_jl:s_ju,s_il:s_iu),&
+                        [(s_ku-s_kl+1)*(s_ju-s_jl+1)*(s_iu-s_il+1)])
+
 				!++++
-				! send:
-				if ( (send /= mp1%id) ) then 
-				    count=count+1
-					call MPI_Isend(array(s_kl:s_ku,s_jl:s_ju,s_il:s_iu), &
-						size1, MPI_REAL8, send, &
-						tag1, comm3d, request(count),error)
-				endif
 				! receive:
 				if( (recv /= mp1%id) ) then
 				    count=count+1
@@ -1152,15 +1242,16 @@
 						size1, MPI_REAL8, recv, &
 						tag1, comm3d, request(count),error)
 				endif	
+				! send:
+				if ( (send /= mp1%id) ) then 
+				    count=count+1
+					call MPI_Isend(array(s_kl:s_ku,s_jl:s_ju,s_il:s_iu), &
+						size1, MPI_REAL8, send, &
+						tag1, comm3d, request(count),error)
+				endif
 				!----
 		
 									
-                if ( send == id) then
-                    ! adjacent cells:
-                    buf = &
-                        reshape(array(s_kl:s_ku,s_jl:s_ju,s_il:s_iu),&
-                            [(s_ku-s_kl+1)*(s_ju-s_jl+1)*(s_iu-s_il+1)])
-                endif
 									
 			end subroutine exchange_edges
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
