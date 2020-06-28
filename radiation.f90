@@ -836,12 +836,8 @@
             enddo
             !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-            if(dims(3)==(coords(3)+1)) then
-                kend=kp
-            else 
-                kend=kp+1
-            endif
-
+            kend=kp+1
+            
 			do m=1,nbands
 
 				!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -862,14 +858,18 @@
 				! sigma_ray is the extinction on p-points
 				! tau is optical depth on w-points
 				! mpi - add bottom taus to all and add cumulative
+			    dtau(kp+1)=0._sp
 				tau(kp+1)=0._sp
 				tau(kp)=0._sp ! for top level tau(kp) needs to be defined taking into 
 				              ! account the atmosphere above domain
+                if(dims(3)==(coords(3)+1)) then
+                    tau(kp+1)=1.e-2_sp
+                    dtau(kp+1)=-tau(kp+1)
+                endif
 				do k=kend-1,0,-1 
 					! cumulative extinction x dz
 					tau(k)=tau(k+1)+sigma_ray(k+1)*dz(k) 
 				enddo
-				
 				
 				
 			
@@ -890,20 +890,20 @@
                 msend=dtau(1)  ! message to send
                 call MPI_allgather(msend,1,MPI_REAL8,mvrecv,1,MPI_REAL8,comm3d,error)
                 if((coords(3)+1).lt.(dims(3))) dtau(kp+1)=mvrecv(coords(3)+2)
-				if(coords(3)==(dims(3)-1)) dtau(kp)=0._sp
+				!if(coords(3)==(dims(3)-1)) dtau(kp)=0._sp
 				!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 
 				!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
                 ! store direct radiation                                                 !
 				!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-                direct=0._sp
-                if(cos_theta_s > 0._sp) then
-                    do k=0,kp
-                        direct(k)=cos_theta_s*sflux_l(m)* &
-                                exp(-0.5_sp*(tau(k+1)+tau(k))/cos_theta_s)
-                    enddo			
-                endif
+!                 direct=0._sp
+!                 if(cos_theta_s > 0._sp) then
+!                     do k=0,kp
+!                         direct(k)=cos_theta_s*sflux_l(m)* &
+!                                 exp(-0.5_sp*(tau(k+1)+tau(k))/cos_theta_s)
+!                     enddo			
+!                 endif
 				!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
                 
                 
@@ -1034,11 +1034,11 @@
                 
                 if(coords(3)==(dims(3)-1)) then
                     a(tdend)=0._sp ! no contribution from upward flux in last equation
-    				b(tdend)=1._sp
+    				b(tdend)=1._sp ! was 1
     				r(tdend)=0._sp ! toa downward flux at night
     				c(tdend)=0._sp ! this is specific to parallel
                     if(cos_theta_s > 0._sp) then
-                        !r(tdend)=cos_theta_s*sflux_l(m) ! toa downward flux - day
+                        r(tdend)=cos_theta_s*sflux_l(m) ! toa downward flux - day
                                                         ! should be multiplied by tau(kp) 
                                                         ! for atmosphere above
                     endif
@@ -1053,14 +1053,12 @@
 				call parallel_tridag(a,b,c,r,u,tdend,coords,dims, id, comm3d)
 				!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
                 
-                
-                
 				!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 				! assumes temperature is given by reference state:						 !
 				! message passing done out of this routine                               !
 				!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
                 kstart=1
-                if(coords(3)==0) then
+                if(coords(3)==0) then ! bottom
                     do i=1,ip	
                         do j=1,jp
                             ! flux_d(kp) recv
@@ -1100,21 +1098,22 @@
                 if((coords(3)==0).and.(coords(3)==(dims(3)-1))) then
                     do i=1,ip	
                         do j=1,jp
-                            flux_d(kp+1-kstart,j,i,m)=u(2*(kp+1))                            
+                            flux_d(kp+1-kstart,j,i,m)=u(2*(kp))                            
                         enddo
                     enddo
                 endif
-				!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-                if(cos_theta_s > 0._sp) then
-                    do i=1,ip	
-                        do j=1,jp
-                            do k=0,kp
-                                flux_d(k,j,i,m)=  flux_d(k,j,i,m)+direct(k)
-                            enddo                        
-                        enddo
-                    enddo
-                endif
-				
+!                 
+! 				!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!                 if(cos_theta_s > 0._sp) then
+!                     do i=1,ip	
+!                         do j=1,jp
+!                             do k=0,kp
+!                                 flux_d(k,j,i,m)=  flux_d(k,j,i,m)!+direct(k)
+!                             enddo     
+!                             !flux_d(k,j,i,m)=  flux_d(k,j,i,m)+cos_theta_s*sflux_l(m)                   
+!                         enddo
+!                     enddo
+!                 endif
 			enddo
 			
 									
