@@ -696,30 +696,33 @@
 ! 			enddo
 ! 		enddo
 
-		do i=0,ip+1
-			do j=0,jp+1
-				do k=0,kp+1
-				    call random_number(r)
-					if((i >= ipstart) .and. (i <=ipstart+ipp+1) &
-						.and. (j >= jpstart) .and. (j <= jpstart+jpp+1) &
-						.and. (k >= kpstart) .and. (k <= kpstart+kpp+1) ) then
-					
-						if ( (z(k-kpstart)>param_z) .and. &
-						    (z(k-kpstart)<param_z+param_delz) ) &
-							th(k-kpstart,j-jpstart,i-ipstart) = -0.001_sp+(r-0.5_sp)/100._sp
+        if(param_wind) then
+            do i=0,ip+1
+                do j=0,jp+1
+                    do k=0,kp+1
+                        call random_number(r)
+                        if((i >= ipstart) .and. (i <=ipstart+ipp+1) &
+                            .and. (j >= jpstart) .and. (j <= jpstart+jpp+1) &
+                            .and. (k >= kpstart) .and. (k <= kpstart+kpp+1) ) then
+                    
+                            if ( (z(k-kpstart)>param_z) .and. &
+                                (z(k-kpstart)<param_z+param_delz) ) &
+                                th(k-kpstart,j-jpstart,i-ipstart) = &
+                                    -0.001_sp+(r-0.5_sp)/100._sp
 
-						if ( (z(k-kpstart)>param_z-param_delz) .and. &
-						    (z(k-kpstart)<param_z) ) &
-							th(k-kpstart,j-jpstart,i-ipstart) = 0.001_sp-(r-0.5_sp)/100._sp
-						
+                            if ( (z(k-kpstart)>param_z-param_delz) .and. &
+                                (z(k-kpstart)<param_z) ) &
+                                th(k-kpstart,j-jpstart,i-ipstart) = &
+                                    0.001_sp-(r-0.5_sp)/100._sp
+                        
 
-					endif
-										
+                        endif
+                                        
 
-				enddo
-			enddo
-		enddo
-
+                    enddo
+                enddo
+            enddo
+        endif
 ! 		
 !  		do i=1-r_h,ipp+r_h
 !  			do j=1-r_h,jpp+r_h
@@ -733,18 +736,20 @@
 !             enddo
 !         enddo
 
- 		do i=1-r_h,ipp+r_h
- 			do j=1-r_h,jpp+r_h
-                do k=0,kpp+1
-                    v(k,j,i)=(0.5_sp*erf((zn(k)-param_z)/param_sigz)+0.5_sp)*param_vmax
-                    if((coords(3)==(dims(3)-1)).and.(k==kpp)) v(k,j,i)=0._sp
-                    if((coords(3)==0).and.(k<=1)) v(k,j,i)=0._sp
-                    zv(k,j,i)=v(k,j,i)
-                    tv(k,j,i)=v(k,j,i)
+        if(param_wind) then
+            do i=1-r_h,ipp+r_h
+                do j=1-r_h,jpp+r_h
+                    do k=0,kpp+1
+                        v(k,j,i)=(0.5_sp*erf((zn(k)-param_z)/param_sigz)+0.5_sp)*param_vmax
+                        if((coords(3)==(dims(3)-1)).and.(k==kpp)) v(k,j,i)=0._sp
+                        if((coords(3)==0).and.(k<=1)) v(k,j,i)=0._sp
+                        zv(k,j,i)=v(k,j,i)
+                        tv(k,j,i)=v(k,j,i)
+                    enddo
                 enddo
             enddo
-        enddo
-
+        endif
+        
 !  		th=0._sp
 ! 		
 ! 		
