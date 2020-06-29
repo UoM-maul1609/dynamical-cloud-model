@@ -62,7 +62,7 @@
  	nm1%th_grad=0.005,
     nm1%n_levels = 7,
     nm1%param_wind=.false., ! these variables define the wind if param_wind set to true
-    nm1%param_vmax=5.,
+    nm1%param_vmax=15.,
     nm1%param_z=2500.,
     nm1%param_sigz=50.,
     nm1%param_delz=100./
