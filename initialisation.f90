@@ -98,6 +98,7 @@
 	!>@param[in] n_levels
 	!>@params[inout] q_read,z_read,theta_read, psurf,tsurf - sounding variables
 	!>@params[in] adiabatic_prof,adiabatic_frac,t_cbase,t_ctop, rh_above, th_jump,th_grad
+	!>@param[in] param_wind, param_vmax,param_z,param_sigz,param_delz
 	!>@param[in] l_h,r_h - halo for arrays
 	!>@param[inout] thbase, thtop
 	!>@param[in] coords,dims - dimensions of cartesian topology
@@ -137,6 +138,7 @@
 			q_read, &
 			z_read, theta_read,psurf,tsurf, &
 			adiabatic_prof,adiabatic_frac,t_cbase,t_ctop, rh_above, th_jump, th_grad,&
+			param_wind, param_vmax,param_z,param_sigz,param_delz, &
 			l_h,r_h, &
 			thbase,thtop, &
 			coords,dims, id, comm3d)
@@ -175,12 +177,13 @@
 		integer(i4b), intent(in) :: ip, jp, kp, l_h, r_h, nq,nprec,iqv,iqc,inc
 		integer(i4b), intent(inout) :: nqg,nprecg
 		logical, intent(in) :: moisture,theta_flag,damping_layer, forcing, drop_num_init, &
-		    adiabatic_prof,divergence
+		    adiabatic_prof,divergence, param_wind
 		integer(i4b), intent(in) :: n_levels
 		real(sp), dimension(n_levels), target, intent(inout) :: z_read,theta_read
 		real(sp), dimension(nq,n_levels), target, intent(inout) :: q_read
 		real(sp), intent(in) :: psurf, tsurf,damping_thickness,damping_tau, &
-		    adiabatic_frac,t_cbase,t_ctop,rh_above,th_jump,th_grad
+		    adiabatic_frac,t_cbase,t_ctop,rh_above,th_jump,th_grad, &
+		    param_vmax, param_z, param_sigz, param_delz
 		integer(i4b), dimension(3), intent(inout) :: coords
 		integer(i4b), dimension(3), intent(in) :: dims
 		integer(i4b), intent(in) :: id, comm3d
@@ -701,10 +704,12 @@
 						.and. (j >= jpstart) .and. (j <= jpstart+jpp+1) &
 						.and. (k >= kpstart) .and. (k <= kpstart+kpp+1) ) then
 					
-						if ( (z(k-kpstart)>2500._sp) .and. (z(k-kpstart)<2600._sp) ) &
+						if ( (z(k-kpstart)>param_z) .and. &
+						    (z(k-kpstart)<param_z+param_delz) ) &
 							th(k-kpstart,j-jpstart,i-ipstart) = -0.001_sp+(r-0.5_sp)/100._sp
 
-						if ( (z(k-kpstart)>2400._sp) .and. (z(k-kpstart)<2500._sp) ) &
+						if ( (z(k-kpstart)>param_z-param_delz) .and. &
+						    (z(k-kpstart)<param_z) ) &
 							th(k-kpstart,j-jpstart,i-ipstart) = 0.001_sp-(r-0.5_sp)/100._sp
 						
 
@@ -731,7 +736,7 @@
  		do i=1-r_h,ipp+r_h
  			do j=1-r_h,jpp+r_h
                 do k=0,kpp+1
-                    v(k,j,i)=(0.5_sp*erf((zn(k)-2500._sp)/50._sp)+0.5_sp)*15._sp
+                    v(k,j,i)=(0.5_sp*erf((zn(k)-param_z)/param_sigz)+0.5_sp)*param_vmax
                     if((coords(3)==(dims(3)-1)).and.(k==kpp)) v(k,j,i)=0._sp
                     if((coords(3)==0).and.(k<=1)) v(k,j,i)=0._sp
                     zv(k,j,i)=v(k,j,i)

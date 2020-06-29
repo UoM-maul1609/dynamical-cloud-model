@@ -199,6 +199,7 @@
 			nm1%psurf,nm1%tsurf, &
 			nm1%adiabatic_prof, nm1%adiabatic_frac,nm1%t_cbase,nm1%t_ctop, &
 			nm1%rh_above, nm1%th_jump, nm1%th_grad, &
+			nm1%param_wind,nm1%param_vmax,nm1%param_z,nm1%param_sigz,nm1%param_delz, &
 			grid1%l_halo,grid1%r_halo, &
 			grid1%thbase,grid1%thtop, &
 			grid1%coords,mp1%dims, mp1%id, mp1%ring_comm)
