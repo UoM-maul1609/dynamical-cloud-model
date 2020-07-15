@@ -27,7 +27,9 @@
     private
     public :: p_microphysics_3d, &
             p_microphysics_2d, p_microphysics_1d, read_in_pamm_bam_namelist, &
-            p_initialise_aerosol_3d,p_initialise_aerosol, p_initialise_aerosol_1d
+            p_initialise_aerosol_3d,p_initialise_aerosol, p_initialise_aerosol_1d, &
+            calculate_gamma_params
+            
             
     ! Chen and Lamb (1994) Gamma variable fit (scaled and centred logarithm)
     integer(i4b), parameter :: n_cl=18
@@ -99,7 +101,8 @@
 				mass_imm, num_imm, q0sat, &
 				chi_rain, chi_cloud, chi_ice, chi_snow, chi_graupel, &
 				chi_rain1, chi_cloud1, chi_ice1, chi_snow1, chi_graupel1, &
-				chi_num_ice, chi_num_ice1
+				chi_num_ice, chi_num_ice1, &
+				gam1cr,gam2cr ! for radiation
 				
 	! Seifert and Beheng autoconversion
 	real(sp) :: kc, kr, xstar
@@ -1043,7 +1046,185 @@
     kc=9.44e9_sp ! m3 kg-2 s-1
     kr=5.78e0_sp ! m3 kg-2 s-1
     xstar=2.6e-10_sp ! kg
+    
+    
+    ! for radiation - converting number-mass to number-diameter
+    gam1cr=gamma(alpha_c+1._sp+1._sp/dc)
+    gam2cr=gamma(alpha_c+1._sp+2._sp/dc)
     end subroutine initialise_microphysics_vars
+    
+    
+	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+	!>@author
+	!>Paul J. Connolly, The University of Manchester
+	!>@brief
+	!>calculate the size distribution parameters
+	!>@param[in] nq: number of q-fields
+	!>@param[in] ncat: number of categories
+	!>@param[in] n_mode: number of aerosol modes
+	!>@param[in] cst,cen: indices of categories
+	!>@param[in] inc, iqc: index of cloud number, index of cloud mass
+	!>@param[in] inr, iqr: index of rain number, index of rain mass
+	!>@param[in] ini, iqi,iai: index of ice number, index of ice mass, and ice aerosol
+	!>@param[in] cat_am,cat_c, cat_r, cat_i: category index for cloud and rain and ice
+	!>@param[in] ip,jp: number of horizontal levels
+	!>@param[in] kp: number of vertical levels
+	!>@param[in] o_halo: extra points for advection
+	!>@param[inout] q: q-variables 
+	!>@param[inout] nrad,ngs,lamgs,mugs- needed for radiation
+	!>@param[in] rho, rhon: density 
+    subroutine calculate_gamma_params(nq,ncat,n_mode,cst,cen,inc,iqc, inr,iqr,ini,iqi,iai, &
+                    cat_am,cat_c, cat_r, cat_i,&
+                    ip,jp,kp,l_h,r_h,q,&
+                    nrad,ngs,lamgs,mugs, &
+                    rhoan,ice_flag)
+    implicit none
+    ! arguments:
+    integer(i4b), intent(in) :: nq, ncat, n_mode, ip,jp,kp, inc, iqc, inr,iqr,&
+        ini,iqi,iai, &
+        cat_am,&
+        cat_c, cat_r,cat_i,l_h,r_h
+    integer(i4b), dimension(ncat), intent(in) :: cst,cen
+    real(sp), dimension(-l_h+1:kp+r_h,-l_h+1:jp+r_h,-l_h+1:ip+r_h,nq), intent(inout) :: q
+
+    real(sp), dimension(-l_h+1:kp+r_h), intent(in) :: rhoan
+    logical, intent(in) :: ice_flag
+    
+    integer(i4b), intent(in) :: nrad
+	real(sp), intent(inout), dimension(-l_h+1:kp+r_h,-l_h+1:jp+r_h,-l_h+1:ip+r_h,nrad) :: ngs,lamgs,mugs
+
+	! locals
+	integer(i4b) :: i,j,k
+	real(sp) :: p
+	real(sp), dimension(-l_h+1:kp+r_h,-l_h+1:jp+r_h,-l_h+1:ip+r_h,4) :: moms
+
+    ! RAIN
+    do i=1-l_h,ip+r_h
+        do j=1-l_h,jp+r_h
+            do k=1-l_h,kp+r_h
+                ! rain n0, lambda
+                lamgs(k,j,i,2)=(max(q(k,j,i,cst(cat_r)),1._sp)*cr*gam2r / &
+                        (max(q(k,j,i,cst(cat_r)+1),1.e-10_sp)*gam1r))**(1._sp/dr)
+            enddo
+        enddo
+    enddo
+    do i=1-l_h,ip+r_h
+        do j=1-l_h,jp+r_h
+            do k=1-l_h,kp+r_h
+                ! rain n0, lambda
+                ngs(k,j,i,2)=rhoan(k)* &
+                    max(q(k,j,i,cst(cat_r)),0._sp)*&
+                    lamgs(k,j,i,2)**(1._sp+alpha_r) / gam1r
+            enddo
+        enddo
+    enddo
+    do i=1-l_h,ip+r_h
+        do j=1-l_h,jp+r_h
+            do k=1-l_h,kp+r_h
+                ! rain n0, lambda
+                mugs(k,j,i,2)=alpha_r
+            enddo
+        enddo
+    enddo
+               
+               
+    ! CLOUD - note these params are for a mass-distribution. They need to be converted
+    ! to be applicable for diameter distribution: Calculate the 1st and 2nd moments 
+    ! (diameter)
+    ! which enables calculation of shape parameter by taking ratios
+    do i=1-l_h,ip+r_h
+        do j=1-l_h,jp+r_h
+            do k=1-l_h,kp+r_h
+                ! cloud n0, lambda    
+                lamgs(k,j,i,1)=(max(q(k,j,i,inc),1._sp)*gam2c / &
+                    (max(q(k,j,i,iqc),1.e-10_sp)*gam1c))**(1._sp/1._sp)
+            enddo
+        enddo
+    enddo
+                    
+    do i=1-l_h,ip+r_h
+        do j=1-l_h,jp+r_h
+            do k=1-l_h,kp+r_h
+                ! cloud n0, lambda    
+                ngs(k,j,i,1)=rhoan(k)*max(q(k,j,i,inc),0._sp)*&
+                    lamgs(k,j,i,1)**(1._sp+alpha_c) / gam1c
+            enddo
+        enddo
+    enddo
+    ! cloud moments
+    moms=0._sp
+    do i=1-l_h,ip+r_h
+        do j=1-l_h,jp+r_h
+            do k=1-l_h,kp+r_h
+                ! zeroth  
+                if (q(k,j,i,inc).lt.1._sp) cycle
+                if (q(k,j,i,iqc).lt.1.e-20_sp) cycle
+                moms(k,j,i,1)=rhoan(k)*q(k,j,i,inc)
+                ! first  
+                moms(k,j,i,2)=ngs(k,j,i,1)*gam1cr / &
+                    (cc**(1._sp/dc)*lamgs(k,j,i,1)**(alpha_c+1._sp+1._sp/dc))
+                ! second  
+                moms(k,j,i,3)=ngs(k,j,i,1)*gam2cr / &
+                    (cc**(2._sp/dc)*lamgs(k,j,i,1)**(alpha_c+1._sp+2._sp/dc))
+                ! third 
+                moms(k,j,i,4)=rhoan(k)*q(k,j,i,iqc)/cc
+            enddo
+        enddo
+    enddo
+    ! now, convert these moments to parameters
+    do i=1-l_h,ip+r_h
+        do j=1-l_h,jp+r_h
+            do k=1-l_h,kp+r_h
+                ! calculate the ratio p M1/M0*M2/M3
+                p=moms(k,j,i,2)/moms(k,j,i,1)* &
+                    moms(k,j,i,3)/moms(k,j,i,4)
+                ! mu    
+                mugs(k,j,i,1)=(1._sp-3._sp*p) / (p-1._sp)
+                ! now calculate ratio of m1 : m0
+                p=moms(k,j,i,1) / moms(k,j,i,2)
+                ! lambda
+                lamgs(k,j,i,1)=p*(mugs(k,j,i,1)+1._sp)
+                ! n0
+                ngs(k,j,i,1)=lamgs(k,j,i,1)**(mugs(k,j,i,1)+1._sp)*moms(k,j,i,1) / &
+                    gamma(mugs(k,j,i,1)+1._sp)
+            enddo
+        enddo
+    enddo
+
+
+    ! ICE - note, this should be updated to take into account variable density
+    if(ice_flag) then
+        do i=1-l_h,ip+r_h
+            do j=1-l_h,jp+r_h
+                do k=1-l_h,kp+r_h
+                    ! ice n0, lambda
+                    lamgs(k,j,i,3)=(max(q(k,j,i,ini),1._sp)*ci*gam2i / &
+                        (max(q(k,j,i,iqi),1.e-10_sp)*gam1i))**(1._sp/di)
+                enddo
+            enddo
+        enddo
+        do i=1-l_h,ip+r_h
+            do j=1-l_h,jp+r_h
+                do k=1-l_h,kp+r_h
+                    ! ice n0, lambda
+                    ngs(k,j,i,3)=rhoan(k)*max(q(k,j,i,ini),0._sp)*&
+                        lamgs(k,j,i,3)**(1._sp+alpha_i) / gam1i
+                enddo
+            enddo
+        enddo
+        do i=1-l_h,ip+r_h
+            do j=1-l_h,jp+r_h
+                do k=1-l_h,kp+r_h
+                    ! ice n0, lambda
+                    mugs(k,j,i,3)=alpha_i
+                enddo
+            enddo
+        enddo
+    endif
+    end subroutine calculate_gamma_params    
+	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    
+    
     
 #if MPI_PAMM == 0
 	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -1066,6 +1247,7 @@
 	!>@param[in] dz: dz, dzn
 	!>@param[in] o_halo: extra points for advection
 	!>@param[inout] q: q-variables 
+	!>@param[inout] nrad,ngs,lamgs,mugs- needed for radiation
 	!>@param[inout] precip: precip in rain, snow, graupel, ice cats - diagnostic
 	!>@param[inout] theta: theta 
 	!>@param[inout] p: pressure
@@ -1082,7 +1264,9 @@
     subroutine p_microphysics_3d(nq,ncat,n_mode,cst,cen,inc,iqc, inr,iqr,ini,iqi,iai, &
                     cat_am,cat_c, cat_r, cat_i,&
                     nprec, &
-                    ip,jp,kp,l_h,r_h,dt,dz,dzn,q,precip,th,prefn, z,thetan,rhoa,rhoan,w, &
+                    ip,jp,kp,l_h,r_h,dt,dz,dzn,q, &
+                    nrad,ngs,lamgs,mugs, &
+                    precip,th,prefn, z,thetan,rhoa,rhoan,w, &
     				micro_init,hm_flag, mass_ice, ice_flag, theta_flag, &
     				j_stochastic,ice_nuc_flag)
 #else
@@ -1106,6 +1290,7 @@
 	!>@param[in] dz: dz, dzn
 	!>@param[in] o_halo: extra points for advection
 	!>@param[inout] q: q-variables 
+	!>@param[inout] nrad,ngs,lamgs,mugs- needed for radiation
 	!>@param[inout] precip: precip in rain, snow, graupel, ice cats - diagnostic
 	!>@param[inout] theta: theta 
 	!>@param[inout] p: pressure
@@ -1118,14 +1303,16 @@
 	!>@param[in] mass_ice: mass of a single ice crystal (override)
 	!>@param[in] ice_flag: ice microphysics
 	!>@param[in] theta_flag: whether to alter theta
-	!>@param[in] j_stochastic, ice_nuc_flag
+	!>@param[in] j_stochastic, ice_nuc_flag, calc_parms
 	!>@param[in] comm,comm_vert,id,dims,coords: MPI variables
     subroutine p_microphysics_3d(nq,ncat,n_mode,cst,cen,inc,iqc, inr,iqr,ini,iqi,iai, &
                     cat_am,cat_c, cat_r, cat_i,&
                     nprec, &
-                    ip,jp,kp,l_h,r_h,dt,dz,dzn,q,precip,th,prefn, z,thetan,rhoa,rhoan,w, &
+                    ip,jp,kp,l_h,r_h,dt,dz,dzn,q,precip,&
+                    nrad,ngs,lamgs,mugs, &
+                    th,prefn, z,thetan,rhoa,rhoan,w, &
     				micro_init,hm_flag, mass_ice, ice_flag, theta_flag, &
-    				j_stochastic,ice_nuc_flag, &
+    				j_stochastic,ice_nuc_flag, calc_params, &
     				comm,comm_vert,id,dims,coords)
     use mpi
 	use advection_s_3d, only : mpdata_vec_vert_3d, mpdata_vert_3d
@@ -1146,13 +1333,17 @@
     real(sp), dimension(-l_h+1:kp+r_h), intent(in) :: z, dz, dzn, rhoa,rhoan, thetan, &
         prefn
     real(sp), dimension(-l_h+1:kp+r_h,-l_h+1:jp+r_h,-l_h+1:ip+r_h), intent(in) :: w
-    logical, intent(in) :: ice_flag, hm_flag, theta_flag
+    logical, intent(in) :: ice_flag, hm_flag, theta_flag, calc_params
     integer(i4b), intent(in) :: ice_nuc_flag
     logical , intent(inout) :: micro_init
     real(sp), intent(in) :: mass_ice, j_stochastic
+    
+    integer(i4b), intent(in) :: nrad
+	real(sp), intent(inout), &
+	    dimension(-l_h+1:kp+r_h,-l_h+1:jp+r_h,-l_h+1:ip+r_h,nrad) :: ngs,lamgs,mugs
 
 	! locals
-	integer(i4b) :: i,j,n, error,n1
+	integer(i4b) :: i,j,k,n, error,n1
 #if MPI_PAMM == 1
 	real(sp), dimension(-l_h+1:kp+r_h,-l_h+1:jp+r_h,-l_h+1:ip+r_h) :: & 
 	                vqr, vqc, vqi
@@ -1298,6 +1489,15 @@
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     endif       
 #endif
+
+    if (calc_params) then
+        call calculate_gamma_params(nq,ncat,n_mode,cst,cen,inc,iqc, inr,iqr,ini,iqi,iai, &
+                    cat_am,cat_c, cat_r, cat_i,&
+                    ip,jp,kp,l_h,r_h,q,&
+                    nrad,ngs,lamgs,mugs, &
+                    rhoan,ice_flag)
+    endif
+    
 	end subroutine p_microphysics_3d
 	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 	
@@ -1667,14 +1867,14 @@
     ! some commonly used variables that depend on prognostics                            !
     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     t=(theta+th)*(p/1.e5_sp)**(ra/cp) ! temperature
-    rho=rhoa !p / (ra*t) ! air density    
+    rho=rhon !p / (ra*t) ! air density    
     rho_fac=(rho0/rho(:))**0.5_sp
     ! rain n0, lambda
     lam_r=(max(q(:,cst(cat_r)),1._sp)*cr*gam2r / &
             (max(q(:,cst(cat_r)+1),1.e-10_sp)*gam1r))**(1._sp/dr)
     n_r=rho(:)*max(q(:,cst(cat_r)),0._sp)*lam_r**(1._sp+alpha_r) / gam1r
     ! cloud n0, lambda    
-    lam_c=(max(q(:,inc),1._sp)*cc*gam2c / (max(q(:,iqc),1.e-10_sp)*gam1c))**(1._sp/1._sp)
+    lam_c=(max(q(:,inc),1._sp)*gam2c / (max(q(:,iqc),1.e-10_sp)*gam1c))**(1._sp/1._sp)
     n_c=rho(:)*max(q(:,inc),0._sp)*lam_c**(1._sp+alpha_c) / gam1c
     
     if(ice_flag) then
