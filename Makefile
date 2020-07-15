@@ -86,7 +86,7 @@ initialisation.$(OBJ) : initialisation.f90 random.$(OBJ) nr.$(OBJ) nrtype.$(OBJ)
 driver_code.$(OBJ) : driver_code.f90 nrtype.$(OBJ) dynamics.$(OBJ) \
         sfvt_code sgm_code pamm_code rtm_code diagnostics.$(OBJ)
 	$(FOR) driver_code.f90 -I ${NETCDFMOD}  $(FFLAGS)driver_code.$(OBJ) -I$(SFVT_DIR) \
-	    -I$(SGM_DIR) -I$(PAMM_DIR)
+	    -I$(SGM_DIR) -I$(PAMM_DIR) -I$(RTM_DIR)
 mpi_module.$(OBJ) : mpi_module.f90 
 	$(FOR) mpi_module.f90 $(FFLAGS)mpi_module.$(OBJ)
 dynamics.$(OBJ) : dynamics.f90 sgm_code rtm_code 

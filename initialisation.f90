@@ -99,6 +99,8 @@
 	!>@params[inout] q_read,z_read,theta_read, psurf,tsurf - sounding variables
 	!>@params[in] adiabatic_prof,adiabatic_frac,t_cbase,t_ctop, rh_above, th_jump,th_grad
 	!>@param[in] param_wind, param_vmax,param_z,param_sigz,param_delz
+	!>@param[in] radiation,nrad
+	!>@param[inout] ngs,lamgs,mugs
 	!>@param[in] l_h,r_h - halo for arrays
 	!>@param[inout] thbase, thtop
 	!>@param[in] coords,dims - dimensions of cartesian topology
@@ -139,6 +141,7 @@
 			z_read, theta_read,psurf,tsurf, &
 			adiabatic_prof,adiabatic_frac,t_cbase,t_ctop, rh_above, th_jump, th_grad,&
 			param_wind, param_vmax,param_z,param_sigz,param_delz, &
+			radiation,nrad,ngs,lamgs,mugs, &
 			l_h,r_h, &
 			thbase,thtop, &
 			coords,dims, id, comm3d)
@@ -157,7 +160,7 @@
 														su,sv,sw,psrc, &
 														sth,strain,vism,vist
 		real(sp), dimension(:,:,:,:), allocatable, intent(inout) :: &
-														q,sq,viss, precip
+														q,sq,viss, precip, ngs,lamgs,mugs
 		real(sp), dimension(:), allocatable, intent(inout) :: x,y,z,xn,yn,zn,dx,dy,dz, &
 															dxn,dyn,dzn, theta,thetan, &
 															rhoa, rhoan, lamsq, lamsqn, &
@@ -174,10 +177,10 @@
 		                        divergence_hgt
 		integer(i4b), intent(inout) :: ipp, jpp, kpp, ipstart, jpstart, kpstart
 		integer(i4b), intent(inout) :: ntim
-		integer(i4b), intent(in) :: ip, jp, kp, l_h, r_h, nq,nprec,iqv,iqc,inc
+		integer(i4b), intent(in) :: ip, jp, kp, l_h, r_h, nq,nprec,iqv,iqc,inc, nrad
 		integer(i4b), intent(inout) :: nqg,nprecg
 		logical, intent(in) :: moisture,theta_flag,damping_layer, forcing, drop_num_init, &
-		    adiabatic_prof,divergence, param_wind
+		    adiabatic_prof,divergence, param_wind, radiation
 		integer(i4b), intent(in) :: n_levels
 		real(sp), dimension(n_levels), target, intent(inout) :: z_read,theta_read
 		real(sp), dimension(nq,n_levels), target, intent(inout) :: q_read
@@ -297,7 +300,18 @@
 		allocate( vist(1-r_h:kpp+r_h,1-r_h:jpp+r_h,1-r_h:ipp+r_h), STAT = AllocateStatus)
 		if (AllocateStatus /= 0) STOP "*** Not enough memory ***"
 
-
+        if(radiation) then
+            allocate( ngs(1-r_h:kpp+r_h,1-r_h:jpp+r_h,1-r_h:ipp+r_h,nrad), &
+                STAT = AllocateStatus)
+            if (AllocateStatus /= 0) STOP "*** Not enough memory ***"
+            allocate( lamgs(1-r_h:kpp+r_h,1-r_h:jpp+r_h,1-r_h:ipp+r_h,nrad), &
+                STAT = AllocateStatus)
+            if (AllocateStatus /= 0) STOP "*** Not enough memory ***"
+            allocate( mugs(1-r_h:kpp+r_h,1-r_h:jpp+r_h,1-r_h:ipp+r_h,nrad), &
+                STAT = AllocateStatus)
+            if (AllocateStatus /= 0) STOP "*** Not enough memory ***"
+        endif
+        
         ! moisture variables
         allocate( qbar(1-r_h:kpp+r_h,1:nq), &
             STAT = AllocateStatus)

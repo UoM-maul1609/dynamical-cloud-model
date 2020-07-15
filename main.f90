@@ -39,7 +39,7 @@
         use initialisation, only : allocate_and_set, allocate_nml_qs
         use drivers
         use p_micro_module, only : read_in_pamm_bam_namelist, p_initialise_aerosol, &
-                p_initialise_aerosol_3d
+                p_initialise_aerosol_3d, calculate_gamma_params
         use radiation, only : allocate_and_set_radiation, nm2, radg1
         use pts
         
@@ -107,6 +107,8 @@
 
                     nm1%nq=grid1%nq
                     nm1%nprec=grid1%nprec
+                    if (nm1%radiation) grid1%nrad=2
+                    if (nm1%radiation.and.nm1%ice_flag) grid1%nrad=3
                 case default
                     print *, 'error'
                     stop
@@ -200,6 +202,9 @@
 			nm1%adiabatic_prof, nm1%adiabatic_frac,nm1%t_cbase,nm1%t_ctop, &
 			nm1%rh_above, nm1%th_jump, nm1%th_grad, &
 			nm1%param_wind,nm1%param_vmax,nm1%param_z,nm1%param_sigz,nm1%param_delz, &
+			nm1%radiation, & ! needed to store 
+            grid1%nrad, &
+            grid1%ngs,grid1%lamgs,grid1%mugs,&
 			grid1%l_halo,grid1%r_halo, &
 			grid1%thbase,grid1%thtop, &
 			grid1%coords,mp1%dims, mp1%id, mp1%ring_comm)
@@ -227,6 +232,7 @@
               nm2%lambda_s_low, nm2%lambda_s_high, &
               nm2%lambda_l_low, nm2%lambda_l_high, &
               radg1%lambda,radg1%lambda_low,radg1%lambda_high, radg1%delta_lambda, &
+    		  radg1%nrwbin,radg1%niwbin, &
               radg1%sflux_l, radg1%b_s_g, &
               radg1%ext_s_g, radg1%flux_u, radg1%flux_d, radg1%rad_power,  &
               grid1%l_halo, grid1%r_halo, grid1%rhoan, grid1%thetan, &
@@ -255,8 +261,15 @@
                         grid1%inc, grid1%ip,grid1%jp,grid1%kp,grid1%l_halo, &
                         grid1%x,grid1%y,grid1%z,grid1%rhoan,grid1%prefn,grid1%trefn,&
                         grid1%q)  
-                        
-                        
+                    if(nm1%radiation) then
+                        call calculate_gamma_params(grid1%nq,grid1%ncat,grid1%n_mode,&
+                            grid1%c_s,grid1%c_e,grid1%inc,grid1%iqc, &
+                            grid1%inr,grid1%iqr,grid1%ini,grid1%iqi,grid1%iai, &
+                            grid1%cat_am,grid1%cat_c, grid1%cat_r, grid1%cat_i,&
+                            grid1%ip,grid1%jp,grid1%kp,grid1%l_halo,grid1%r_halo,grid1%q,&
+                            grid1%nrad,grid1%ngs,grid1%lamgs,grid1%mugs, &
+                            grid1%rhoan,nm1%ice_flag)
+                    endif                        
                 case default
                     print *, 'error'
                     stop
@@ -340,10 +353,13 @@
                     radg1%ntot, radg1%ns, radg1%nl, &
                     radg1%flux_u, radg1%flux_d, radg1%rad_power, &
                     radg1%lambda,radg1%lambda_low,radg1%lambda_high, radg1%delta_lambda, &
+                    radg1%nrwbin,radg1%niwbin, &
                     radg1%sflux_l, radg1%b_s_g, &
                     nm2%start_year, nm2%start_mon, nm2%start_day,&
                     nm2%start_hour, nm2%start_min,nm2%start_sec, &
                     radg1%lat, radg1%lon, radg1%albedo, radg1%emiss,nm2%quad_flag, &
+                    nm2%asymmetry_water, &
+                    grid1%nrad, grid1%ngs,grid1%lamgs,grid1%mugs, &
                     radg1%nprocv,radg1%mvrecv, &
 				grid1%coords, &
 				mp1%dims,mp1%id, world_process, mp1%rank, mp1%ring_comm, &

@@ -28,7 +28,7 @@
             										sth,strain,vism,vist, div
 
             real(sp), dimension(:,:,:,:), allocatable :: q, sq, viss, &
-            										precip
+            										precip, ngs,lamgs,mugs
             real(sp), dimension(:), allocatable ::	dx, dy, dz, dxn,dyn,dzn, &
             										x, y, z, xn,yn,zn, theta, thetan, &
             										rhoa, rhoan, lamsq, lamsqn, &
@@ -39,7 +39,7 @@
             ! point to the start and end of a category
             integer(i4b), dimension(:), allocatable :: c_s, c_e
             character(len=20), dimension(:), allocatable :: q_name
-            integer(i4b) :: n_mode
+            integer(i4b) :: n_mode, nrad=0
             real(sp), dimension(:,:), allocatable :: qbar
             real(sp) :: thbase, thtop
             

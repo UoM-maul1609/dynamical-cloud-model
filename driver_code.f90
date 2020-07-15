@@ -62,9 +62,12 @@
 	!>@param[inout] a, b, c, r, usol: tridag
     !>@param[in] nbands, ns, nl: number of bands
     !>@param[inout] flux_u, flux_d, rad_power
-    !>@param[in] lambda, lambda_low, lambda_high, delta_lambda, sflux_l, b_s_g
+    !>@param[in] lambda, lambda_low, lambda_high, delta_lambda, nrwbin,niwbin
+    !>@param[in] sflux_l, b_s_g
     !>@param[in] start_year, start_mon,start_day,start_hour,start_min,start_sec
-    !>@param[in] lat, lon, albedo, emiss,quad_flag
+    !>@param[in] lat, lon, albedo, emiss,quad_flag, asymmetry_water
+    !>@param[in] nrad
+    !>@param[inout] ngs,lamgs,mugs
 	!>@param[in] coords: for Cartesian topology
 	!>@param[in] dims,id, world_process, ring_comm, sub_horiz_comm: mpi variables
 	!>@param[in] sub_vert_comm: mpi variables
@@ -107,9 +110,11 @@
                     a,b,c,r,usol, &
                     nbands, ns,nl, flux_u, flux_d, rad_power, &
                     lambda,lambda_low,lambda_high, delta_lambda,&
+                    nrwbin,niwbin, &
                     sflux_l, b_s_g, &
                     start_year,start_mon, start_day,start_hour,start_min,start_sec, &
-                    lat, lon, albedo, emiss,quad_flag, &
+                    lat, lon, albedo, emiss,quad_flag, asymmetry_water, &
+                    nrad,ngs,lamgs,mugs, &
                     nprocv,mvrecv, &
 				coords, &
 				dims,id, world_process, rank, ring_comm,sub_horiz_comm,sub_vert_comm)
@@ -118,11 +123,11 @@
         use advection_s_3d, only : first_order_upstream_3d, &
                     mpdata_3d, mpdata_vec_3d, adv_ref_state, mpdata_3d_add, &
                     mpdata_vert_3d, mpdata_vec_vert_3d
-		use d_solver, only : bicgstab, sources, advance_momentum
+		use d_solver, only : bicgstab, sources, advance_momentum, radiative_transfer
 		use subgrid_3d, only : advance_scalar_fields_3d
         use diagnostics
         use p_micro_module
-
+        
 		implicit none
 				
 		
@@ -130,7 +135,7 @@
 		logical, intent(in) :: viscous, monotone, moisture, &
 		                    damping_layer, forcing, theta_flag, ice_flag, hm_flag, &
 		                    divergence, radiation
-		integer(i4b), intent(in) :: ice_nuc_flag
+		integer(i4b), intent(in) :: ice_nuc_flag, nrad
 		logical, intent(inout) :: micro_init
 		integer(i4b), intent(in) :: ntim,ip,jp,kp, ipp,jpp,kpp, &
 						l_h,r_h, ipstart, jpstart, kpstart, &
@@ -181,11 +186,15 @@
 			dimension(1:kpp,1-l_h:jpp+r_h,1-l_h:ipp+r_h,1:nprec), &
 			intent(inout) :: precip
 					
+		real(sp), &
+			dimension(1-l_h:kpp+r_h,1-r_h:jpp+r_h,1-r_h:ipp+r_h,1:nrad), &
+			intent(inout) :: ngs,lamgs,mugs
+
         character(len=20), intent(in), dimension(nq) :: q_name
 
         ! radiation variables		
 		real(sp), dimension(nbands) :: lambda, b_s_g, lambda_low,&
-										lambda_high, delta_lambda, sflux_l
+							lambda_high, delta_lambda, nrwbin,niwbin, sflux_l
 		real(sp), intent(in), dimension(nprocv) :: mvrecv
 		integer(i4b), intent(in) :: nbands, ns, nl, tdstart,tdend
 		integer(i4b), intent(in) :: nprocv
@@ -194,7 +203,7 @@
 						flux_d,flux_u
 		real(sp), dimension(1-r_h:kpp+r_h,1-r_h:jpp+r_h,1-r_h:ipp+r_h) :: &
 						rad_power
-		real(sp), intent(in) :: lat, lon, albedo, emiss
+		real(sp), intent(in) :: lat, lon, albedo, emiss, asymmetry_water
 		integer(i4b), intent(in) :: quad_flag, start_year, start_mon, start_day, &
 									start_hour, start_min, start_sec
 		!-
@@ -240,6 +249,8 @@
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 		
 
+
+
 		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 		! time-loop                                                                      !
 		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -276,6 +287,26 @@
 			endif
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
+			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+			! try doing radiation here                                                   !
+			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+            if(radiation) then
+                call radiative_transfer(ring_comm,id,rank2, dims, coords, &
+                    dt,dz,dzn,ipp,jpp,kpp,l_h,r_h,&
+                    th,sth,&
+                    tref,trefn, rhoa,rhoan,&
+                    sub_vert_comm, time,tdstart,tdend, &
+                    a,b,c,r,usol, &
+                    nbands, ns,nl, flux_u, flux_d, &
+                    lambda,lambda_low,lambda_high, delta_lambda,nrwbin, niwbin, &
+                    sflux_l, b_s_g, &
+                    start_year,start_mon, start_day,start_hour,start_min,start_sec, &
+                    lat, lon, albedo, emiss,quad_flag, &
+                    asymmetry_water, &
+                    nrad,ngs,lamgs,mugs, &
+                    nprocv,mvrecv)	
+            endif
+			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 			
 			
 			
@@ -322,9 +353,12 @@
                 a,b,c,r,usol, &
                 nbands, ns,nl, flux_u, flux_d, rad_power, &
                 lambda,lambda_low,lambda_high, delta_lambda,&
+                nrwbin,niwbin, &
                 sflux_l, b_s_g, &
                 start_year,start_mon, start_day,start_hour,start_min,start_sec, &
                 lat, lon, albedo, emiss,quad_flag, &
+                asymmetry_water, &
+                nrad,ngs,lamgs,mugs, &
                 nprocv,mvrecv)
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
@@ -486,11 +520,12 @@
                                         nprec, &
                                         ipp,jpp,kpp,l_h,r_h,dt,dz,&
                                         dzn,q(:,:,:,:),precip(:,:,:,:),&
+                                        nrad,ngs(:,:,:,:),lamgs(:,:,:,:),mugs(:,:,:,:), &
                                         th(:,:,:),prefn, &
                                         zn(:),thetan,rhoa,rhoan,w(:,:,:), &
                                         micro_init,hm_flag,1.e-14_sp, &
                                         ice_flag, theta_flag, &
-                                        j_stochastic, ice_nuc_flag, &
+                                        j_stochastic, ice_nuc_flag, radiation, &
                                         ring_comm,sub_vert_comm,id,dims,coords)		
                     case default
                         print *,'not coded'
