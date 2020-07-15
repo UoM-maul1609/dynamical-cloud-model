@@ -39,10 +39,12 @@ main.exe	:  main.$(OBJ) variables.$(OBJ)  mpi_module.$(OBJ) \
 		 ${NETCDFLIB} -I ${NETCDFMOD} ${NETCDF_LIB} $(DEBUG)
 rtm_lib.a	:   radiation.$(OBJ) \
                 nrtype.$(OBJ) nr.$(OBJ) nrutil.$(OBJ) locate.$(OBJ) polint.$(OBJ) \
+				trapzd.$(OBJ) qromb.$(OBJ) \
 				tridag.$(OBJ) rkqs.$(OBJ) rkck.$(OBJ) odeint.$(OBJ) zbrent.$(OBJ) \
 				random.$(OBJ) pts_code
 	$(AR) rc rtm_lib.a radiation.$(OBJ) \
-	            nrutil.$(OBJ) locate.$(OBJ) polint.$(OBJ) tridag.$(OBJ) \
+	            nrutil.$(OBJ) locate.$(OBJ) polint.$(OBJ) trapzd.$(OBJ) qromb.$(OBJ) \
+	            tridag.$(OBJ) \
 				rkqs.$(OBJ) rkck.$(OBJ) odeint.$(OBJ) zbrent.$(OBJ) \
 				random.$(OBJ) \
                 $(PTS_DIR)/nrutil.$(OBJ) $(PTS_DIR)/locate.$(OBJ) \
@@ -54,8 +56,12 @@ rtm_lib.a	:   radiation.$(OBJ) \
 				$(PTS_DIR)/parallel_tridag.$(OBJ) 
 locate.$(OBJ)	: locate.f90
 	$(FOR) locate.f90 $(FFLAGS)locate.$(OBJ)
-polint.$(OBJ)	: polint.f90
+polint.$(OBJ)	: polint.f90 nrutil.$(OBJ)
 	$(FOR) polint.f90 $(FFLAGS)polint.$(OBJ)
+trapzd.$(OBJ)	: trapzd.f90
+	$(FOR) trapzd.f90 $(FFLAGS)trapzd.$(OBJ)
+qromb.$(OBJ)	: qromb.f90
+	$(FOR) qromb.f90 $(FFLAGS)qromb.$(OBJ)
 tridag.$(OBJ)	: tridag.f90
 	$(FOR) tridag.f90 $(FFLAGS)tridag.$(OBJ)
 nrtype.$(OBJ)	: nrtype.f90
@@ -83,7 +89,8 @@ driver_code.$(OBJ) : driver_code.f90 nrtype.$(OBJ) radiation.$(OBJ)
 mpi_module.$(OBJ) : mpi_module.f90 
 	$(FOR) mpi_module.f90 $(FFLAGS)mpi_module.$(OBJ)
 radiation.$(OBJ) : radiation.f90 nrtype.$(OBJ) nr.$(OBJ) mpi_module.$(OBJ) \
-					initialisation.$(OBJ) pts_code
+					initialisation.$(OBJ) locate.$(OBJ) polint.$(OBJ) \
+					trapzd.$(OBJ) qromb.$(OBJ) pts_code
 	$(FOR) radiation.f90 $(FFLAGSOMP)radiation.$(OBJ) -I$(PTS_DIR)
 main.$(OBJ)   : main.f90 variables.$(OBJ) nrtype.$(OBJ)  mpi_module.$(OBJ) \
 			initialisation.$(OBJ) radiation.$(OBJ) driver_code.$(OBJ) pts_code

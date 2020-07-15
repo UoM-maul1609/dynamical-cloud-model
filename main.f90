@@ -142,6 +142,7 @@
 		  nm2%lambda_s_low, nm2%lambda_s_high, &
 		  nm2%lambda_l_low, nm2%lambda_l_high, &
 		  radg1%lambda,radg1%lambda_low,radg1%lambda_high, radg1%delta_lambda, &
+		  radg1%nrwbin,radg1%niwbin, &
 		  radg1%sflux_l, radg1%b_s_g, &
 		  radg1%ext_s_g, radg1%flux_u, radg1%flux_d, radg1%rad_power,  &
 		  grid1%l_halo, grid1%r_halo, grid1%rhoan, grid1%thetan, &
@@ -194,10 +195,12 @@
 				grid1%tref,grid1%trefn, &
 				grid1%rhoa,grid1%rhoan, &
 				radg1%lambda,radg1%lambda_low,radg1%lambda_high, radg1%delta_lambda, &
+				radg1%nrwbin,radg1%niwbin, &
 				radg1%sflux_l, radg1%b_s_g, &
 				nm2%start_year, nm2%start_mon, nm2%start_day,&
 				nm2%start_hour, nm2%start_min,nm2%start_sec, &
 				radg1%lat, radg1%lon, radg1%albedo, radg1%emiss,nm2%quad_flag, &
+				nm2%asymmetry_water, &
 				radg1%nprocv,radg1%mvrecv, &
 				grid1%coords, &
 				io1%new_file, nm1%outputfile, nm1%output_interval, &
