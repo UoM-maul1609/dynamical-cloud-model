@@ -1260,7 +1260,7 @@
 	!>@param[in] mass_ice: mass of a single ice crystal (override)
 	!>@param[in] ice_flag: ice microphysics
 	!>@param[in] theta_flag: whether to alter theta
-	!>@param[in] j_stochastic, ice_nuc_flag
+	!>@param[in] j_stochastic, ice_nuc_flag, calc_params
     subroutine p_microphysics_3d(nq,ncat,n_mode,cst,cen,inc,iqc, inr,iqr,ini,iqi,iai, &
                     cat_am,cat_c, cat_r, cat_i,&
                     nprec, &
@@ -1268,7 +1268,7 @@
                     nrad,ngs,lamgs,mugs, &
                     precip,th,prefn, z,thetan,rhoa,rhoan,w, &
     				micro_init,hm_flag, mass_ice, ice_flag, theta_flag, &
-    				j_stochastic,ice_nuc_flag)
+    				j_stochastic,ice_nuc_flag,calc_params)
 #else
 	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 	!>@author
