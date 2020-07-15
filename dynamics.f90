@@ -11,7 +11,7 @@
 	real(sp), parameter :: grav=9.81_sp, cp=1005._sp ! gravity, heat cap
 	
     private
-    public :: bicgstab,sources, advance_momentum
+    public :: bicgstab,sources, advance_momentum, radiative_transfer
     
 	contains
 	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -303,7 +303,7 @@
 	
 		! locals
 		real(sp), parameter :: tiny=1.e-16 !epsilon(dt)
-		integer(i4b), parameter :: itmax=9999	, prit=1	
+		integer(i4b), parameter :: itmax=9999	, prit=3	
 		real(sp) :: sc_err, err, rho, alf, omg, bet, nrm, tt, ts
 		real(sp), dimension(-r_h+1:kp+r_h,-r_h+1:jp+r_h,-r_h+1:ip+r_h) :: &
 							ax, r,cr,cs,p,v1,t,s
@@ -474,6 +474,111 @@
 	!>@author
 	!>Paul J. Connolly, The University of Manchester
 	!>@brief
+	!>Call the radiation scheme
+	!>@param[in] 
+    subroutine radiative_transfer(comm3d,id,rank, dims, coords, &
+			dt,dz,dzn,ip,jp,kp,l_h,r_h,&
+			th,sth,&
+			tref,trefn, rhoa,rhoan,&
+			sub_vert_comm, time,tdstart,tdend, &
+            a,b,c,r,usol, &
+            nbands, ns,nl, flux_u, flux_d, &
+            lambda,lambda_low,lambda_high, delta_lambda,nrwbin, niwbin, &
+            sflux_l, b_s_g, &
+            start_year,start_mon, start_day,start_hour,start_min,start_sec, &
+            lat, lon, albedo, emiss,quad_flag, &
+            asymmetry_water, &
+            nrad,ngs,lamgs,mugs, &
+            nprocv,mvrecv)
+		use nrtype
+		use mpi_module, only : exchange_full, exchange_along_dim, exchange_d_fluxes, &
+		                       exchange_u_fluxes
+        use radiation, only : solve_fluxes
+
+		implicit none
+		integer(i4b), intent(in) :: id, comm3d, rank
+		integer(i4b), dimension(3), intent(in) :: dims, coords
+
+		
+		real(sp), intent(in) :: dt
+		integer(i4b), intent(in) :: ip, jp, kp, l_h, r_h
+		real(sp), dimension(-l_h+1:kp+r_h), intent(in) :: dz, dzn
+		real(sp), dimension(-r_h+1:kp+r_h,-r_h+1:jp+r_h,-r_h+1:ip+r_h), &
+			intent(inout) :: th, sth
+	    real(sp), dimension(-l_h+1:kp+r_h), intent(in) :: tref,trefn, rhoa, rhoan
+	    
+        ! radiation variables	
+        integer(i4b), intent(in) :: sub_vert_comm
+        real(sp), intent(in) :: time	
+		real(sp), dimension(nbands) :: lambda, b_s_g, lambda_low,&
+										lambda_high, delta_lambda, nrwbin,niwbin,sflux_l
+		real(sp), intent(in), dimension(nprocv) :: mvrecv
+		integer(i4b), intent(in) :: nbands, ns, nl, tdstart,tdend
+		integer(i4b), intent(in) :: nprocv
+		real(sp), intent(inout), dimension(1:tdend) :: a,b,c,r,usol
+		real(sp), dimension(1-r_h:kp+r_h,1-r_h:jp+r_h,1-r_h:ip+r_h,1:nbands), &
+		                intent(inout) :: &
+						flux_d,flux_u
+		real(sp), intent(in) :: lat, lon, albedo, emiss,asymmetry_water
+		integer(i4b), intent(in) :: quad_flag, start_year, start_mon, start_day, &
+									start_hour, start_min, start_sec, nrad
+									
+        real(sp), dimension(1-r_h:kp+r_h,1-r_h:jp+r_h,1-r_h:ip+r_h,1:nrad), intent(in) :: &
+                                                                    ngs,lamgs,mugs
+		!-
+		
+	    ! locals
+		integer(i4b) :: i,j,k
+    	
+        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        ! main solver, solve fluxes in each band                                     !
+        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        call solve_fluxes(start_year,start_mon,start_day, &
+                            start_hour,start_min,start_sec, &
+                            lat, lon, &
+                            time, nbands,ns,nl,ip,jp,kp,r_h, &
+                            tdstart,tdend,a,b,c,r,usol, &
+                            lambda_low, lambda_high, lambda,nrwbin, niwbin, &
+                            b_s_g,sflux_l, &
+                            rhoan, trefn, dz,dzn, albedo, emiss, &
+                            quad_flag, th,flux_u, flux_d, &
+                            asymmetry_water, nrad, ngs,lamgs,mugs, &
+                            .true., &
+                            nprocv,mvrecv, &
+                            coords,dims, id, sub_vert_comm)
+        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+
+        call exchange_d_fluxes(comm3d, id, kp, jp, ip, nbands,&
+                        r_h,r_h,r_h,r_h,r_h, r_h,  flux_d, dims,coords)
+
+        call exchange_u_fluxes(comm3d, id, kp, jp, ip, nbands,&
+                        r_h,r_h,r_h,r_h,r_h, r_h,  flux_u, dims,coords)
+
+        ! calculate changes to temperature here
+        do i=1,ip
+            do j=1,jp
+                do k=1,kp
+                    th(k,j,i)=th(k,j,i)-1._sp/(cp*rhoan(k)*dz(k-1))* &
+                        sum((flux_d(k-1,j,i,:)-flux_u(k-1,j,i,:)) - &
+                         (flux_d(k,j,i,:)-flux_u(k,j,i,:)))*dt
+                        
+                enddo
+            enddo
+        enddo
+        
+        
+
+        call exchange_full(comm3d, id, kp, jp, ip, r_h,r_h,r_h,r_h,l_h,r_h,th,&
+            0._sp,0._sp,dims,coords)	
+	end subroutine radiative_transfer
+	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+
+	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+	!>@author
+	!>Paul J. Connolly, The University of Manchester
+	!>@brief
 	!>find momentum sources and rhs of Poisson equation:
 	!>\f$\nabla ^2 f = \rho \f$
 	!>@param[in] comm3d,id, rank, dims, coords
@@ -518,10 +623,12 @@
 			sub_vert_comm, time,tdstart,tdend, &
             a,b,c,r,usol, &
             nbands, ns,nl, flux_u, flux_d, rad_power, &
-            lambda,lambda_low,lambda_high, delta_lambda,&
+            lambda,lambda_low,lambda_high, delta_lambda,nrwbin, niwbin, &
             sflux_l, b_s_g, &
             start_year,start_mon, start_day,start_hour,start_min,start_sec, &
             lat, lon, albedo, emiss,quad_flag, &
+            asymmetry_water, &
+            nrad,ngs,lamgs,mugs, &
             nprocv,mvrecv)
 		use nrtype
 		use mpi_module, only : exchange_full, exchange_along_dim, exchange_d_fluxes, &
@@ -574,18 +681,22 @@
         integer(i4b), intent(in) :: sub_vert_comm
         real(sp), intent(in) :: time	
 		real(sp), dimension(nbands) :: lambda, b_s_g, lambda_low,&
-										lambda_high, delta_lambda, sflux_l
+										lambda_high, delta_lambda, nrwbin,niwbin,sflux_l
 		real(sp), intent(in), dimension(nprocv) :: mvrecv
 		integer(i4b), intent(in) :: nbands, ns, nl, tdstart,tdend
 		integer(i4b), intent(in) :: nprocv
 		real(sp), intent(inout), dimension(1:tdend) :: a,b,c,r,usol
-		real(sp), dimension(1-r_h:kp+r_h,1-r_h:jp+r_h,1-r_h:ip+r_h,1:nbands) :: &
+		real(sp), dimension(1-r_h:kp+r_h,1-r_h:jp+r_h,1-r_h:ip+r_h,1:nbands), &
+		                intent(inout) :: &
 						flux_d,flux_u
 		real(sp), dimension(1-r_h:kp+r_h,1-r_h:jp+r_h,1-r_h:ip+r_h) :: &
 						rad_power
-		real(sp), intent(in) :: lat, lon, albedo, emiss
+		real(sp), intent(in) :: lat, lon, albedo, emiss,asymmetry_water
 		integer(i4b), intent(in) :: quad_flag, start_year, start_mon, start_day, &
-									start_hour, start_min, start_sec
+									start_hour, start_min, start_sec, nrad
+									
+        real(sp), dimension(1-r_h:kp+r_h,1-r_h:jp+r_h,1-r_h:ip+r_h,1:nrad), intent(in) :: &
+                                                                    ngs,lamgs,mugs
 		!-
 		
 	    ! locals
@@ -727,48 +838,6 @@
                 enddo
             enddo              
 !$omp end simd 
-        endif
-
-
-        if(radiation) then
-            !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-            ! main solver, solve fluxes in each band                                     !
-            !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-            call solve_fluxes(start_year,start_mon,start_day, &
-                                start_hour,start_min,start_sec, &
-                                lat, lon, &
-                                time, nbands,ns,nl,ip,jp,kp,r_h, &
-                                tdstart,tdend,a,b,c,r,usol, &
-                                lambda_low, lambda_high, lambda,b_s_g,sflux_l, &
-                                rhoan, trefn, dz,dzn, albedo, emiss, &
-                                quad_flag, flux_u, flux_d, &
-                                nprocv,mvrecv, &
-                                coords,dims, id, sub_vert_comm)
-            !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-
-
-            call exchange_d_fluxes(comm3d, id, kp, jp, ip, nbands,&
-                            r_h,r_h,r_h,r_h,r_h, r_h,  flux_d, dims,coords)
-
-            call exchange_u_fluxes(comm3d, id, kp, jp, ip, nbands,&
-                            r_h,r_h,r_h,r_h,r_h, r_h,  flux_u, dims,coords)
-
-            ! calculate changes to temperature here
-            do i=1,ip
-                do j=1,jp
-                    do k=1,kp
-                        sth(k,j,i)=sth(k,j,i)+1._sp/(cp*rhoan(k)*dz(k-1))* &
-                            sum((flux_d(k-1,j,i,:)-flux_u(k-1,j,i,:)) - &
-                             (flux_d(k,j,i,:)-flux_u(k,j,i,:)))
-                            
-                    enddo
-                enddo
-            enddo
-            
-            
-
-            call exchange_full(comm3d, id, kp, jp, ip, r_h,r_h,r_h,r_h,l_h,r_h,sth,&
-                0._sp,0._sp,dims,coords)	
         endif
 
 
