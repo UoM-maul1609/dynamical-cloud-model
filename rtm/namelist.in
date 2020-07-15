@@ -38,12 +38,13 @@
  	nm2%quad_flag=0, ! 0 is quadrature, 1 is Eddington
  	nm2%albedo="Grass",
  	nm2%emissivity="Grass",
+ 	nm2%asymmetry_water=0.85,
  	nm2%ns=10,
  	nm2%nl=10,
  	nm2%lambda_s_low=10.e-9,
  	nm2%lambda_s_high=705.e-9,
 	nm2%lambda_read_s(1:10)=100.e-9,200.e-9,300.e-9,350.e-9,400.e-9,450.e-9,500.e-9,550.e-9,600.e-9,700.e-9,
  	nm2%lambda_l_low=705.e-9,
- 	nm2%lambda_l_high=15000.e-9,
-	nm2%lambda_read_l(1:10)=800.e-9,900.e-9,1000.e-9,1100.e-9,1200.e-9,1300.e-9,1400.e-9,1500.e-9,1600.e-9,12000.e-9/ 
+ 	nm2%lambda_l_high=150000.e-9,
+	nm2%lambda_read_l(1:10)=800.e-9,900.e-9,1000.e-9,1100.e-9,1200.e-9,1300.e-9,1400.e-9,10500.e-9,16000.e-9,120000.e-9/ 
 	

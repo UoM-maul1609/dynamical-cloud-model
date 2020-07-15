@@ -22,9 +22,10 @@
 	!>@param[in] theta, thetan: reference variables
 	!>@param[in] tref, trefn: reference variables
 	!>@param[in] rhoa, rhoan: reference variables
-	!>@param[in] lambda, lambda_low, lambda_high, delta_lambda, sflux_l, b_s_g
+	!>@param[in] lambda, lambda_low, lambda_high, delta_lambda, nrwbin,niwbin
+	!>@param[in] sflux_l, b_s_g
 	!>@param[in] start_year, start_mon,start_day,start_hour,start_min,start_sec
-	!>@param[in] lat, lon, albedo, emiss,quad_flag
+	!>@param[in] lat, lon, albedo, emiss,quad_flag, asymmetry_water
 	!>@param[in] coords: for Cartesian topology
 	!>@param[inout] new_file: flag for if this is a new file
 	!>@param[in] outputfile: netcdf output
@@ -44,9 +45,11 @@
 				tref,trefn, &
 				rhoa,rhoan, &
 				lambda,lambda_low,lambda_high, delta_lambda,&
+				nrwbin,niwbin, &
 				sflux_l, b_s_g, &
 				start_year,start_mon, start_day,start_hour,start_min,start_sec, &
 				lat, lon, albedo, emiss,quad_flag, &
+				asymmetry_water, &
 				nprocv,mvrecv, &
 				coords, &
 				new_file,outputfile, output_interval, &
@@ -61,7 +64,7 @@
 		implicit none
 		logical, intent(inout) :: new_file
 		real(sp), dimension(nbands) :: lambda, b_s_g, lambda_low,&
-										lambda_high, delta_lambda, sflux_l
+						lambda_high, delta_lambda, nrwbin, niwbin, sflux_l
 		real(sp), intent(in), dimension(nprocv) :: mvrecv
 		integer(i4b), intent(in) :: ntim,ip,jp,kp, ipp,jpp,kpp, &
 						l_h,r_h, ipstart, jpstart, kpstart, nbands, ns, nl, &
@@ -79,15 +82,19 @@
 		real(sp), dimension(1-l_h:jpp+r_h), intent(in) :: y,dy,dyn
 		real(sp), dimension(1-l_h:kpp+r_h), intent(in) :: z,dz,dzn, theta, thetan, &
 														rhoa, rhoan, tref, trefn
-		real(sp), intent(in) :: lat, lon, albedo, emiss
+		real(sp), intent(in) :: lat, lon, albedo, emiss, asymmetry_water
 		integer(i4b), intent(in) :: quad_flag, start_year, start_mon, start_day, &
 									start_hour, start_min, start_sec
 		! locals:		
 		integer(i4b) :: n,n2, cur=1, i,j,k, error, rank2
 		real(sp) :: time, time_last_output, output_time
-
+        real(sp), dimension(1-r_h:kpp+r_h,1-r_h:jpp+r_h,1-r_h:ipp+r_h) :: th
+        real(sp), dimension(1-r_h:kpp+r_h,1-r_h:jpp+r_h,1-r_h:ipp+r_h,0) :: &
+                ngs,lamgs,mugs
 		
         if(id>=dims(1)*dims(2)*dims(3)) return 
+        
+        th=0._sp ! dummy variable for this code
 
 
 		
@@ -110,9 +117,12 @@
 								lat, lon, &
 								time, nbands,ns,nl,ipp,jpp,kpp,r_h, &
 								tdstart,tdend,a,b,c,r,usol, &
-								lambda_low, lambda_high, lambda,b_s_g,sflux_l, &
+								lambda_low, lambda_high, lambda,nrwbin, niwbin, &
+								b_s_g,sflux_l, &
 								rhoan, trefn, dz,dzn, albedo, emiss, &
-								quad_flag, flux_u, flux_d, &
+								quad_flag, th, flux_u, flux_d, &
+								asymmetry_water, 0, ngs,lamgs,mugs, &
+								.false., &
 								nprocv,mvrecv, &
 								coords,dims, id, sub_comm)
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
