@@ -1471,7 +1471,7 @@
                 
                 
                         if(coords(3)==(dims(3)-1)) then
-                            a(tdend)=0._sp ! no contribution from upward flux in last equation
+                            a(tdend)=1._sp ! no contribution from upward flux in last equation
                             b(tdend)=-1._sp ! was 1
                             r(tdend)=0._sp ! toa downward flux at night
                             c(tdend)=0._sp ! this is specific to parallel
