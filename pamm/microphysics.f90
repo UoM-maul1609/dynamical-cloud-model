@@ -88,13 +88,13 @@
 				fall_q_r, fall_q_c, fall_q_s, fall_q_g, fall_n_r, fall_n_s, fall_n_g, &
 				fall_q_i, fall_n_i, fall_n_c, &
 				phi_r, mass_iacr,num_iacr, mass_sacw_i, mass_iacw, &
-				mass_racs1,mass_racs2,mass_racs3, &
+				mass_raci1,mass_raci2,mass_raci3, &
 				mass_racg1,mass_racg2,mass_racg3, &
-				mass_sacr1,mass_sacr2,mass_sacr3, &
+				mass_iacr1,mass_iacr2,mass_iacr3, &
 				mass_sacg1,mass_sacg2,mass_sacg3, &
 				mass_gacr1,mass_gacr2,mass_gacr3, &
 				mass_gacs1,mass_gacs2,mass_gacs3, &
-				num_racs1,num_racs2,num_racs3, num_racg1,num_racg2,num_racg3, &
+				num_raci1,num_raci2,num_raci3, num_racg1,num_racg2,num_racg3, &
 				num_sacg1, num_sacg2,num_sacg3, &
 				mass_gacw, mass_gaci, &
 				nu_r1,nu_r2,nu_i1, nu_i2, nu_s1, nu_s2, nu_g1, nu_g2, &
@@ -941,13 +941,13 @@
 	
 	! collisions between precipitating particles of different species
 	! rain-snow
-	mass_racs1=gamma(1._sp+alpha_r)*gamma(3._sp+alpha_s+ds)
-	mass_racs2=2._sp*gamma(2._sp+alpha_r)*gamma(2._sp+alpha_s+ds)
-	mass_racs3=gamma(3._sp+alpha_r)*gamma(1._sp+alpha_s+ds)
+	mass_raci1=gamma(1._sp+alpha_r)*gamma(3._sp+alpha_i+di)
+	mass_raci2=2._sp*gamma(2._sp+alpha_r)*gamma(2._sp+alpha_i+di)
+	mass_raci3=gamma(3._sp+alpha_r)*gamma(1._sp+alpha_i+di)
 	
-	num_racs1=gamma(1._sp+alpha_r)*gamma(3._sp+alpha_s)
-	num_racs2=2._sp*gamma(2._sp+alpha_r)*gamma(2._sp+alpha_s)
-	num_racs3=gamma(3._sp+alpha_r)*gamma(1._sp+alpha_s)
+	num_raci1=gamma(1._sp+alpha_r)*gamma(3._sp+alpha_i)
+	num_raci2=2._sp*gamma(2._sp+alpha_r)*gamma(2._sp+alpha_i)
+	num_raci3=gamma(3._sp+alpha_r)*gamma(1._sp+alpha_i)
     ! rain-graupel
 	mass_racg1=gamma(1._sp+alpha_r)*gamma(3._sp+alpha_g+dg)
 	mass_racg2=2._sp*gamma(2._sp+alpha_r)*gamma(2._sp+alpha_g+dg)
@@ -957,9 +957,9 @@
 	num_racg2=2._sp*gamma(2._sp+alpha_r)*gamma(2._sp+alpha_g)
 	num_racg3=gamma(3._sp+alpha_r)*gamma(1._sp+alpha_g)
     ! snow-rain
-	mass_sacr1=gamma(1._sp+alpha_s)*gamma(3._sp+alpha_r+dr)
-	mass_sacr2=2._sp*gamma(2._sp+alpha_s)*gamma(2._sp+alpha_r+dr)
-	mass_sacr3=gamma(3._sp+alpha_s)*gamma(1._sp+alpha_r+dr)
+	mass_iacr1=gamma(1._sp+alpha_i)*gamma(3._sp+alpha_r+dr)
+	mass_iacr2=2._sp*gamma(2._sp+alpha_i)*gamma(2._sp+alpha_r+dr)
+	mass_iacr3=gamma(3._sp+alpha_i)*gamma(1._sp+alpha_r+dr)
     ! snow-graupel
 	mass_sacg1=gamma(1._sp+alpha_s)*gamma(3._sp+alpha_g+dg)
 	mass_sacg2=2._sp*gamma(2._sp+alpha_s)*gamma(2._sp+alpha_g+dg)
@@ -1774,7 +1774,11 @@
 				rcwacr, & ! cloud water number accreted onto rain
 				rraut, &  ! increase in rain number due to autoconversion
     			rrsel, &     ! rain self accretion - number
-    			rcwsel     ! cloud water self accretion - number
+    			rcwsel, &     ! cloud water self accretion - number
+    			praci, & ! rain accreting ice - mass
+    			rraci, &  ! rain accreting ice - number
+    			piacr, & ! ice accreting rain - mass
+    			riacr  ! ice accreting rain - number
     				    
     real(sp) :: pgwet ! amount of liquid that graupel can freeze without shedding
     								
@@ -1860,6 +1864,10 @@
     rraut=0._sp
     rrsel=0._sp
     rcwsel=0._sp
+    praci=0._sp
+    rraci=0._sp
+    piacr=0._sp
+    riacr=0._sp
     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     
     
@@ -1885,6 +1893,8 @@
         ! ice
         vqi(:)=min(max(fall_q_i*rho_fac * lam_i**(1._sp+alpha_i+di) / &
             (lam_i+f_i)**(1._sp+alpha_i+di+b_i), 0._sp), 10._sp)
+        vni(:)=max(fall_n_i*rho_fac * lam_i**(1._sp+alpha_i) / &
+            (lam_i+f_i)**(1._sp+alpha_i+b_i), 0._sp)
 
         ! precipitation
         precip(1:kp,2)=n_i(1:kp)*(a_i*chi_num_ice/(lam_i(1:kp)**(alpha_i+b_i+1._sp)) - &
@@ -2149,6 +2159,92 @@
         
         
         
+		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+		! collisions between precipitating particles of different species                !
+		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+		if(ice_flag.and.(t(k).lt.268._sp)) then
+			praci(k)=max(n_r(k)*n_i(k)*pi/(4._sp*rho(k))*eri*ci*max((vqi(k)+vqr(k))/8._sp,abs(vqi(k)-vqr(k))) * &
+					( &
+					mass_raci1/(lam_r(k)**(1._sp+alpha_r) *lam_i(k)**(3._sp+alpha_i+di)) + &
+					mass_raci2/(lam_r(k)**(2._sp+alpha_r) *lam_i(k)**(2._sp+alpha_i+di)) + &
+					mass_raci3/(lam_r(k)**(3._sp+alpha_r) *lam_i(k)**(1._sp+alpha_i+di))  &
+					) , 0._sp)  
+			praci(k)=min(praci(k),q(k,iqi)/dt)
+			
+			rraci(k)=max(n_i(k)*n_r(k)*pi/(4._sp*rho(k))*eri*max((vnr(k)+vni(k))/8._sp,abs(vnr(k)-vni(k))) * &
+					( &
+					num_raci1/(lam_i(k)**(1._sp+alpha_i) *lam_r(k)**(3._sp+alpha_r)) + &
+					num_raci2/(lam_i(k)**(2._sp+alpha_i) *lam_r(k)**(2._sp+alpha_r)) + &
+					num_raci3/(lam_i(k)**(3._sp+alpha_i) *lam_r(k)**(1._sp+alpha_r))  &
+					)    , 0._sp)    
+			rraci(k)=min(rraci(k),q(k,ini)/dt)
+
+			piacr(k)=max(n_i(k)*n_r(k)*pi/(4._sp*rho(k))*eri*cr*max((vqr(k)+vqi(k))/8._sp,abs(vqr(k)-vqi(k))) * &
+					( &
+					mass_iacr1/(lam_i(k)**(1._sp+alpha_i) *lam_r(k)**(3._sp+alpha_r+dr)) + &
+					mass_iacr2/(lam_i(k)**(2._sp+alpha_i) *lam_r(k)**(2._sp+alpha_r+dr)) + &
+					mass_iacr3/(lam_i(k)**(3._sp+alpha_i) *lam_r(k)**(1._sp+alpha_r+dr))  &
+					)    , 0._sp)    
+			piacr(k)=min(piacr(k),q(k,iqr)/dt)   		
+			riacr(k)=rraci(k)
+			
+			
+            !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+            ! remove aerosol from rain water and add to ice                              !
+            !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+            do i=1,n_mode-1
+                !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+                ! remove from rain water:                                                !
+                !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+                ! number in aerosol modes
+                dummy1=q(k,cst(cat_r)+2+(i-1)*3)*piacr(k)*dt/q(k,  iqr)
+                q(k,cst(cat_r)+(i-1)*3+2)=q(k,cst(cat_r)+(i-1)*3+2)-dummy1 
+                
+                ! surface area in aerosol modes
+                dummy2=q(k,cst(cat_r)+3+(i-1)*3)*piacr(k)*dt/q(k,  iqr)
+                q(k,cst(cat_r)+(i-1)*3+3)=q(k,cst(cat_r)+(i-1)*3+3)-dummy2
+                
+                ! mass in aerosol modes
+                dummy3=q(k,cst(cat_r)+4+(i-1)*3)*piacr(k)*dt/q(k,  iqr)
+                q(k,cst(cat_r)+(i-1)*3+4)=q(k,cst(cat_r)+(i-1)*3+4)-dummy3
+                !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+
+                !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+                ! add to aerosol particles in ice water                                  !
+                !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+                ! number in aerosol modes
+                ! qv, n_mode aerosol + 1
+                q(k,iai+(i-1)*3)=q(k,iai+(i-1)*3)+dummy1 
+                
+                ! surface area in aerosol modes
+                q(k,iai+(i-1)*3+1)=q(k,iai+(i-1)*3+1)+dummy2 
+                
+                ! mass in aerosol modes
+                q(k,iai+(i-1)*3+2)=q(k,iai+(i-1)*3+2)+dummy3
+                !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+            enddo
+
+			! iacr is a source of ice mass only - not number
+            ! increase ice crystal mass
+            q(k  ,iqi)  =q(k  ,iqi)+piacr(k)*dt
+            ! increase rime mass of ice
+            q(k,  iqi+4)=q(k  ,iqi+4)+piacr(k)*dt
+            ! iacr is a sink of rain mass and number
+            q(k,  iqr)  =q(k, iqr)-piacr(k)*dt
+            q(k,  inr)  =q(k, inr)-riacr(k)*dt
+            
+            ! multiplication according to new lab results...
+!            nfrag=piacr(k)*dt*5._sp /(pi/6._sp*1000._sp*2.e-3_sp**3)
+            ! increase ice crystal number
+!            q(k  ,ini)=q(k  ,ini)+nfrag
+            ! increase ice crystal shape factor
+!            q(k  ,iqi+1)=q(k  ,iqi+1)+nfrag
+            ! increase ice crystal monomers
+!            q(k  ,iqi+3)=q(k  ,iqi+3)+nfrag
+            
+		endif
+        		
         
         
     
@@ -2202,8 +2298,8 @@
                     lam_freeze=(q(k,  inc)/dummy1*gam2c/gam1c)
                     n0_freeze = q(k,  inc)/gam1c*lam_freeze**(alpha_c+1)
                     ! lawson et al
-                    nfrag = 2.5e13_sp*n0_freeze/(cc**(4._sp/dc))* &
-                        gam3c/(lam_freeze**(4._sp/dc+1._sp+alpha_c))
+!                     nfrag = 2.5e13_sp*n0_freeze/(cc**(4._sp/dc))* &
+!                         gam3c/(lam_freeze**(4._sp/dc+1._sp+alpha_c))
                 endif
                 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
                 
@@ -2315,8 +2411,8 @@
                     lam_freeze=(q(k,  inr)/dummy1*gam2r/gam1r)**(1._sp/dr)
                     n0_freeze = q(k,  inr)/gam1r*lam_freeze**(alpha_r+1)
                     ! lawson et al
-                    nfrag = 2.5e13_sp*n0_freeze* &
-                        gam3r/(lam_freeze**(5._sp+alpha_r))
+!                     nfrag = 2.5e13_sp*n0_freeze* &
+!                         gam3r/(lam_freeze**(5._sp+alpha_r))
                 endif
                 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
@@ -2534,13 +2630,13 @@
             riaci(k)=eii(k)*dummy1
             
             ! Vardiman approximate - 3 particles for every collision that doesn't aggregate
-            dummy2=min(dummy1*(1._sp-eii(K))*3._sp*dt,q(k,ini)*0.1_sp)
-
-            phi=min(max(q(k,iqi+1) / (q(k,ini)+qsmall),1.e-5_sp),100._sp) 
-                                                            ! calculate old shape
-            q(k,ini)=q(k,ini)+dummy2
-            q(k,iqi+3)=q(k,iqi+3)+dummy2 ! update the number of monomers
-            q(k,iqi+1)=phi*q(k,ini)   ! update shape variable
+!             dummy2=min(dummy1*(1._sp-eii(K))*3._sp*dt,q(k,ini)*0.1_sp)
+! 
+!             phi=min(max(q(k,iqi+1) / (q(k,ini)+qsmall),1.e-5_sp),100._sp) 
+!                                                             ! calculate old shape
+!             q(k,ini)=q(k,ini)+dummy2
+!             q(k,iqi+3)=q(k,iqi+3)+dummy2 ! update the number of monomers
+!             q(k,iqi+1)=phi*q(k,ini)   ! update shape variable
             
             
         endif
