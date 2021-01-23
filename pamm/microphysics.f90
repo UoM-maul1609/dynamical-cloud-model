@@ -1346,7 +1346,7 @@
 	integer(i4b) :: i,j,k,n, error,n1
 #if MPI_PAMM == 1
 	real(sp), dimension(-l_h+1:kp+r_h,-l_h+1:jp+r_h,-l_h+1:ip+r_h) :: & 
-	                vqr, vqc, vqi
+	                vqr, vqc, vqi, vni
 	integer(i4b), dimension(3) :: n_step,n_step_o,n_step_g
     integer(i4b), intent(in) :: id, comm,comm_vert
     integer(i4b), dimension(3), intent(in) :: coords, dims
@@ -1378,7 +1378,7 @@
 		                kp,l_h,dt,dz,dzn,q(:,j,i,:),precip(:,j,i,:),th(:,j,i),&
 		                    prefn, &
 							z(:),thetan,rhoa(:),rhoan(:),w(:,j,i), &
-							vqc(:,j,i),vqr(:,j,i),vqi(:,j,i),n_step, adv_l, &
+							vqc(:,j,i),vqr(:,j,i),vqi(:,j,i),vni(:,j,i),n_step, adv_l, &
 							coords, &
     						micro_init,hm_flag, mass_ice, ice_flag, &
     						.true.,.true.,theta_flag, &
@@ -1570,7 +1570,7 @@
 	! locals
 	integer(i4b) :: i
 #if MPI_PAMM == 1
-    real(sp), dimension(-o_halo+1:kp+o_halo,-o_halo+1:ip+o_halo) :: vqc,vqr, vqi
+    real(sp), dimension(-o_halo+1:kp+o_halo,-o_halo+1:ip+o_halo) :: vqc,vqr, vqi, vni
     integer(i4b), dimension(3) :: n_step, n_step_o
     logical, dimension(3) :: adv_l=[.false.,.false.,.false.]
     integer(i4b), dimension(3) :: coords
@@ -1594,7 +1594,7 @@
 		                cat_am,cat_c, cat_r, cat_i,nprec, &
 		                kp,o_halo,dt,dz,dzn,q(:,i,:),precip(:,i,:),theta(:,i),p(:,i), &
 							z(:),theta_ref,rho(:,i),rhon(:),w(:,i), &
-							vqc(:,i),vqr(:,i),vqi(:,i), n_step, adv_l, coords,&
+							vqc(:,i),vqr(:,i),vqi(:,i), vni(:,i), n_step, adv_l, coords,&
     						micro_init,hm_flag, mass_ice, ice_flag, &
     						wr_flag,rm_flag,theta_flag, &
     						j_stochastic,ice_nuc_flag)
@@ -1690,7 +1690,7 @@
     subroutine p_microphysics_1d(nq,ncat,n_mode,cst,cen, inc, iqc, inr,iqr,ini,iqi,iai,&
                             cat_am,cat_c, cat_r, cat_i,nprec,&
                             kp,o_halo,dt,dz,dzn,q,precip,th,p, z,theta,rhoa,rhon,u, &
-                            vqc,vqr,vqi,n_step, adv_l, coords,&
+                            vqc,vqr,vqi,vni,n_step, adv_l, coords,&
     						micro_init,hm_flag, mass_ice,ice_flag, &
     						wr_flag, rm_flag, theta_flag, &
     						j_stochastic,ice_nuc_flag)
@@ -1791,7 +1791,7 @@
 	real(sp), dimension(1-o_halo:kp+o_halo) :: vqr, vqs, vqg, vqi, vns, vng, vni, &
 	                                        vqc
 #else
-	real(sp), intent(inout), dimension(1-o_halo:kp+o_halo) :: vqr, vqc, vqi
+	real(sp), intent(inout), dimension(1-o_halo:kp+o_halo) :: vqr, vqc, vqi, vni
 #endif
 	real(sp), dimension(1-o_halo:kp+o_halo) :: t
 	! coalescence efficiencies
