@@ -17,8 +17,10 @@ FOR2 = mpif90
 AR = ar 
 RANLIB = ranlib 
 OBJ = o
-FFLAGS = $(OPT)  $(DEBUG)  -o 
-FFLAGS2 =  $(DEBUG) -O0 -o 
+
+FFLAGS = $(OPT)  $(DEBUG) -w -fallow-argument-mismatch -o 
+#FFLAGSOMP = -fopenmp-simd $(FFLAGS)
+FFLAGS2 =  $(DEBUG) -w -fallow-argument-mismatch -O3 -o 
 
 
 pmicro_lib.a	:   nrtype.$(OBJ) nr.$(OBJ) nrutil.$(OBJ) locate.$(OBJ) polint.$(OBJ) \
