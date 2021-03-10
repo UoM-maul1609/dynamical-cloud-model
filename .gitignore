@@ -13,4 +13,6 @@ papers
 tests
 matlab-dev
 *.dSYM
-
+__pycache__
+correlated_k_distribution_single.py
+correlated_k_distribution.py
