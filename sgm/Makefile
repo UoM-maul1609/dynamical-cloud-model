@@ -19,9 +19,9 @@ FOR2 = mpif90
 AR = ar 
 RANLIB = ranlib 
 OBJ = o
-FFLAGS = $(OPT)  $(DEBUG)  -o 
+FFLAGS = $(OPT)  $(DEBUG) -w -fallow-argument-mismatch -o 
 FFLAGSOMP = -fopenmp-simd $(FFLAGS)
-FFLAGS2 =  $(DEBUG) -O3 -o 
+FFLAGS2 =  $(DEBUG) -w -fallow-argument-mismatch -O3 -o 
 
 all: main.exe main_ser_1d.exe main_ser_2d.exe
 
