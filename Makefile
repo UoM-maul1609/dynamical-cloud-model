@@ -29,9 +29,10 @@ FOR2 = mpif90
 AR = ar 
 RANLIB = ranlib 
 OBJ = o
-FFLAGS = $(OPT)  $(DEBUG)  -o 
-FFLAGSOMP = -fopenmp $(FFLAGS) #-fopenmp-simd
-FFLAGS2 =  $(DEBUG) -O3 -o 
+
+FFLAGS = $(OPT)  $(DEBUG) -w -fallow-argument-mismatch -o 
+FFLAGSOMP = -fopenmp-simd $(FFLAGS)
+FFLAGS2 =  $(DEBUG) -w -fallow-argument-mismatch -O3 -o 
 
 
 main.exe	:  main.$(OBJ) variables.$(OBJ) nrtype.$(OBJ) mpi_module.$(OBJ) \
