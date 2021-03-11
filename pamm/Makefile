@@ -18,9 +18,9 @@ AR = ar
 RANLIB = ranlib 
 OBJ = o
 
-FFLAGS = $(OPT)  $(DEBUG) -w -fallow-argument-mismatch -o 
+FFLAGS = $(OPT)  $(DEBUG) -w -o 
 #FFLAGSOMP = -fopenmp-simd $(FFLAGS)
-FFLAGS2 =  $(DEBUG) -w -fallow-argument-mismatch -O3 -o 
+FFLAGS2 =  $(DEBUG) -w -O3 -o 
 
 
 pmicro_lib.a	:   nrtype.$(OBJ) nr.$(OBJ) nrutil.$(OBJ) locate.$(OBJ) polint.$(OBJ) \
