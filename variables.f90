@@ -73,7 +73,7 @@
             			adiabatic_prof=.false.,divergence, &
             			param_wind=.false.
             integer(i4b) :: nq,ip, jp, kp, subgrid_model, advection_scheme, kord, &
-                        microphysics_flag,nprec, ice_nuc_flag=1
+                        microphysics_flag,nprec, ice_nuc_flag=1, mode2_ice_flag=0
             real(sp) :: vis, &
             			runtime, dt, output_interval, &
             			rotation_period_hours, &

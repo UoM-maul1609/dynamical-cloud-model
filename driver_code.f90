@@ -104,7 +104,7 @@
 				advection_scheme, kord, monotone, &
 				moisture, microphysics_flag, ice_flag, hm_flag, theta_flag, &
 				damping_layer,forcing, divergence, radiation, &
-				j_stochastic, ice_nuc_flag, &
+				j_stochastic, ice_nuc_flag, mode2_ice_flag, &
 				nq, nprec, ncat, &
                     tdstart,tdend, &
                     a,b,c,r,usol, &
@@ -135,7 +135,7 @@
 		logical, intent(in) :: viscous, monotone, moisture, &
 		                    damping_layer, forcing, theta_flag, ice_flag, hm_flag, &
 		                    divergence, radiation
-		integer(i4b), intent(in) :: ice_nuc_flag, nrad
+		integer(i4b), intent(in) :: ice_nuc_flag, nrad, mode2_ice_flag
 		logical, intent(inout) :: micro_init
 		integer(i4b), intent(in) :: ntim,ip,jp,kp, ipp,jpp,kpp, &
 						l_h,r_h, ipstart, jpstart, kpstart, &
@@ -525,7 +525,8 @@
                                         zn(:),thetan,rhoa,rhoan,w(:,:,:), &
                                         micro_init,hm_flag,1.e-14_sp, &
                                         ice_flag, theta_flag, &
-                                        j_stochastic, ice_nuc_flag, radiation, &
+                                        j_stochastic, ice_nuc_flag, mode2_ice_flag, &
+                                        radiation, &
                                         ring_comm,sub_vert_comm,id,dims,coords)		
                     case default
                         print *,'not coded'
