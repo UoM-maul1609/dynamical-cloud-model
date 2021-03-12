@@ -23,6 +23,7 @@
     		w_test, act_frac1, smax1, dcrit2, &
     		a_eq_7, b_eq_7, &
     		ctmm_activation, initialise_arrays, read_in_bam_namelist
+    use numerics, only : quad2d_qgaus, invgammainc
     
     private
     public :: p_microphysics_3d, &
@@ -30,7 +31,10 @@
             p_initialise_aerosol_3d,p_initialise_aerosol, p_initialise_aerosol_1d, &
             calculate_gamma_params
             
-            
+    real(sp) :: mrthresh, mrupper, miupper, f_mode2, lambda0r, lambda0i, n0r, n0i, &
+            pthreshr, pthreshi
+    real(sp), parameter :: phi_mode2=0.35_sp, probthresh=0.9999_sp
+    
     ! Chen and Lamb (1994) Gamma variable fit (scaled and centred logarithm)
     integer(i4b), parameter :: n_cl=18
     real(sp), dimension(n_cl), parameter :: gam_cl=[-0.072328469664620_sp, &
@@ -49,7 +53,8 @@
     					   cp=1005._sp, cw=4187._sp, cice=2093._sp, r=8.314_sp, &
     						mw=18e-3_sp, ma=29e-3_sp, ra=r/ma,rv=r/mw, eps1=ra/rv, &
     						ttr=273.15_sp, joules_in_an_erg=1.0e-7_sp, &
-    						joules_in_a_cal=4.187_sp
+    						joules_in_a_cal=4.187_sp, &
+    						gamma_liq=0.072_sp, DEcrit=0.2_sp
     						
     						
     ! mass-diameter and size spectra relations
@@ -1048,6 +1053,11 @@
     xstar=2.6e-10_sp ! kg
     
     
+    ! mode 2 multiplication - specify the limit of integration for gamma distribution
+    pthreshr=invgammainc(probthresh,alpha_r+1.0_sp)
+    pthreshi=invgammainc(probthresh,alpha_i+1.0_sp)
+    
+    
     ! for radiation - converting number-mass to number-diameter
     gam1cr=gamma(alpha_c+1._sp+1._sp/dc)
     gam2cr=gamma(alpha_c+1._sp+2._sp/dc)
@@ -1260,7 +1270,7 @@
 	!>@param[in] mass_ice: mass of a single ice crystal (override)
 	!>@param[in] ice_flag: ice microphysics
 	!>@param[in] theta_flag: whether to alter theta
-	!>@param[in] j_stochastic, ice_nuc_flag, calc_params
+	!>@param[in] j_stochastic, ice_nuc_flag, mode2_ice_flag, calc_params
     subroutine p_microphysics_3d(nq,ncat,n_mode,cst,cen,inc,iqc, inr,iqr,ini,iqi,iai, &
                     cat_am,cat_c, cat_r, cat_i,&
                     nprec, &
@@ -1268,7 +1278,7 @@
                     nrad,ngs,lamgs,mugs, &
                     precip,th,prefn, z,thetan,rhoa,rhoan,w, &
     				micro_init,hm_flag, mass_ice, ice_flag, theta_flag, &
-    				j_stochastic,ice_nuc_flag,calc_params)
+    				j_stochastic,ice_nuc_flag,mode2_ice_flag, calc_params)
 #else
 	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 	!>@author
@@ -1303,7 +1313,7 @@
 	!>@param[in] mass_ice: mass of a single ice crystal (override)
 	!>@param[in] ice_flag: ice microphysics
 	!>@param[in] theta_flag: whether to alter theta
-	!>@param[in] j_stochastic, ice_nuc_flag, calc_parms
+	!>@param[in] j_stochastic, ice_nuc_flag, mode2_ice_flag, calc_parms
 	!>@param[in] comm,comm_vert,id,dims,coords: MPI variables
     subroutine p_microphysics_3d(nq,ncat,n_mode,cst,cen,inc,iqc, inr,iqr,ini,iqi,iai, &
                     cat_am,cat_c, cat_r, cat_i,&
@@ -1312,7 +1322,7 @@
                     nrad,ngs,lamgs,mugs, &
                     th,prefn, z,thetan,rhoa,rhoan,w, &
     				micro_init,hm_flag, mass_ice, ice_flag, theta_flag, &
-    				j_stochastic,ice_nuc_flag, calc_params, &
+    				j_stochastic,ice_nuc_flag, mode2_ice_flag, calc_params, &
     				comm,comm_vert,id,dims,coords)
     use mpi
 	use advection_s_3d, only : mpdata_vec_vert_3d, mpdata_vert_3d
@@ -1334,7 +1344,7 @@
         prefn
     real(sp), dimension(-l_h+1:kp+r_h,-l_h+1:jp+r_h,-l_h+1:ip+r_h), intent(in) :: w
     logical, intent(in) :: ice_flag, hm_flag, theta_flag, calc_params
-    integer(i4b), intent(in) :: ice_nuc_flag
+    integer(i4b), intent(in) :: ice_nuc_flag, mode2_ice_flag
     logical , intent(inout) :: micro_init
     real(sp), intent(in) :: mass_ice, j_stochastic
     
@@ -1370,7 +1380,7 @@
 							z(:),thetan,rhoa(:),rhoan(:),w(:,j,i), &
     						micro_init,hm_flag, mass_ice, ice_flag, &
     						.true.,.true.,theta_flag, &
-    						j_stochastic,ice_nuc_flag)
+    						j_stochastic,ice_nuc_flag,mode2_ice_flag)
 #else
 
     		call p_microphysics_1d(nq,ncat,n_mode,cst,cen,inc,iqc,inr,iqr, ini,iqi,iai, &
@@ -1382,7 +1392,7 @@
 							coords, &
     						micro_init,hm_flag, mass_ice, ice_flag, &
     						.true.,.true.,theta_flag, &
-    						j_stochastic,ice_nuc_flag)
+    						j_stochastic,ice_nuc_flag, mode2_ice_flag)
     		n_step_o=max(n_step,n_step_o)
 
     		adv_l_o=adv_l_o .or. adv_l ! if there has been a true at any point, 
@@ -1540,13 +1550,13 @@
 	!>@param[in] wr_flag: warm rain on /off
 	!>@param[in] rm_flag: riming on /off
 	!>@param[in] theta_flag: whether to alter theta
-	!>@param[in] j_stochastic, ice_nuc_flag
+	!>@param[in] j_stochastic, ice_nuc_flag, mode2_ice_flag
     subroutine p_microphysics_2d(nq,ncat,n_mode,cst,cen,inc,iqc,inr,iqr,ini,iqi,iai, &
                     cat_am,cat_c, cat_r, cat_i,nprec, &
                     ip,kp,o_halo,dt,dz,dzn,q,precip,theta,p, z,theta_ref,rho,rhon,w, &
     						micro_init,hm_flag, mass_ice, ice_flag, &
     						wr_flag, rm_flag, theta_flag, &
-    						j_stochastic,ice_nuc_flag)
+    						j_stochastic,ice_nuc_flag,mode2_ice_flag)
     implicit none
     ! arguments:
     integer(i4b), intent(in) :: nq, ncat, n_mode, ip,kp, o_halo, inc, iqc, inr,iqr, &
@@ -1562,7 +1572,7 @@
                     rhon, theta_ref
     real(sp), dimension(-o_halo+1:kp+o_halo,-o_halo+1:ip+o_halo), intent(in) :: w
     logical, intent(in) :: hm_flag, ice_flag, wr_flag, rm_flag, theta_flag
-    integer(i4b), intent(in) :: ice_nuc_flag
+    integer(i4b), intent(in) :: ice_nuc_flag, mode2_ice_flag
     logical , intent(inout) :: micro_init
     real(sp), intent(in) :: mass_ice, j_stochastic
 
@@ -1588,7 +1598,7 @@
 							z(:),theta_ref,rho(:,i),rhon(:),w(:,i), &
     						micro_init,hm_flag, mass_ice, ice_flag, &
     						wr_flag,rm_flag,theta_flag, &
-    						j_stochastic,ice_nuc_flag)
+    						j_stochastic,ice_nuc_flag,mode2_ice_flag)
 #else
 		call p_microphysics_1d(nq,ncat,n_mode,cst,cen,inc,iqc,inr,iqr, ini,iqi,iai,&
 		                cat_am,cat_c, cat_r, cat_i,nprec, &
@@ -1597,7 +1607,7 @@
 							vqc(:,i),vqr(:,i),vqi(:,i), vni(:,i), n_step, adv_l, coords,&
     						micro_init,hm_flag, mass_ice, ice_flag, &
     						wr_flag,rm_flag,theta_flag, &
-    						j_stochastic,ice_nuc_flag)
+    						j_stochastic,ice_nuc_flag,mode2_ice_flag)
     	n_step_o=max(n_step_o,n_step)
 #endif	
 	enddo
@@ -1643,13 +1653,13 @@
 	!>@param[in] wr_flag: warm rain
 	!>@param[in] rm_flag: riming flag
 	!>@param[in] theta_flag: whether to alter theta
-	!>@param[in] j_stochastic, ice_nuc_flag
+	!>@param[in] j_stochastic, ice_nuc_flag,mode2_ice_flag
     subroutine p_microphysics_1d(nq,ncat,n_mode,cst,cen, inc, iqc, inr,iqr, ini,iqi,iai,&
                             cat_am,cat_c, cat_r, cat_i,nprec, &
                             kp,o_halo,dt,dz,dzn,q,precip,th,p, z,theta,rhoa,rhon,u, &
     						micro_init,hm_flag, mass_ice,ice_flag, &
     						wr_flag, rm_flag, theta_flag, &
-    						j_stochastic,ice_nuc_flag)
+    						j_stochastic,ice_nuc_flag,mode2_ice_flag)
 #else
 	!>@author
 	!>Paul J. Connolly, The University of Manchester
@@ -1686,14 +1696,14 @@
 	!>@param[in] wr_flag: warm rain
 	!>@param[in] rm_flag: riming flag
 	!>@param[in] theta_flag: whether to alter theta
-	!>@param[in] j_stochastic, ice_nuc_flag
+	!>@param[in] j_stochastic, ice_nuc_flag,mode2_ice_flag
     subroutine p_microphysics_1d(nq,ncat,n_mode,cst,cen, inc, iqc, inr,iqr,ini,iqi,iai,&
                             cat_am,cat_c, cat_r, cat_i,nprec,&
                             kp,o_halo,dt,dz,dzn,q,precip,th,p, z,theta,rhoa,rhon,u, &
                             vqc,vqr,vqi,vni,n_step, adv_l, coords,&
     						micro_init,hm_flag, mass_ice,ice_flag, &
     						wr_flag, rm_flag, theta_flag, &
-    						j_stochastic,ice_nuc_flag)
+    						j_stochastic,ice_nuc_flag,mode2_ice_flag)
 #endif
 
 	use advection_1d
@@ -1713,7 +1723,7 @@
                                                     rhon, theta,p
     real(sp), dimension(-o_halo+1:kp+o_halo), intent(in) :: u
     logical, intent(in) :: hm_flag, ice_flag, wr_flag, rm_flag, theta_flag
-    integer(i4b), intent(in) :: ice_nuc_flag
+    integer(i4b), intent(in) :: ice_nuc_flag, mode2_ice_flag
     logical , intent(inout) :: micro_init
     real(sp), intent(in) :: mass_ice, j_stochastic
     ! locals:
@@ -2234,14 +2244,42 @@
             q(k,  iqr)  =q(k, iqr)-piacr(k)*dt
             q(k,  inr)  =q(k, inr)-riacr(k)*dt
             
-            ! multiplication according to new lab results...
-!            nfrag=piacr(k)*dt*5._sp /(pi/6._sp*1000._sp*2.e-3_sp**3)
-            ! increase ice crystal number
-!            q(k  ,ini)=q(k  ,ini)+nfrag
-            ! increase ice crystal shape factor
-!            q(k  ,iqi+1)=q(k  ,iqi+1)+nfrag
-            ! increase ice crystal monomers
-!            q(k  ,iqi+3)=q(k  ,iqi+3)+nfrag
+            
+            if(mode2_ice_flag.eq.1) then
+            
+                ! calculate the number of fragments
+                lambda0r=lam_r(k)
+                lambda0i=lam_i(k)
+                mrthresh=cr*150.e-6_sp**dr
+                mrupper=cr*(pthreshr/lambda0r)**dr
+                miupper=ci*(pthreshi/lambda0i)**di
+                mrupper=min(mrupper,miupper)
+            
+                ! only call integral if mrupper gt mrthresh
+                if((mrupper.gt.mrthresh).and.(q(k,iqr).gt.qsmall) &
+                    .and.(q(k,iqi).gt.qsmall)) then
+
+                    f_mode2=min(-cw*(t(k)-ttr)/lf,1.0_sp)
+                    n0r=n_r(k)
+                    n0i=n_i(k)
+
+
+                    call quad2d_qgaus(dintegral_mode2, &
+                        limit1_mode2,limit2_mode2,mrthresh,mrupper,dummy3)
+                    ! multiplication according to new lab results...
+                    nfrag=dummy3
+        !            nfrag=piacr(k)*dt*5._sp /(pi/6._sp*1000._sp*2.e-3_sp**3)
+                    ! increase ice crystal number
+                    q(k  ,ini)=q(k  ,ini)+nfrag
+                    ! increase ice crystal shape factor
+                    q(k  ,iqi+1)=q(k  ,iqi+1)+nfrag
+                    ! increase ice crystal monomers
+                    q(k  ,iqi+3)=q(k  ,iqi+3)+nfrag
+                endif
+            endif            
+            
+            
+            
             
 		endif
         		
@@ -3516,6 +3554,69 @@
 	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 
+    
+	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    ! This evaluates the integrand                                                       !
+    ! for mode 2 ice multiplication                                                      !
+	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    function dintegral_mode2(x,y)
+        use numerics_type, only : wp
+        implicit none
+        real(wp), intent(in) :: x
+        real(wp), dimension(:), intent(in) :: y
+        real(wp), dimension(size(y)) :: dintegral_mode2
+        real(wp) :: diamr, mr, vr
+        real(wp), dimension(size(y)) :: mi, diami, delv, vi, k0, de, nfrag, nfrag_freeze1, &
+            nfrag_freeze2
+
+
+        mr=x
+        mi=y
+        diamr=(mr/cr)**(1.0_wp/dr)
+        diami=(mi/ci)**(1.0_wp/di)
+        ! fall-speeds
+        vr=a_r*diamr**b_r
+        vi=a_i*diami**b_i
+        delv=abs(vr-vi)
+        !delv=max((vx+vy)/8.0,abs(vx-vy))
+        ! last bit is to convert to integral over m
+        dintegral_mode2=eri*pi/4.0_wp*(diamr+diami)**2* &
+            delv*n0r*diamr**alpha_r* &
+            exp(-lambda0r*diamr)*n0i*diami**alpha_i*exp(-lambda0i*diami)* &
+            (diamr**(1.0_wp-dr)) / (cr*dr)*(diami**(1.0_wp-di)) / (ci*di)
+        
+        ! cke from equation 6
+        k0=0.5_wp*(mr*mi/(mr+mi))*(vr-vi)**2
+        ! de parameter
+        de=k0/(gamma_liq*pi*diamr**2)
+        ! number of fragments in spalsh
+        nfrag=3.0_wp*max(de-decrit, 0.0_wp)
+        ! number of fragments in splash that freeze due to mode 1
+        nfrag_freeze1=nfrag*f_mode2
+        ! number of fragments in splash that freeze due to mode 2
+        nfrag_freeze2=nfrag*(1.0_wp-f_mode2)*phi_mode2
+        
+        dintegral_mode2=dintegral_mode2*nfrag_freeze2
+    
+    end function dintegral_mode2
+	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+
+    function limit1_mode2(x)
+        use numerics_type, only : wp
+        implicit none
+        real(wp), intent(in) :: x
+        real(wp) :: limit1_mode2
+        limit1_mode2=x
+    end function limit1_mode2
+!
+    function limit2_mode2(x)
+        use numerics_type, only : wp
+        implicit none
+        real(wp), intent(in) :: x
+        real(wp) :: limit2_mode2
+        limit2_mode2=miupper
+    end function limit2_mode2
 
 
     end module p_micro_module
