@@ -302,7 +302,6 @@
             !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         endif
 
-
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         ! Driver code: time-loop, advance solution, output	   				   !
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -346,7 +345,7 @@
 				nm1%hm_flag, &
 				nm1%theta_flag, &
 				nm1%damping_layer,  nm1%forcing, nm1%divergence, nm1%radiation, &
-				nm1%j_stochastic, nm1%ice_nuc_flag, nm1%mode2_ice_flag, &
+				nm1%j_stochastic, nm1%ice_nuc_flag, nm1%mode2_ice_flag, nm1%heyms_west, &
 				grid1%nq, grid1%nprec, grid1%ncat, &
                     radg1%tdstart,radg1%tdend, &
                     radg1%a,radg1%b,radg1%c,radg1%r,radg1%u, &
