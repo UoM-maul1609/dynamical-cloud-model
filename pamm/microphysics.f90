@@ -33,7 +33,7 @@
             
     real(sp) :: mrthresh, mrupper, miupper, f_mode2, lambda0r, lambda0i, n0r, n0i, &
             pthreshr, pthreshi
-    real(sp), parameter :: phi_mode2=0.35_sp, probthresh=0.9999_sp
+    real(sp), parameter :: phi_mode2=0.35_sp, probthresh=0.9999_sp, grav=9.81_sp
     
     ! Chen and Lamb (1994) Gamma variable fit (scaled and centred logarithm)
     integer(i4b), parameter :: n_cl=18
@@ -82,6 +82,7 @@
     real(sp), parameter :: hm_rate=3.5e8_sp, nar=1.1e15_sp, nbr=0._sp, &
     						rho0=1.2_sp, bbigg=100._sp, abigg=0.66_sp
     real(sp) :: mi0=1.e-14_sp
+    
 
 	! coalescence efficiencies
 	real(sp), parameter :: erw=1._sp, erg=1._sp, ers=1._sp, eri=1._sp, esw=1._sp, &
@@ -90,6 +91,7 @@
 	! variables used in various process rates:
 	real(sp) :: gam1r,gam2r,gam3r,gam1c, gam2c, gam3c, &
 	            gam1i,gam2i, gam1s, gam2s,gam1g,gam2g, &
+	            gam3ai,gam3bi,gam4ai,gam4bi,gam5ai,gam5bi, fall_q_i_hw,fall_n_i_hw, &
 				fall_q_r, fall_q_c, fall_q_s, fall_q_g, fall_n_r, fall_n_s, fall_n_g, &
 				fall_q_i, fall_n_i, fall_n_c, &
 				phi_r, mass_iacr,num_iacr, mass_sacw_i, mass_iacw, &
@@ -114,7 +116,10 @@
 				
 	real(sp), dimension(3) :: c=[1._sp,2._sp,1._sp]
 	integer(i4b) :: k
-	real(sp) :: isnow, iice, f1,f2,a,b, qsmall=1.e-30_sp
+	real(sp) :: isnow, iice, iice2, f1,f2,a,b, qsmall=1.e-30_sp
+	
+	! to send to integrator
+	real(sp) :: a_hw_new, pre_hw_new, ci_new
 	
 	integer :: n_modes_prof, n_levels_s
 	real(sp), allocatable, dimension(:,:) :: n_read, sig_read, d_read
@@ -918,6 +923,18 @@
 	gam2s=gamma(1._sp+alpha_s+ds)
 	gam1g=gamma(1._sp+alpha_g)
 	gam2g=gamma(1._sp+alpha_g+dg)
+	
+	! Raphael's "Magic" function representation of fall-speeds
+	! Derived from Heymsfield and Westbrook (2010)
+	gam3ai=1._sp/gamma(alpha_i+di/2._sp)
+	gam3bi=4._sp/gamma(alpha_i+di)
+	gam4ai=1._sp/gamma(alpha_i+di+di/2._sp)
+	gam4bi=4._sp/gamma(alpha_i+2._sp*di)
+	gam5ai=1._sp/gamma(alpha_i+1.5_sp+0.25_sp*di)
+	gam5bi=2._sp/gamma(alpha_i+1.5_sp+0.5_sp*di)
+	fall_q_i_hw=1._sp/ gamma(1._sp+alpha_i+di)
+	fall_n_i_hw=1._sp/ gamma(1._sp+alpha_i)
+	
 
     ! mass weighted fall for r, c, s, g, i
     fall_q_r=a_r*gamma(1._sp+alpha_r+dr+b_r) / gamma(1._sp+alpha_r+dr)
@@ -1011,7 +1028,17 @@
 	enddo
 	iice=a_i*pi*gamma(b)/(2._sp**(6._sp+2._sp*alpha_i+b_i)) * iice
 	
-	
+    ! ice for Heymsfield and Westbrook (2010):
+    a=1._sp
+    b=3._sp+2._sp*alpha_i+di
+    iice2=0._sp
+    do k=1,3
+	    call hygfx(a, b, real(k,sp)+alpha_i+1.0_sp,0.5_sp,f1)
+	    call hygfx(a, b, real(k,sp)+alpha_i+di, 0.5_sp,f2)
+	    iice2=iice2+c(k)*(f1/(real(k,sp)+alpha_i)-f2/(real(k,sp)+alpha_i+di-1._sp))
+	enddo
+	iice2=pi*gamma(b)/(2._sp**(5._sp+2._sp*alpha_i+di)) * iice2
+		
 	! ventilation
 	! rain:
 	nu_r1=0.78_sp*gamma(2._sp+alpha_r)
@@ -1270,7 +1297,7 @@
 	!>@param[in] mass_ice: mass of a single ice crystal (override)
 	!>@param[in] ice_flag: ice microphysics
 	!>@param[in] theta_flag: whether to alter theta
-	!>@param[in] j_stochastic, ice_nuc_flag, mode2_ice_flag, calc_params
+	!>@param[in] j_stochastic, ice_nuc_flag, mode2_ice_flag, heyms_west, calc_params
     subroutine p_microphysics_3d(nq,ncat,n_mode,cst,cen,inc,iqc, inr,iqr,ini,iqi,iai, &
                     cat_am,cat_c, cat_r, cat_i,&
                     nprec, &
@@ -1278,7 +1305,7 @@
                     nrad,ngs,lamgs,mugs, &
                     precip,th,prefn, z,thetan,rhoa,rhoan,w, &
     				micro_init,hm_flag, mass_ice, ice_flag, theta_flag, &
-    				j_stochastic,ice_nuc_flag,mode2_ice_flag, calc_params)
+    				j_stochastic,ice_nuc_flag,mode2_ice_flag, heyms_west, calc_params)
 #else
 	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 	!>@author
@@ -1313,7 +1340,7 @@
 	!>@param[in] mass_ice: mass of a single ice crystal (override)
 	!>@param[in] ice_flag: ice microphysics
 	!>@param[in] theta_flag: whether to alter theta
-	!>@param[in] j_stochastic, ice_nuc_flag, mode2_ice_flag, calc_parms
+	!>@param[in] j_stochastic, ice_nuc_flag, mode2_ice_flag, heyms_west, calc_parms
 	!>@param[in] comm,comm_vert,id,dims,coords: MPI variables
     subroutine p_microphysics_3d(nq,ncat,n_mode,cst,cen,inc,iqc, inr,iqr,ini,iqi,iai, &
                     cat_am,cat_c, cat_r, cat_i,&
@@ -1322,7 +1349,7 @@
                     nrad,ngs,lamgs,mugs, &
                     th,prefn, z,thetan,rhoa,rhoan,w, &
     				micro_init,hm_flag, mass_ice, ice_flag, theta_flag, &
-    				j_stochastic,ice_nuc_flag, mode2_ice_flag, calc_params, &
+    				j_stochastic,ice_nuc_flag, mode2_ice_flag, heyms_west, calc_params, &
     				comm,comm_vert,id,dims,coords)
     use mpi
 	use advection_s_3d, only : mpdata_vec_vert_3d, mpdata_vert_3d
@@ -1343,7 +1370,7 @@
     real(sp), dimension(-l_h+1:kp+r_h), intent(in) :: z, dz, dzn, rhoa,rhoan, thetan, &
         prefn
     real(sp), dimension(-l_h+1:kp+r_h,-l_h+1:jp+r_h,-l_h+1:ip+r_h), intent(in) :: w
-    logical, intent(in) :: ice_flag, hm_flag, theta_flag, calc_params
+    logical, intent(in) :: ice_flag, hm_flag, theta_flag, calc_params, heyms_west
     integer(i4b), intent(in) :: ice_nuc_flag, mode2_ice_flag
     logical , intent(inout) :: micro_init
     real(sp), intent(in) :: mass_ice, j_stochastic
@@ -1380,7 +1407,7 @@
 							z(:),thetan,rhoa(:),rhoan(:),w(:,j,i), &
     						micro_init,hm_flag, mass_ice, ice_flag, &
     						.true.,.true.,theta_flag, &
-    						j_stochastic,ice_nuc_flag,mode2_ice_flag)
+    						j_stochastic,ice_nuc_flag,mode2_ice_flag,heyms_west)
 #else
 
     		call p_microphysics_1d(nq,ncat,n_mode,cst,cen,inc,iqc,inr,iqr, ini,iqi,iai, &
@@ -1392,7 +1419,7 @@
 							coords, &
     						micro_init,hm_flag, mass_ice, ice_flag, &
     						.true.,.true.,theta_flag, &
-    						j_stochastic,ice_nuc_flag, mode2_ice_flag)
+    						j_stochastic,ice_nuc_flag, mode2_ice_flag,heyms_west)
     		n_step_o=max(n_step,n_step_o)
 
     		adv_l_o=adv_l_o .or. adv_l ! if there has been a true at any point, 
@@ -1550,13 +1577,13 @@
 	!>@param[in] wr_flag: warm rain on /off
 	!>@param[in] rm_flag: riming on /off
 	!>@param[in] theta_flag: whether to alter theta
-	!>@param[in] j_stochastic, ice_nuc_flag, mode2_ice_flag
+	!>@param[in] j_stochastic, ice_nuc_flag, mode2_ice_flag, heyms_west
     subroutine p_microphysics_2d(nq,ncat,n_mode,cst,cen,inc,iqc,inr,iqr,ini,iqi,iai, &
                     cat_am,cat_c, cat_r, cat_i,nprec, &
                     ip,kp,o_halo,dt,dz,dzn,q,precip,theta,p, z,theta_ref,rho,rhon,w, &
     						micro_init,hm_flag, mass_ice, ice_flag, &
     						wr_flag, rm_flag, theta_flag, &
-    						j_stochastic,ice_nuc_flag,mode2_ice_flag)
+    						j_stochastic,ice_nuc_flag,mode2_ice_flag,heyms_west)
     implicit none
     ! arguments:
     integer(i4b), intent(in) :: nq, ncat, n_mode, ip,kp, o_halo, inc, iqc, inr,iqr, &
@@ -1571,7 +1598,7 @@
     real(sp), dimension(-o_halo+1:kp+o_halo), intent(in) :: z, dz, dzn, &
                     rhon, theta_ref
     real(sp), dimension(-o_halo+1:kp+o_halo,-o_halo+1:ip+o_halo), intent(in) :: w
-    logical, intent(in) :: hm_flag, ice_flag, wr_flag, rm_flag, theta_flag
+    logical, intent(in) :: hm_flag, ice_flag, wr_flag, rm_flag, theta_flag, heyms_west
     integer(i4b), intent(in) :: ice_nuc_flag, mode2_ice_flag
     logical , intent(inout) :: micro_init
     real(sp), intent(in) :: mass_ice, j_stochastic
@@ -1598,7 +1625,7 @@
 							z(:),theta_ref,rho(:,i),rhon(:),w(:,i), &
     						micro_init,hm_flag, mass_ice, ice_flag, &
     						wr_flag,rm_flag,theta_flag, &
-    						j_stochastic,ice_nuc_flag,mode2_ice_flag)
+    						j_stochastic,ice_nuc_flag,mode2_ice_flag, heyms_west)
 #else
 		call p_microphysics_1d(nq,ncat,n_mode,cst,cen,inc,iqc,inr,iqr, ini,iqi,iai,&
 		                cat_am,cat_c, cat_r, cat_i,nprec, &
@@ -1607,7 +1634,7 @@
 							vqc(:,i),vqr(:,i),vqi(:,i), vni(:,i), n_step, adv_l, coords,&
     						micro_init,hm_flag, mass_ice, ice_flag, &
     						wr_flag,rm_flag,theta_flag, &
-    						j_stochastic,ice_nuc_flag,mode2_ice_flag)
+    						j_stochastic,ice_nuc_flag,mode2_ice_flag, heyms_west)
     	n_step_o=max(n_step_o,n_step)
 #endif	
 	enddo
@@ -1653,13 +1680,13 @@
 	!>@param[in] wr_flag: warm rain
 	!>@param[in] rm_flag: riming flag
 	!>@param[in] theta_flag: whether to alter theta
-	!>@param[in] j_stochastic, ice_nuc_flag,mode2_ice_flag
+	!>@param[in] j_stochastic, ice_nuc_flag,mode2_ice_flag, heyms_west
     subroutine p_microphysics_1d(nq,ncat,n_mode,cst,cen, inc, iqc, inr,iqr, ini,iqi,iai,&
                             cat_am,cat_c, cat_r, cat_i,nprec, &
                             kp,o_halo,dt,dz,dzn,q,precip,th,p, z,theta,rhoa,rhon,u, &
     						micro_init,hm_flag, mass_ice,ice_flag, &
     						wr_flag, rm_flag, theta_flag, &
-    						j_stochastic,ice_nuc_flag,mode2_ice_flag)
+    						j_stochastic,ice_nuc_flag,mode2_ice_flag, heyms_west)
 #else
 	!>@author
 	!>Paul J. Connolly, The University of Manchester
@@ -1696,14 +1723,14 @@
 	!>@param[in] wr_flag: warm rain
 	!>@param[in] rm_flag: riming flag
 	!>@param[in] theta_flag: whether to alter theta
-	!>@param[in] j_stochastic, ice_nuc_flag,mode2_ice_flag
+	!>@param[in] j_stochastic, ice_nuc_flag,mode2_ice_flag, heyms_west
     subroutine p_microphysics_1d(nq,ncat,n_mode,cst,cen, inc, iqc, inr,iqr,ini,iqi,iai,&
                             cat_am,cat_c, cat_r, cat_i,nprec,&
                             kp,o_halo,dt,dz,dzn,q,precip,th,p, z,theta,rhoa,rhon,u, &
                             vqc,vqr,vqi,vni,n_step, adv_l, coords,&
     						micro_init,hm_flag, mass_ice,ice_flag, &
     						wr_flag, rm_flag, theta_flag, &
-    						j_stochastic,ice_nuc_flag,mode2_ice_flag)
+    						j_stochastic,ice_nuc_flag,mode2_ice_flag, heyms_west)
 #endif
 
 	use advection_1d
@@ -1722,7 +1749,7 @@
     real(sp), dimension(-o_halo+1:kp+o_halo), intent(in) :: dz, z, dzn, rhoa, &
                                                     rhon, theta,p
     real(sp), dimension(-o_halo+1:kp+o_halo), intent(in) :: u
-    logical, intent(in) :: hm_flag, ice_flag, wr_flag, rm_flag, theta_flag
+    logical, intent(in) :: hm_flag, ice_flag, wr_flag, rm_flag, theta_flag, heyms_west
     integer(i4b), intent(in) :: ice_nuc_flag, mode2_ice_flag
     logical , intent(inout) :: micro_init
     real(sp), intent(in) :: mass_ice, j_stochastic
@@ -1794,7 +1821,8 @@
     								
 
     real(sp), dimension(1-o_halo:kp+o_halo) :: n_r, lam_r, n_i, lam_i, n_s, &
-                                                 lam_s, n_g, lam_g, lam_c, n_c
+                                                 lam_s, n_g, lam_g, lam_c, n_c, &
+                                                 lam_i_star
     real(sp), dimension(1-o_halo:kp+o_halo) :: rho_fac
 	real(sp), dimension(1-o_halo:kp+o_halo) :: vnr, vnc
 #if MPI_PAMM == 0
@@ -1803,7 +1831,7 @@
 #else
 	real(sp), intent(inout), dimension(1-o_halo:kp+o_halo) :: vqr, vqc, vqi, vni
 #endif
-	real(sp), dimension(1-o_halo:kp+o_halo) :: t
+	real(sp), dimension(1-o_halo:kp+o_halo) :: t, a_hw,a_hw1,pre_hw
 	! coalescence efficiencies
 	real(sp), dimension(kp) :: egi_dry, egs_dry, esi, eii, ess
 	real(sp) :: qold,des_dt,dqs_dt,err,cond,temp1, dummy1,dummy2, dummy3,&
@@ -1896,20 +1924,56 @@
     n_c=rho(:)*max(q(:,inc),0._sp)*lam_c**(1._sp+alpha_c) / gam1c
     
     if(ice_flag) then
+                                            
         ! ice n0, lambda
         lam_i=(max(q(:,ini),1._sp)*ci*gam2i / (max(q(:,iqi),1.e-10_sp)*gam1i))**(1._sp/di)
         n_i=rho(:)*max(q(:,ini),0._sp)*lam_i**(1._sp+alpha_i) / gam1i
 
-        ! ice
-        vqi(:)=min(max(fall_q_i*rho_fac * lam_i**(1._sp+alpha_i+di) / &
-            (lam_i+f_i)**(1._sp+alpha_i+di+b_i), 0._sp), 10._sp)
-        vni(:)=max(fall_n_i*rho_fac * lam_i**(1._sp+alpha_i) / &
-            (lam_i+f_i)**(1._sp+alpha_i+b_i), 0._sp)
+        if(heyms_west) then
+            ! HEYMSFIELD AND WESTBROOK (2010) FALL-SPEEDS !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+            ! this calculates the prefactor of the terminal velocity relation
+            pre_hw=heymsfield_and_westbrook_fall_parameters2(t,rhoa)
+            !
+        
+    !         a_hw = heymsfield_and_westbrook_fall_parameters1(vol,mass,nmon,&
+    !                                         phi,rim,t(1:kp),rhoa)
 
-        ! precipitation
-        precip(1:kp,2)=n_i(1:kp)*(a_i*chi_num_ice/(lam_i(1:kp)**(alpha_i+b_i+1._sp)) - &
-                        u(1:kp)*chi_num_ice1/(lam_i(1:kp)**(alpha_i+1._sp))) &
-                        /rho(1:kp)
+            ! this calculates a, which is needed to implement the Magic Function.
+            a_hw = heymsfield_and_westbrook_fall_parameters1(1._sp/920._sp,1._sp,1._sp, &
+                                            1._sp,0._sp,t,rho)
+            a_hw1 = a_hw
+            a_hw = 1._sp/(a_hw**(2._sp/di))
+                                        
+            ! lambda star - Magic function.
+            lam_i_star = lam_i*a_hw
+        
+            ! calculate fall-speeds
+            vni(:)=max(fall_n_i_hw*pre_hw*lam_i* &
+                (1._sp/(gam3ai*lam_i_star**(di/2._sp)+gam3bi*lam_i_star**(di) )),0._sp)
+            vqi(:)=max(fall_q_i_hw*pre_hw*lam_i* &
+                (1._sp/(gam4ai*lam_i_star**(di/2._sp)+gam4bi*lam_i_star**(di) )),0._sp)
+                
+            ! precipitation - this one is actually number flux
+            ! the Magic Function - standard, but with n0
+            precip(1:kp,2)=n_i(1:kp)*pre_hw(1:kp)*lam_i(1:kp)**(-alpha_i)/rho(1:kp)* &
+             (1._sp/(gam3ai*lam_i_star(1:kp)**(di/2._sp)+gam3bi*lam_i_star(1:kp)**(di) ))
+        
+            !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        else  
+            ! ice
+            vqi(:)=min(max(fall_q_i*rho_fac * lam_i**(1._sp+alpha_i+di) / &
+                (lam_i+f_i)**(1._sp+alpha_i+di+b_i), 0._sp), 10._sp)
+            vni(:)=max(fall_n_i*rho_fac * lam_i**(1._sp+alpha_i) / &
+                (lam_i+f_i)**(1._sp+alpha_i+b_i), 0._sp)
+
+            ! precipitation
+            precip(1:kp,2)=n_i(1:kp)*(a_i*chi_num_ice/(lam_i(1:kp)**(alpha_i+b_i+1._sp)) - &
+                            u(1:kp)*chi_num_ice1/(lam_i(1:kp)**(alpha_i+1._sp))) &
+                            /rho(1:kp)
+                        
+        endif
+        
+        
     endif
     
     ! precipitation
@@ -2263,9 +2327,16 @@
                     n0r=n_r(k)
                     n0i=n_i(k)
 
-
-                    call quad2d_qgaus(dintegral_mode2, &
-                        limit1_mode2,limit2_mode2,mrthresh,mrupper,dummy3)
+                    if(heyms_west) then
+                        ci_new=pi/6._sp*910._sp
+                        a_hw_new=a_hw1(k)
+                        pre_hw_new=pre_hw(k)
+                        call quad2d_qgaus(dintegral_mode2_hw, &
+                            limit1_mode2,limit2_mode2,mrthresh,mrupper,dummy3)
+                    else
+                        call quad2d_qgaus(dintegral_mode2, &
+                            limit1_mode2,limit2_mode2,mrthresh,mrupper,dummy3)                    
+                    endif
                     ! multiplication according to new lab results...
                     nfrag=dummy3
         !            nfrag=piacr(k)*dt*5._sp /(pi/6._sp*1000._sp*2.e-3_sp**3)
@@ -2572,12 +2643,21 @@
 		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!	
 		if ((t(k).le.ttr) .and. ice_flag) then
 		    if(q(k,iqi).gt.qsmall) then
-                nu_ice=2._sp*pi*n_i(k) / rho(k) * &
-                        (nu_i1 / lam_i(k)**(2._sp+alpha_i) + &
-                        (a_i/nu_vis)**0.5_sp*sc**(1._sp/3._sp)* &
-                        (rho(k)*rho0)**0.25_sp*nu_i2 / &
-                        (lam_i(k)+0.5_sp*f_i)**(0.5_sp*b_i+alpha_i+2.5_sp))
-            
+		        if(heyms_west) then
+                    nu_ice=2._sp*pi*n_i(k) / rho(k) * &
+                            (nu_i1 / lam_i(k)**(2._sp+alpha_i) + &
+                            sqrt(pre_hw(k))*0.31_sp*sc**(1._sp/3._sp)* &
+                            (rho(k)/nu_vis)**0.5_sp* &
+                            lam_i(k)**(-1.5_sp-alpha_i)/ &
+                            (lam_i_star(k)**(0.25_sp*di)*gam5ai+&
+                            lam_i_star(k)**(0.5_sp*di)*gam5bi) )
+                else
+                    nu_ice=2._sp*pi*n_i(k) / rho(k) * &
+                            (nu_i1 / lam_i(k)**(2._sp+alpha_i) + &
+                            (a_i/nu_vis)**0.5_sp*sc**(1._sp/3._sp)* &
+                            (rho(k)*rho0)**0.25_sp*nu_i2 / &
+                            (lam_i(k)+0.5_sp*f_i)**(0.5_sp*b_i+alpha_i+2.5_sp))                
+                endif
                 ab_ice=ls**2 / (ktherm1*rv*t(k)**2) + 1._sp/(rho(k)*smr_i(k)*diff1)
 
                 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -2642,9 +2722,15 @@
 		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 		if ((t(k).le.ttr).and.ice_flag) then
 		    if((q(k,iqc).gt.qsmall) .and. (q(k,iqi).gt.qsmall)) then
-                piacw(k)=max(mass_iacw * n_i(k)* eiw *q(k,iqc)*rho_fac(k) / &
-                        (lam_i(k)+f_i)**(3._sp+b_i+alpha_i),0._sp)
-                
+		        if(heyms_west) then
+                    piacw(k)=0.25_sp*pi*n_i(k)*pre_hw(k)*&
+                        lam_i(k)**(-2._sp-alpha_i) * eiw * q(k,iqc)*&
+                     1._sp/(gam3ai*lam_i_star(k)**(di/2._sp)+gam3bi*lam_i_star(k)**(di))		        
+		        else
+                    piacw(k)=max(mass_iacw * n_i(k)* eiw *q(k,iqc)*rho_fac(k) / &
+                            (lam_i(k)+f_i)**(3._sp+b_i+alpha_i),0._sp)
+                endif
+                                
                 dummy1=q(k,iqi) ! total mass of particle
                 
                 piacw(k)=max(min(piacw(k),q(k,iqc)/dt),0._sp)
@@ -2659,10 +2745,15 @@
 		! ice aggregation see Ferrier (1994)                                             !
 		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 		if(ice_flag.and.(t(k).lt.ttr).and.(lam_i(k).lt.1.e5_sp)) then
-		    ! collisions
-		    dummy1=max(iice*n_i(k)**2._sp*rho_fac(k) / &
-                    lam_i(k)**(4._sp+2.*sp*alpha_i+b_i),0._sp)
-                        
+		    if(heyms_west) then
+                ! collisions
+                dummy1=max(a_hw1(k)*a_hw1(k)*pre_hw(k)*iice2*n_i(k)*n_i(k) / &
+                        lam_i(k)**(3._sp+2.*sp*alpha_i+di),0._sp)
+            else
+                ! collisions
+                dummy1=max(iice*n_i(k)**2._sp*rho_fac(k) / &
+                        lam_i(k)**(4._sp+2.*sp*alpha_i+b_i),0._sp)
+            endif                                    
             
             ! aggregation rate
             riaci(k)=eii(k)*dummy1
@@ -3265,7 +3356,7 @@
 	!>calculates the viscosity of air vs temperature
 	!>@param[in] t: temperature
 	!>@return viscosity_air: viscosity of air
-	function viscosity_air(t)
+	elemental function viscosity_air(t)
 		use nrtype
 		implicit none
 		real(sp), intent(in) :: t
@@ -3601,6 +3692,53 @@
     end function dintegral_mode2
 	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
+	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    ! This evaluates the integrand                                                       !
+    ! for mode 2 ice multiplication                                                      !
+	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    function dintegral_mode2_hw(x,y)
+        use numerics_type, only : wp
+        implicit none
+        real(wp), intent(in) :: x
+        real(wp), dimension(:), intent(in) :: y
+        real(wp), dimension(size(y)) :: dintegral_mode2_hw
+        real(wp) :: diamr, mr, vr
+        real(wp), dimension(size(y)) :: mi, diami, delv, vi, k0, de, nfrag, nfrag_freeze1, &
+            nfrag_freeze2
+
+
+        mr=x
+        mi=y
+        diamr=(mr/cr)**(1.0_wp/dr)
+        diami=(mi/ci_new)**(1.0_wp/di)
+        ! fall-speeds
+        vr=a_r*diamr**b_r
+!         vi=a_i*diami**b_i
+        vi=pre_hw_new*(diami**-1)*((1._sp+a_hw_new*diami**(0.5_sp*di))**0.5_sp-1._sp)**2
+        delv=abs(vr-vi)
+        !delv=max((vx+vy)/8.0,abs(vx-vy))
+        ! last bit is to convert to integral over m
+        dintegral_mode2_hw=eri*pi/4.0_wp*(diamr+diami)**2* &
+            delv*n0r*diamr**alpha_r* &
+            exp(-lambda0r*diamr)*n0i*diami**alpha_i*exp(-lambda0i*diami)* &
+            (diamr**(1.0_wp-dr)) / (cr*dr)*(diami**(1.0_wp-di)) / (ci_new*di)
+        
+        ! cke from equation 6
+        k0=0.5_wp*(mr*mi/(mr+mi))*(vr-vi)**2
+        ! de parameter
+        de=k0/(gamma_liq*pi*diamr**2)
+        ! number of fragments in spalsh
+        nfrag=3.0_wp*max(de-decrit, 0.0_wp)
+        ! number of fragments in splash that freeze due to mode 1
+        nfrag_freeze1=nfrag*f_mode2
+        ! number of fragments in splash that freeze due to mode 2
+        nfrag_freeze2=nfrag*(1.0_wp-f_mode2)*phi_mode2
+        
+        dintegral_mode2_hw=dintegral_mode2_hw*nfrag_freeze2
+    
+    end function dintegral_mode2_hw
+	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
 
     function limit1_mode2(x)
         use numerics_type, only : wp
@@ -3618,6 +3756,59 @@
         limit2_mode2=miupper
     end function limit2_mode2
 
+
+
+	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    ! calculate the a parameter in the heymsfield and westbrook fall-speed scheme        !
+	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+	!>@author
+	!>Paul J. Connolly, The University of Manchester, 2021
+	!>@brief calculates the "constant term" in the reynolds number for Heymsfield and 
+	! Westbrook (2010)
+	!>@param[in] vol, mass, nmon, phi, rim, t, rhoa
+	!>@param[out] a
+    elemental function &
+        heymsfield_and_westbrook_fall_parameters1(vol,mass,nmon,&
+                                        phi,rim,t,rhoa) result(a)
+        use numerics_type, only : wp
+        implicit none
+        real(wp), intent(in) :: vol, mass, nmon, phi, rim, t, rhoa
+        real(wp) :: a
+        
+        
+        a=0.0625_wp/sqrt(0.175_wp) / &
+            (viscosity_air(t))*2._wp*sqrt(rhoa*grav/(6._wp)*920._wp)
+        
+    
+    end function heymsfield_and_westbrook_fall_parameters1
+	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+
+
+
+	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    ! calculate the pre-factor in the heymsfield and westbrook fall-speed scheme         !
+	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+	!>@author
+	!>Paul J. Connolly, The University of Manchester, 2021
+	!>@brief calculates the "pre-factor" in the reynolds number for Heymsfield and 
+	! Westbrook (2010)
+	!>@param[in] t, rhoa
+	!>@param[out] a
+    elemental function &
+        heymsfield_and_westbrook_fall_parameters2(t,rhoa) result(pre)
+        use numerics_type, only : wp
+        implicit none
+        real(wp), intent(in) :: t, rhoa
+        real(wp) :: pre
+        
+        
+        pre=16._wp*viscosity_air(t)/rhoa
+        
+    
+    end function heymsfield_and_westbrook_fall_parameters2
+	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    
 
     end module p_micro_module
     
