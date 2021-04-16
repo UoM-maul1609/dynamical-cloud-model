@@ -67,7 +67,8 @@
     private
     public :: mpi_define, block_ring, exchange_full, mpi_integer9, mp1, world_process, &
     			mpi_cart_initialise, exchange_along_dim, find_base_top, find_top, &
-    			exchange_d_fluxes, exchange_u_fluxes, exchange_along_z
+    			exchange_d_fluxes, exchange_u_fluxes, exchange_along_z, &
+    			exchange_full_wo, exchange_along_dim_wo
     
 
 	contains
@@ -1259,7 +1260,589 @@
 	end subroutine exchange_full
 	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 	
+	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+	! exchange along dim for a variable using Cartesian topology                         !
+	! without top and bottom bc set                                                      !
+	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+	!>@author
+	!>Paul J. Connolly, The University of Manchester
+	!>@brief
+	!>define some types to be used in the model
+	!>@param[in] comm3d, id, ipp, jpp, kpp, w_h,e_h,s_h,n_h,d_h,u_h
+	!>@param[inout] array: the array to exchange_halos on
+	!>@param[in] dims,coords
+	subroutine exchange_along_dim_wo(comm3d, id, kpp, jpp, ipp, &
+							d_h,u_h,s_h,n_h,w_h, e_h,  array, dims,coords)
+		implicit none
 		
+		integer(i4b), intent(in) :: comm3d, id, ipp, jpp, kpp, w_h, e_h, s_h,n_h,d_h,u_h
+		real(sp), intent(inout), &
+			 dimension(1-d_h:u_h+kpp,1-s_h:n_h+jpp,1-w_h:e_h+ipp) :: &
+			 array
+		integer(i4b), dimension(3), intent(in) :: dims,coords
+		
+		! locals:
+		integer(i4b), dimension(12) :: request
+		integer(i4b), dimension(MPI_STATUS_SIZE, 12) :: status
+		integer(i4b) :: error, tag1,num_messages,imess, tag2
+		
+		! buffers for receiving data
+	    integer(i4b) :: count
+		real(sp), dimension(jpp,ipp) :: top_buf, bot_buf
+		real(sp), dimension(kpp,jpp) :: east_buf,west_buf
+		real(sp), dimension(kpp,ipp) :: south_buf,north_buf
+		
+		
+
+			
+		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+		! message passing for adjacent cells in up / down direction                      !
+		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+		tag1=10
+		count=0
+
+		! receive from the top of the lower cell:
+        if(mp1%face%r_top /= id) then
+		    count=count+1
+            call MPI_IRecv(bot_buf, &!array(1-d_h:0,1:jpp,1:ipp), &
+                (ipp*jpp)*d_h, MPI_REAL8, mp1%face%r_top, &
+                tag1, comm3d, request(count),error)
+        endif
+        tag1=11
+		! receive from the bottom of upper cell:
+		if(mp1%face%r_bottom /= id) then
+		    count=count+1
+            call MPI_IRecv(top_buf, & !array(kpp+1:kpp+u_h,1:jpp,1:ipp), &
+                (ipp*jpp)*u_h, MPI_REAL8, mp1%face%r_bottom, &
+                tag1, comm3d, request(count),error)
+        endif
+        tag1=10
+		! send to the top:
+		if(mp1%face%s_top /= id) then
+		    count=count+1
+            call MPI_Isend(array(kpp+1-d_h:kpp,1:jpp,1:ipp), &
+                (ipp*jpp)*d_h, MPI_REAL8, mp1%face%s_top, &
+                tag1, comm3d, request(count),error)
+        endif
+		tag1=11
+		! send to the bottom:
+		if(mp1%face%s_bottom /= id) then
+		    count=count+1
+            call MPI_Isend(array(1:u_h,1:jpp,1:ipp), &
+                (ipp*jpp)*u_h, MPI_REAL8, mp1%face%s_bottom, &
+                tag1, comm3d, request(count),error)
+        endif
+        
+		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+
+
+
+
+
+		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+		! message passing for adjacent cells in east / west direction                    !
+		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+		tag1=12
+		! receive from the east of the west cell:
+		if( mp1%face%r_east /= id ) then
+		    count=count+1
+			call MPI_IRecv(west_buf, & !array(1:kpp,1:jpp,1-w_h:0), &
+				(jpp*kpp)*w_h, MPI_REAL8, mp1%face%r_east, &
+				tag1, comm3d, request(count),error)
+		endif
+		tag1=13
+		! receive from the west of east cell:
+		if( mp1%face%r_west /= id ) then
+		    count=count+1
+			call MPI_IRecv(east_buf, & !array(1:kpp,1:jpp,ipp+1:ipp+e_h), &
+				(jpp*kpp)*e_h, MPI_REAL8, mp1%face%r_west, &
+				tag1, comm3d, request(count),error)
+		endif
+		
+		tag1=12
+		! send to the east:
+		if ( mp1%face%s_east /= id ) then 
+		    count=count+1
+			call MPI_Isend(array(1:kpp,1:jpp,ipp+1-w_h:ipp), &
+				(jpp*kpp)*w_h, MPI_REAL8, mp1%face%s_east, &
+				tag1, comm3d, request(count),error)
+		endif
+
+		tag1=13
+		! send to the west:
+		if ( mp1%face%s_west /= id ) then	
+		    count=count+1
+			call MPI_Isend(array(1:kpp,1:jpp,1:e_h), &
+				(jpp*kpp)*e_h, MPI_REAL8, mp1%face%s_west, &
+				tag1, comm3d, request(count),error)
+		endif
+
+		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+
+
+
+		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+		! message passing for adjacent cells in north / south direction                  !
+		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+		tag1=14
+		! receive from north of south cell:
+		if( mp1%face%r_north /= id ) then
+		    count=count+1
+			call MPI_IRecv(south_buf, &!array(1:kpp,1-s_h:0,1:ipp), &
+				(ipp*kpp)*s_h, MPI_REAL8, mp1%face%r_north, &
+				tag1, comm3d, request(count),error)
+		endif
+		tag1=15
+		! receive from south of north cell:
+		if( mp1%face%r_south /= id ) then
+		    count=count+1
+			call MPI_IRecv(north_buf, &!array(1:kpp,jpp+1:jpp+n_h,1:ipp), &
+				(ipp*kpp)*n_h, MPI_REAL8, mp1%face%r_south, &
+				tag1, comm3d, request(count),error)
+		endif
+		tag1=14
+		! send to the north:
+		if ( mp1%face%s_north /= id ) then 
+		    count=count+1
+			call MPI_Isend(array(1:kpp,jpp+1-s_h:jpp,1:ipp), &
+				(ipp*kpp)*s_h, MPI_REAL8, mp1%face%s_north, &
+				tag1, comm3d, request(count),error)
+		endif
+		tag1=15
+		! send to the south:
+		if ( mp1%face%s_south /= id ) then
+		    count=count+1
+			call MPI_Isend(array(1:kpp,1:n_h,1:ipp), &
+				(ipp*kpp)*n_h, MPI_REAL8, mp1%face%s_south, &
+				tag1, comm3d, request(count),error)
+		endif
+
+		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+
+
+
+		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+		! case where only 1 pe in x or y directions                                      !
+		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+		if ( mp1%face%s_west == id) then
+			! adjacent cells:
+			array(1:kpp,1:jpp,1-w_h:0)=array(1:kpp,1:jpp,ipp+1-w_h:ipp)
+			array(1:kpp,1:jpp,ipp+1:ipp+e_h)=array(1:kpp,1:jpp,1:e_h)
+			west_buf=array(1:kpp,1:jpp,ipp)
+			east_buf=array(1:kpp,1:jpp,1)
+			! corner cells - not relevant, because below surface and above lid			
+		endif
+				
+		if ( mp1%face%s_south == id) then
+			! adjacent cells:
+			array(1:kpp,1-s_h:0,1:ipp)=array(1:kpp,jpp+1-s_h:jpp,1:ipp)
+			array(1:kpp,jpp+1:jpp+n_h,1:ipp)=array(1:kpp,1:n_h,1:ipp)
+			south_buf=array(1:kpp,jpp,1:ipp)
+			north_buf=array(1:kpp,1,1:ipp)
+			! corner cells - not relevant, because below surface and above lid			
+		endif
+! 		if ( mp1%face%s_top == -1) then
+! 			! adjacent cells:
+! 			array(kpp+1:kpp+u_h,1-s_h:jpp+n_h,1-w_h:ipp+e_h)=ubc
+! 			! corner cells - not relevant, because below surface and above lid			
+! 		endif
+! 		if ( mp1%face%s_bottom == -1) then
+! 			! adjacent cells:
+! 			array(1-d_h:0,1-s_h:jpp+n_h,1-w_h:ipp+e_h)=lbc
+! 			! corner cells - not relevant, because below surface and above lid			
+! 		endif
+		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        ! wait for all messages to return before writing buffers                         !
+		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        call MPI_Waitall(count,request(1:count), status(:,1:count), error)
+		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        
+		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        ! write buffers                                                                  !
+		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+		if(mp1%face%s_bottom /= -1) then
+            array(0,1:jpp,1:ipp)=bot_buf
+        endif
+        
+		if(mp1%face%s_top /= -1) then
+            array(kpp+1,1:jpp,1:ipp)=top_buf
+        endif
+        array(1:kpp,1:jpp,0)=west_buf
+        array(1:kpp,1:jpp,ipp+1)=east_buf
+        array(1:kpp,0,1:ipp)=south_buf
+        array(1:kpp,jpp+1,1:ipp)=north_buf
+		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        
+        
+
+	end subroutine exchange_along_dim_wo
+	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+
+		
+	
+	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+	! exchange halos for a variable using Cartesian topology                             !
+	! without top and bottom being set                                                   !
+	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+	!>@author
+	!>Paul J. Connolly, The University of Manchester
+	!>@brief
+	!>define some types to be used in the model
+	!>@param[in] comm3d, id, ipp, jpp, kpp, w_h,e_h,s_h,n_h,d_h,u_h
+	!>@param[inout] array: the array to exchange_halos on
+	!>@param[in] dims,coords
+	subroutine exchange_full_wo(comm3d, id, kpp, jpp, ipp, &
+							d_h,u_h,s_h,n_h,w_h, e_h,  array, dims,coords)
+		implicit none
+		
+		integer(i4b), intent(in) :: comm3d, id, ipp, jpp, kpp, w_h, e_h, s_h,n_h,d_h,u_h
+		real(sp), intent(inout), &
+			 dimension(1-d_h:u_h+kpp,1-s_h:n_h+jpp,1-w_h:e_h+ipp) :: &
+			 array
+		integer(i4b), dimension(3), intent(in) :: dims,coords
+		
+		! locals:
+		integer(i4b), dimension(40) :: request
+		integer(i4b), dimension(MPI_STATUS_SIZE, 40) :: status
+		integer(i4b) :: error, tag1,num_messages,imess, tag2, count
+		
+		! buffers for receiving data
+		! edges
+		real(sp), dimension(kpp) :: ws_bt, wn_bt, es_bt, en_bt
+		real(sp), dimension(ipp) :: bs_we, bn_we, ts_we, tn_we
+		real(sp), dimension(jpp) :: bw_sn, be_sn, tw_sn, te_sn
+		! corners
+		real(sp) :: wsb, wnb, wst, wnt, esb, enb, est, ent
+				
+
+		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+		! exchange only only the dimensions                                              !
+		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+		call exchange_along_dim_wo(comm3d, id, kpp, jpp, ipp, &
+							d_h,u_h,s_h,n_h,w_h, e_h,  array, dims,coords)
+		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+
+
+		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+		! edges                                                                          !
+		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+		count=0
+		! ws_bt
+		call exchange_edges(comm3d, id,count,40,kpp,ws_bt,request,status, &
+		            array,kpp,jpp,ipp,d_h,u_h,s_h,n_h,w_h, e_h, &
+					1,   kpp,     1,          n_h,       1,     e_h, &
+					1,   kpp,     jpp+1,      jpp+n_h,   ipp+1, ipp+e_h, &
+					mp1%edge%s_ws_bt,mp1%edge%r_ws_bt)
+		! wn_bt
+		call exchange_edges(comm3d, id,count,40,kpp,wn_bt,request,status, &
+		            array,kpp,jpp,ipp,d_h,u_h,s_h,n_h,w_h, e_h, &
+					1,   kpp,     jpp-s_h+1,    jpp,       1,     e_h, &
+					1,   kpp,     1-s_h,      0,        ipp+1, ipp+e_h, &
+					mp1%edge%s_wn_bt,mp1%edge%r_wn_bt)
+		! es_bt
+		call exchange_edges(comm3d, id,count,40,kpp,es_bt,request,status, &
+		            array,kpp,jpp,ipp,d_h,u_h,s_h,n_h,w_h, e_h, &
+					1,   kpp,     1,          n_h,       ipp-w_h+1,     ipp, &
+					1,   kpp,     jpp+1,      jpp+n_h,   1-w_h, 0, &
+					mp1%edge%s_es_bt,mp1%edge%r_es_bt)
+		! en_bt
+		call exchange_edges(comm3d, id,count,40,kpp,en_bt,request,status, &
+		            array,kpp,jpp,ipp,d_h,u_h,s_h,n_h,w_h, e_h, &
+					1,   kpp,     jpp-s_h+1,    jpp,       ipp-w_h+1,     ipp, &
+					1,   kpp,     1-s_h,      0,        1-w_h, 0, &
+					mp1%edge%s_en_bt,mp1%edge%r_en_bt)
+					
+		! bs_we
+		call exchange_edges(comm3d, id,count,40,ipp,bs_we,request,status, &
+		            array,kpp,jpp,ipp,d_h,u_h,s_h,n_h,w_h, e_h, &
+					1,   		 u_h,        1,       n_h,     1, ipp, &
+					kpp+1,       kpp+u_h,    jpp+1,   jpp+n_h,   1, ipp, &
+					mp1%edge%s_bs_we,mp1%edge%r_bs_we)
+		! bn_we
+		call exchange_edges(comm3d, id,count,40,ipp,bn_we,request,status, &
+		            array,kpp,jpp,ipp,d_h,u_h,s_h,n_h,w_h, e_h, &
+					1,   		 u_h,        jpp-s_h+1,       jpp,     1, ipp, &
+					kpp+1,       kpp+u_h,    1-s_h,           0,       1, ipp, &
+					mp1%edge%s_bn_we,mp1%edge%r_bn_we)
+		! ts_we
+		call exchange_edges(comm3d, id,count,40,ipp,ts_we,request,status, &
+		            array,kpp,jpp,ipp,d_h,u_h,s_h,n_h,w_h, e_h, &
+					kpp+1-d_h,   		 kpp,        1,       n_h,     1, ipp, &
+					1-d_h,       0,    jpp+1,   jpp+n_h,   1, ipp, &
+					mp1%edge%s_ts_we,mp1%edge%r_ts_we)
+
+		! tn_we
+		call exchange_edges(comm3d, id,count,40,ipp,tn_we,request,status, &
+		            array,kpp,jpp,ipp,d_h,u_h,s_h,n_h,w_h, e_h, &
+					kpp+1-d_h,   kpp,     jpp+1-s_h,  jpp, 1, ipp, &
+					1-d_h,       0,       1-s_h,      0,   1, ipp, &
+					mp1%edge%s_tn_we,mp1%edge%r_tn_we)
+
+		! bw_sn
+		call exchange_edges(comm3d, id,count,40,jpp,bw_sn,request,status, &
+		            array,kpp,jpp,ipp,d_h,u_h,s_h,n_h,w_h, e_h, &
+					1,   		 u_h,        1,       jpp,     1, e_h, &
+					kpp+1,       kpp+u_h,    1,       jpp,   ipp+1, ipp+e_h, &
+					mp1%edge%s_bw_sn,mp1%edge%r_bw_sn)
+		! be_sn
+		call exchange_edges(comm3d, id,count,40,jpp,be_sn,request,status, &
+		            array,kpp,jpp,ipp,d_h,u_h,s_h,n_h,w_h, e_h, &
+					1,   		 u_h,        1,       jpp,     ipp-w_h+1, ipp, &
+					kpp+1,       kpp+u_h,    1,       jpp,   1-w_h, 0, &
+					mp1%edge%s_be_sn,mp1%edge%r_be_sn)
+		! tw_sn
+		call exchange_edges(comm3d, id,count,40,jpp,tw_sn,request,status, &
+		            array,kpp,jpp,ipp,d_h,u_h,s_h,n_h,w_h, e_h, &
+					kpp+1-d_h,   		 kpp,        1,       jpp,     1, e_h, &
+					1-d_h,       0,    1,       jpp,   ipp+1, ipp+e_h, &
+					mp1%edge%s_tw_sn,mp1%edge%r_tw_sn)
+		! te_sn
+		call exchange_edges(comm3d, id,count,40,jpp,te_sn,request,status, &
+		            array,kpp,jpp,ipp,d_h,u_h,s_h,n_h,w_h, e_h, &
+					kpp+1-d_h,   		 kpp,      1,       jpp,     ipp-w_h+1, ipp, &
+					1-d_h,       0,      1,       jpp,   1-w_h, 0, &
+					mp1%edge%s_te_sn,mp1%edge%r_te_sn)
+		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+
+
+
+
+		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+		! corners                                                                        !
+		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+		! wsb
+		call exchange_corner(comm3d, id,count,40,wsb,request,status, &
+		            array,kpp,jpp,ipp,d_h,u_h,s_h,n_h,w_h, e_h, &
+					1,   u_h,     1,          n_h,       1,     e_h, &
+					kpp+1,   kpp+u_h,     jpp+1,      jpp+n_h,   ipp+1, ipp+e_h, &
+					mp1%cnr%s_wsb,mp1%cnr%r_wsb)
+		! wnb
+		call exchange_corner(comm3d, id,count,40,wnb,request,status, &
+		            array,kpp,jpp,ipp,d_h,u_h,s_h,n_h,w_h, e_h, &
+					1,   u_h,     jpp+1-s_h,    jpp,       1,     e_h, &
+					kpp+1,   kpp+u_h,     1-s_h,      0,        ipp+1, ipp+e_h, &
+					mp1%cnr%s_wnb,mp1%cnr%r_wnb)
+		! wst
+		call exchange_corner(comm3d, id,count,40,wst,request,status, &
+		            array,kpp,jpp,ipp,d_h,u_h,s_h,n_h,w_h, e_h, &
+					kpp+1-d_h,   kpp,     1,          n_h,       1,     e_h, &
+					1-d_h,       0,     jpp+1,      jpp+n_h,   ipp+1, ipp+e_h, &
+					mp1%cnr%s_wst,mp1%cnr%r_wst)
+		! wnt
+		call exchange_corner(comm3d, id,count,40,wnt,request,status, &
+		            array,kpp,jpp,ipp,d_h,u_h,s_h,n_h,w_h, e_h, &
+					kpp+1-d_h,   kpp,     jpp+1-s_h,    jpp,       1,     e_h, &
+					1-d_h,        0,     1-s_h,      0,        ipp+1, ipp+e_h, &
+					mp1%cnr%s_wnt,mp1%cnr%r_wnt)
+				
+					
+		! esb
+		call exchange_corner(comm3d, id,count,40,esb,request,status, &
+		            array,kpp,jpp,ipp,d_h,u_h,s_h,n_h,w_h, e_h,&
+					1,   		 u_h,        1,       n_h,     ipp+1-w_h, ipp, &
+					kpp+1,       kpp+u_h,    jpp+1,   jpp+n_h,   1-w_h, 0, &
+					mp1%cnr%s_esb,mp1%cnr%r_esb)
+		! enb
+		call exchange_corner(comm3d, id,count,40,enb,request,status, &
+		            array,kpp,jpp,ipp,d_h,u_h,s_h,n_h,w_h, e_h, &
+					1,   		 u_h,        jpp+1-s_h,       jpp,     ipp+1-w_h, ipp, &
+					kpp+1,       kpp+u_h,    1-s_h,           0,       1-w_h, 0, &
+					mp1%cnr%s_enb,mp1%cnr%r_enb)
+		! est
+		call exchange_corner(comm3d, id,count,40,est,request,status, &
+		            array,kpp,jpp,ipp,d_h,u_h,s_h,n_h,w_h, e_h, &
+					kpp+1-d_h,   		 kpp,        1,       n_h,     ipp+1-w_h, ipp, &
+					1-d_h,       0,             jpp+1,   jpp+n_h,   1-w_h, 0, &
+					mp1%cnr%s_est,mp1%cnr%r_est)
+
+		! ent
+		call exchange_corner(comm3d, id,count,40,ent,request,status, &
+		            array,kpp,jpp,ipp,d_h,u_h,s_h,n_h,w_h, e_h, &
+					kpp+1-d_h,   kpp,     jpp+1-s_h,  jpp, ipp+1-w_h, ipp, &
+					1-d_h,       0,       1-s_h,      0,   1-w_h, 0, &
+					mp1%cnr%s_ent,mp1%cnr%r_ent)
+
+
+		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        ! wait for all messages to return before writing buffers                         !
+		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        call MPI_Waitall(count,request(1:count), status(:,1:count), error)
+		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        ! write buffers                                                                  !
+		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+		! edges:
+        array(1:kpp,jpp+1,ipp+1)=ws_bt
+        array(1:kpp,1-s_h,ipp+1)=wn_bt
+        array(1:kpp,jpp+1,1-w_h)=es_bt
+        array(1:kpp,1-s_h,1-w_h)=en_bt
+
+        array(kpp+1,jpp+1,1:ipp)=bs_we
+        array(kpp+1,1-s_h,1:ipp)=bn_we
+        array(1-d_h,jpp+1,1:ipp)=ts_we
+        array(1-d_h,1-s_h,1:ipp)=tn_we
+
+        array(kpp+1,1:jpp,ipp+1)=bw_sn
+        array(kpp+1,1:jpp,1-w_h)=be_sn
+        array(1-d_h,1:jpp,ipp+1)=tw_sn
+        array(1-d_h,1:jpp,1-w_h)=te_sn
+
+        ! corners:
+        if( mp1%cnr%r_wsb /=id ) array(kpp+1,jpp+1,ipp+1)=wsb
+        if( mp1%cnr%r_wnb /=id ) array(kpp+1,1-s_h,ipp+1)=wnb
+        if( mp1%cnr%r_wst /=id ) array(1-d_h,jpp+1,ipp+1)=wst
+        if( mp1%cnr%r_wnt /=id ) array(1-d_h,1-s_h,ipp+1)=wnt
+        if( mp1%cnr%r_esb /=id ) array(kpp+1,jpp+1,1-w_h)=esb
+        if( mp1%cnr%r_enb /=id ) array(kpp+1,1-s_h,1-w_h)=enb
+        if( mp1%cnr%r_est /=id ) array(1-d_h,jpp+1,1-w_h)=est
+        if( mp1%cnr%r_ent /=id ) array(1-d_h,1-s_h,1-w_h)=ent
+		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+				
+		contains
+			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+			! exchange corners for a variable using Cartesian topology                   !
+			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+			!>@author
+			!>Paul J. Connolly, The University of Manchester
+			!>@brief
+			!>exchange corners
+			!>@param[in] comm3d, id
+			!>@param[inout] array: the array to exchange_halos on
+			!>@param[inout] buf: buffer for the receive
+			!>@param[in] count,lenm
+			!>@param[inout] request, status (mpi variables)
+			!>@param[in] kp, jp, ip, d_h_, u_h, s_h, n_h, w_h, e_h, s_kl, s_ku, s_jl, 
+			!            s_ju, s_il, s_iu, r_kl, r_ku, r_jl, r_ju, r_il, r_iu
+			!>@param[in] send, recv
+			subroutine exchange_corner(comm3d,id,count,lenm,buf,request,status, &
+			                        array,kp,jp,ip,d_h,u_h,s_h,n_h,w_h, e_h, &
+									s_kl,s_ku,s_jl,s_ju,s_il,s_iu, &
+									r_kl,r_ku,r_jl,r_ju,r_il,r_iu, send,recv)
+				implicit none
+				integer(i4b), intent(in) :: comm3d, id
+				integer(i4b), intent(in) :: kp,jp,ip,w_h, e_h, s_h,n_h,d_h,u_h,   &
+											s_kl,s_ku,s_jl,s_ju,s_il,s_iu, &
+											r_kl,r_ku,r_jl,r_ju,r_il,r_iu, send,recv, &
+											lenm
+				real(sp), intent(inout), &
+					 dimension(1-d_h:u_h+kp,1-s_h:n_h+jp,1-w_h:e_h+ip) :: &
+					 array
+			    real(sp), intent(inout) :: buf
+				integer(i4b), dimension(lenm), intent(inout) :: request
+				integer(i4b), dimension(MPI_STATUS_SIZE,lenm), intent(inout) :: status
+				integer(i4b), intent(inout) :: count
+				integer(i4b) :: error,tag1=3, size1, size2 
+
+				integer(i4b), dimension(lenm) :: request1
+				integer(i4b), dimension(MPI_STATUS_SIZE,lenm) :: status1
+
+				size1=(s_iu-s_il+1)*(s_ju-s_jl+1)*(s_ku-s_kl+1)
+				size2=(r_iu-r_il+1)*(r_ju-r_jl+1)*(r_ku-r_kl+1)
+
+                buf = array(s_kl,s_jl,s_il)
+				!++++
+				! receive:
+				if( (recv /= id) ) then
+				    count=count+1
+					call MPI_IRecv(buf, &!array(r_kl:r_ku,r_jl:r_ju,r_il:r_iu), &
+						size1, MPI_REAL8, recv, &
+						tag1, comm3d, request(count),error)
+					!call MPI_Wait(request1(1), status1(:,1), error)
+				endif	
+				! send:
+				if ( (send /= id) ) then 
+				    count=count+1
+					call MPI_Isend(array(s_kl:s_ku,s_jl:s_ju,s_il:s_iu), &
+						size1, MPI_REAL8, send, &
+						tag1, comm3d, request(count),error)
+				endif
+				!----	
+				
+				
+			end subroutine exchange_corner
+			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+
+
+		
+			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+			! exchange edges for a variable using Cartesian topology                     !
+			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+			!>@author
+			!>Paul J. Connolly, The University of Manchester
+			!>@brief
+			!>exchange corners
+			!>@param[in] comm3d, id
+			!>@param[inout] array: the array to exchange_halos on
+			!>@param[inout] buf: buffer for the receive
+			!>@param[in] count,lenm,lenb
+			!>@param[inout] request, status (mpi variables)
+			!>@param[in] kp, jp, ip, d_h_, u_h, s_h, n_h, w_h, e_h, s_kl, s_ku, s_jl, 
+			!            s_ju, s_il, s_iu, r_kl, r_ku, r_jl, r_ju, r_il, r_iu
+			!>@param[in] send, recv
+			subroutine exchange_edges(comm3d,id,count,lenm,lenb,buf,request,status, &
+			                        array,kp,jp,ip,d_h,u_h,s_h,n_h,w_h, e_h, &
+									s_kl,s_ku,s_jl,s_ju,s_il,s_iu, &
+									r_kl,r_ku,r_jl,r_ju,r_il,r_iu, send,recv)
+				implicit none
+				integer(i4b), intent(in) :: comm3d, id
+				integer(i4b), intent(in) :: kp,jp,ip, w_h, e_h, s_h,n_h,d_h,u_h, &
+											s_kl,s_ku,s_jl,s_ju,s_il,s_iu, &
+											r_kl,r_ku,r_jl,r_ju,r_il,r_iu, send,recv, &
+											lenm,lenb
+				real(sp), intent(inout), &
+					 dimension(1-d_h:u_h+kp,1-s_h:n_h+jp,1-w_h:e_h+ip) :: &
+					 array
+			    real(sp), intent(inout), dimension(lenb) :: buf
+			    integer(i4b), intent(inout) :: count
+				integer(i4b), dimension(lenm), intent(inout) :: request
+				integer(i4b), dimension(MPI_STATUS_SIZE,lenm), intent(inout) :: status
+				integer(i4b) :: error,tag1=2, size1, size2
+
+
+				size1=(s_iu-s_il+1)*(s_ju-s_jl+1)*(s_ku-s_kl+1)
+				size2=(r_iu-r_il+1)*(r_ju-r_jl+1)*(r_ku-r_kl+1)
+
+                buf = &
+                    reshape(array(s_kl:s_ku,s_jl:s_ju,s_il:s_iu),&
+                        [(s_ku-s_kl+1)*(s_ju-s_jl+1)*(s_iu-s_il+1)])
+
+				!++++
+				! receive:
+				if( (recv /= mp1%id) ) then
+				    count=count+1
+! 
+					call MPI_IRecv(buf, &!array(r_kl:r_ku,r_jl:r_ju,r_il:r_iu), &
+						size1, MPI_REAL8, recv, &
+						tag1, comm3d, request(count),error)
+				endif	
+				! send:
+				if ( (send /= mp1%id) ) then 
+				    count=count+1
+					call MPI_Isend(array(s_kl:s_ku,s_jl:s_ju,s_il:s_iu), &
+						size1, MPI_REAL8, send, &
+						tag1, comm3d, request(count),error)
+				endif
+				!----
+		
+									
+									
+			end subroutine exchange_edges
+			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+			
+	end subroutine exchange_full_wo
+	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 	
 	
 	
