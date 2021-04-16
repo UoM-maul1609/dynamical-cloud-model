@@ -2676,7 +2676,7 @@
                         pidep(k)=min(max(ice_dep,0._sp),(q(k,1)-smr_i(k))/dt)
                     else
                         pidep(k)=0._sp
-                        pisub(k)=min(-min(ice_dep,0._sp),q(k,iqi)/dt)
+                        pisub(k)=min(-min(ice_dep,0._sp),-(q(k,1)-smr_i(k))/dt)
                     endif
                     !!!
                 
@@ -3633,13 +3633,13 @@
         elseif(phi>1.01_sp) then
             ! see equation 40 of Chen and Lamb (1994)
             ecc=sqrt(1._sp-(1._sp/phi)**2)
-            fac2=1._sp/phi/log((1._sp+ecc)*phi)
+            fac2=(ecc)/log((1._sp+ecc)*phi)*phi/fac1
         else
             fac2=1._sp
         endif
         
         ! total factor
-        chen_and_lamb_cap_fac=fac1*fac2
+        chen_and_lamb_cap_fac=fac2
         
     end function chen_and_lamb_cap_fac
 	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
