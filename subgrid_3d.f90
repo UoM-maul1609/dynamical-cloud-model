@@ -168,15 +168,15 @@
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         ! surface layer - monin-obukhov similarity theory                                !
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-        call monin_obukhov(z0,z0th,thetan,zn,th,u,v,vism,vist,ip,jp,kp,l_h,r_h)
+        call monin_obukhov(z0,z0th,theta,thetan,z,zn,th,u,v,vism,vist,ip,jp,kp,l_h,r_h)
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     endif
 
     ! full exchange
-    call exchange_full(comm3d, id, kp, jp, ip, r_h,r_h,r_h,r_h,l_h,r_h,vism,&
-        0._sp,0._sp,dims,coords)
-    call exchange_full(comm3d, id, kp, jp, ip, r_h,r_h,r_h,r_h,l_h,r_h,vist,&
-        0._sp,0._sp,dims,coords)
+    call exchange_full_wo(comm3d, id, kp, jp, ip, r_h,r_h,r_h,r_h,l_h,r_h,vism,&
+        dims,coords)
+    call exchange_full_wo(comm3d, id, kp, jp, ip, r_h,r_h,r_h,r_h,l_h,r_h,vist,&
+        dims,coords)
 
 
     if(moisture) then
@@ -368,9 +368,9 @@
 	!>calculate the momentum and potential temperature scales
 	!> see page 243, Jacobson 
 	!> "Noniterative parameterisation for momentum and potential temperature scales"
-	!>@param[in] z0,z0th,thetan,zn,th,u,v,ip,jp,kp,l_h,r_h
+	!>@param[in] z0,z0th,theta,thetan,z,zn,th,u,v,ip,jp,kp,l_h,r_h
 	!>@param[inout] vism,vist
-    subroutine monin_obukhov(z0,z0th,thetan,zn,th,u,v,vism,vist,ip,jp,kp,l_h,r_h)
+    subroutine monin_obukhov(z0,z0th,theta,thetan,z,zn,th,u,v,vism,vist,ip,jp,kp,l_h,r_h)
 	use nrtype
 	use mpi_module
 	use mpi
@@ -381,7 +381,7 @@
             th, u, v
     real(sp), intent(inout), dimension(-r_h+1:kp+r_h,-r_h+1:jp+r_h,-l_h+1:ip+r_h) :: &
             vism,vist
-    real(sp), intent(in), dimension(-r_h+1:kp+r_h) :: thetan, zn
+    real(sp), intent(in), dimension(-r_h+1:kp+r_h) :: thetan, zn,z,theta
     real(sp), intent(in) :: z0, z0th
             
     ! locals
@@ -393,37 +393,37 @@
     
     do i=1,ip
         do j=1,jp
-            ! wind speed in first layer above surface
-            vmag(j,i)=0.5_sp*sqrt((u(2,j,i)+u(2,j,i-1))**2 + &
-                                  (v(2,j,i)+v(2,j-1,i))**2  )+small
+            ! wind speed in first layer above surface 
+            vmag(j,i)=0.5_sp*sqrt((u(1,j,i)+u(1,j,i-1))**2 + &
+                                  (v(1,j,i)+v(1,j-1,i))**2  )+small
             
             ! bulk richardson number
-            ! equation 8.39 (Jacobson pp 243)
-            rib(j,i)=grav*(th(2,j,i)+thetan(2)-th(1,j,i)-thetan(1))*(zn(2)-z0)**2 / &
-                (thetan(1)*vmag(j,i)**2*(zn(2)-z0th)) 
+            ! equation 8.39 (Jacobson pp 243) - theta(0) is the surface there is no pertubation here
+            rib(j,i)=grav*(th(1,j,i)+thetan(1)-theta(0))*(z(1)-z0)**2 / &
+                (theta(0)*vmag(j,i)**2*(z(1)-z0th)) 
             
-            ! equation 8.41 (Jacobson pp 243)
+            ! equation 8.41 (Jacobson pp 243) - need to use z(1)
             if(rib(j,i) .le. 0._sp) then
                 gm(j,i)=1._sp-9.4_sp*rib(j,i)/ &
-                    (1._sp+70._sp*kvon**2*sqrt(abs(rib(j,i)*zn(2)/z0))/(log(zn(2)/z0))**2)
+                    (1._sp+70._sp*kvon**2*sqrt(abs(rib(j,i)*z(1)/z0))/(log(z(1)/z0))**2)
                 gh(j,i)=1._sp-9.4_sp*rib(j,i)/ &
-                    (1._sp+50._sp*kvon**2*sqrt(abs(rib(j,i)*zn(2)/z0))/(log(zn(2)/z0))**2)
+                    (1._sp+50._sp*kvon**2*sqrt(abs(rib(j,i)*z(1)/z0))/(log(z(1)/z0))**2)
             else
                 gm(j,i)=1._sp/(1._sp+4.7_sp*rib(j,i))**2
                 gh(j,i)=1._sp/(1._sp+4.7_sp*rib(j,i))**2
             endif
             
-            ! equation 8.40 (Jacobson pp 243)
-            ustar(j,i)=kvon*vmag(j,i)/log(zn(2)/z0)*sqrt(gm(j,i))
-            thstar(j,i)=kvon**2*vmag(j,i)*(th(2,j,i)+thetan(2)-th(1,j,i)-thetan(1)) / &
-                (ustar(j,i)*prn*log(zn(2)/z0)**2)*gh(j,i)
+            ! equation 8.40 (Jacobson pp 243) - need to use z(1)
+            ustar(j,i)=kvon*vmag(j,i)/log(z(1)/z0)*sqrt(gm(j,i))
+            thstar(j,i)=kvon**2*vmag(j,i)*(th(1,j,i)+thetan(1)-theta(0)) / &
+                (ustar(j,i)*prn*log(z(1)/z0)**2)*gh(j,i)
                 
                 
-            ! see equation 8.46, page 245 (Jacobson)
-            vism(1,j,i)=ustar(j,i)**2*(zn(2)-z0)/vmag(j,i)
+            ! see equation 8.46, page 245 (Jacobson) - need to use z(1) / look
+            vism(0,j,i)=ustar(j,i)**2*(z(1)-z0)/vmag(j,i)
             
-            vist(1,j,i)=ustar(j,i)*thstar(j,i)/ &
-                ((th(2,j,i)+thetan(2)-th(1,j,i)-thetan(1))/(zn(2)-z0th) + small )
+            vist(0,j,i)=ustar(j,i)*thstar(j,i)/ &
+                ((th(1,j,i)+thetan(1)-theta(0))/(z(1)-z0th) + small )
         enddo
     enddo
     

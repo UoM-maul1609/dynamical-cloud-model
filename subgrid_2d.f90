@@ -125,16 +125,16 @@
     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     ! surface layer - monin-obukhov similarity theory                                    !
     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    call monin_obukhov(z0,z0th,thetan,zn,th,u,vism,vist,ip,kp,l_h,r_h)
+    call monin_obukhov(z0,z0th,theta,thetan,z,zn,th,u,vism,vist,ip,kp,l_h,r_h)
     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
     ! full exchange
-    vism(0,:)=0._sp
+    !vism(0,:)=0._sp
     vism(kp+1,:)=0._sp
-    vism(:,0)=vism(:,ip)
+    !vism(:,0)=vism(:,ip)
     vism(:,ip+1)=vism(:,1)
 
-    vist(0,:)=0._sp
+    !vist(0,:)=0._sp
     vist(kp+1,:)=0._sp
     vist(:,0)=vist(:,ip)
     vist(:,ip+1)=vist(:,1)
@@ -286,9 +286,9 @@
 	!>calculate the momentum and potential temperature scales
 	!> see page 243, Jacobson 
 	!> "Noniterative parameterisation for momentum and potential temperature scales"
-	!>@param[in] z0,z0th,thetan,zn,th,u,ip,kp,l_h,r_h
+	!>@param[in] z0,z0th,theta,thetan,z,zn,th,u,ip,kp,l_h,r_h
 	!>@param[inout] vism,vist
-    subroutine monin_obukhov(z0,z0th,thetan,zn,th,u,vism,vist,ip,kp,l_h,r_h)
+    subroutine monin_obukhov(z0,z0th,theta,thetan,z,zn,th,u,vism,vist,ip,kp,l_h,r_h)
 	use nrtype
     
     implicit none
@@ -297,7 +297,7 @@
             th, u
     real(sp), intent(inout), dimension(-r_h+1:kp+r_h,-l_h+1:ip+r_h) :: &
             vism,vist
-    real(sp), intent(in), dimension(-r_h+1:kp+r_h) :: thetan, zn
+    real(sp), intent(in), dimension(-r_h+1:kp+r_h) :: thetan, zn, theta,z
     real(sp), intent(in) :: z0, z0th
             
     ! locals
@@ -309,35 +309,35 @@
     
     do i=1,ip
         ! wind speed in first layer above surface
-        vmag(i)=0.5_sp*sqrt((u(2,i)+u(2,i-1))**2  )+small
+        vmag(i)=0.5_sp*sqrt((u(1,i)+u(1,i-1))**2  )+small
         
         ! bulk richardson number
         ! equation 8.39 (Jacobson pp 243)
-        rib(i)=grav*(th(2,i)+thetan(2)-th(1,i)-thetan(1))*(zn(2)-z0)**2 / &
-            (thetan(1)*vmag(i)**2*(zn(2)-z0th)) 
+        rib(i)=grav*(th(1,i)+thetan(1)-thetan(0))*(z(1)-z0)**2 / &
+            (theta(0)*vmag(i)**2*(z(1)-z0th)) 
         
         ! equation 8.41 (Jacobson pp 243)
         if(rib(i) .le. 0._sp) then
             gm(i)=1._sp-9.4_sp*rib(i)/ &
-                (1._sp+70._sp*kvon**2*sqrt(abs(rib(i)*zn(2)/z0))/(log(zn(2)/z0))**2)
+                (1._sp+70._sp*kvon**2*sqrt(abs(rib(i)*z(1)/z0))/(log(z(1)/z0))**2)
             gh(i)=1._sp-9.4_sp*rib(i)/ &
-                (1._sp+50._sp*kvon**2*sqrt(abs(rib(i)*zn(2)/z0))/(log(zn(2)/z0))**2)
+                (1._sp+50._sp*kvon**2*sqrt(abs(rib(i)*z(1)/z0))/(log(z(1)/z0))**2)
         else
             gm(i)=1._sp/(1._sp+4.7_sp*rib(i))**2
             gh(i)=1._sp/(1._sp+4.7_sp*rib(i))**2
         endif
         
         ! equation 8.40 (Jacobson pp 243)
-        ustar(i)=kvon*vmag(i)/log(zn(2)/z0)*sqrt(gm(i))
-        thstar(i)=kvon**2*vmag(i)*(th(2,i)+thetan(2)-th(1,i)-thetan(1)) / &
-            (ustar(i)*prn*log(zn(2)/z0)**2)*gh(i)
+        ustar(i)=kvon*vmag(i)/log(z(1)/z0)*sqrt(gm(i))
+        thstar(i)=kvon**2*vmag(i)*(th(1,i)+thetan(1)-theta(0)) / &
+            (ustar(i)*prn*log(z(1)/z0)**2)*gh(i)
             
             
         ! see equation 8.46, page 245 (Jacobson)
-        vism(1,i)=ustar(i)**2*(zn(2)-z0)/vmag(i)
+        vism(0,i)=ustar(i)**2*(z(1)-z0)/vmag(i)
         
-        vist(1,i)=ustar(i)*thstar(i)/ &
-            ((th(2,i)+thetan(2)-th(1,i)-thetan(1))/(zn(2)-z0th) + small )
+        vist(0,i)=ustar(i)*thstar(i)/ &
+            ((th(1,i)+thetan(1)-theta(0))/(z(1)-z0th) + small )
     enddo
     
     
