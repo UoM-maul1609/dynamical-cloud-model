@@ -206,14 +206,14 @@
 		dyn(:)=dy_nm
 		dzn(:)=dz_nm
 		! set up horizontal level array
-		x=dx_nm*(/(i,i=-l_h+ipstart,ipp+r_h+ipstart-1)/) - real(ip+1,sp)/2._sp*dx_nm
-		xn=x+0.5_sp*dx_nm
+		x=dx_nm*(/(i,i=-l_h+ipstart,ipp+r_h+ipstart-1)/) - real(ip-1,sp)/2._sp*dx_nm 
+		xn=x-0.5_sp*dx_nm
 		! set up horizontal level array
-		y=dy_nm*(/(i,i=-l_h+jpstart,jpp+r_h+jpstart-1)/) - real(jp+1,sp)/2._sp*dy_nm
-		yn=y+0.5_sp*dy_nm
+		y=dy_nm*(/(i,i=-l_h+jpstart,jpp+r_h+jpstart-1)/) - real(jp-1,sp)/2._sp*dy_nm
+		yn=y-0.5_sp*dy_nm
 
 		! set up vertical level array
-		z=dz_nm*(/(i,i=-l_h+kpstart-1,kpp+r_h+kpstart-2)/)+0.5_sp*dz_nm
+		z=dz_nm*(/(i,i=-l_h+kpstart-1,kpp+r_h+kpstart-2)/)+1.0_sp*dz_nm
 		zn=z-0.5_sp*dz_nm
 		
 		! temporary density
@@ -481,8 +481,8 @@
 		! grid spacing, staggered:
 		dzn(:)=dz_nm
 		! set up vertical level array
-		z=dz_nm*(/(i,i=-l_h+kpstart-1,kpp+r_h+kpstart-2)/)
-		zn=z+0.5_sp*dz_nm
+		z=dz_nm*(/(i,i=-l_h+kpstart-1,kpp+r_h+kpstart-2)/)+1.0_sp*dz_nm
+		zn=z-0.5_sp*dz_nm
 		
 		! temporary density
 		rhoa=1._sp
@@ -692,12 +692,12 @@
 		dxn(:)=dx_nm
 		dzn(:)=dz_nm
 		! set up horizontal level array
-		x=dx_nm*(/(i,i=-l_h+ipstart,ipp+r_h+ipstart-1)/) - real(ip+1,sp)/2._sp*dx_nm
-		xn=x+0.5_sp*dx_nm
+		x=dx_nm*(/(i,i=-l_h+ipstart,ipp+r_h+ipstart-1)/) - real(ip-1,sp)/2._sp*dx_nm 
+		xn=x-0.5_sp*dx_nm
 
 		! set up vertical level array
-		z=dz_nm*(/(i,i=-l_h+kpstart-1,kpp+r_h+kpstart-2)/)
-		zn=z+0.5_sp*dz_nm
+		z=dz_nm*(/(i,i=-l_h+kpstart-1,kpp+r_h+kpstart-2)/)+1.0_sp*dz_nm
+		zn=z-0.5_sp*dz_nm
 		
 		! temporary density
 		rhoa=1._sp
