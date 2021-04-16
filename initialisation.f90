@@ -718,12 +718,12 @@
                             .and. (k >= kpstart) .and. (k <= kpstart+kpp+1) ) then
                     
                             if ( (z(k-kpstart)>param_z) .and. &
-                                (z(k-kpstart)<param_z+param_delz) ) &
+                                (z(k-kpstart)<=param_z+param_delz) ) &
                                 th(k-kpstart,j-jpstart,i-ipstart) = &
                                     -0.001_sp+(r-0.5_sp)/100._sp
 
                             if ( (z(k-kpstart)>param_z-param_delz) .and. &
-                                (z(k-kpstart)<param_z) ) &
+                                (z(k-kpstart)<=param_z) ) &
                                 th(k-kpstart,j-jpstart,i-ipstart) = &
                                     0.001_sp-(r-0.5_sp)/100._sp
                         
