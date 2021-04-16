@@ -119,7 +119,7 @@
 				coords, &
 				dims,id, world_process, rank, ring_comm,sub_horiz_comm,sub_vert_comm)
 		use nrtype
-		use mpi_module, only : exchange_full, exchange_along_dim
+		use mpi_module, only : exchange_full, exchange_along_dim, exchange_along_dim_wo
         use advection_s_3d, only : first_order_upstream_3d, &
                     mpdata_3d, mpdata_vec_3d, adv_ref_state, mpdata_3d_add, &
                     mpdata_vert_3d, mpdata_vec_vert_3d
@@ -367,8 +367,8 @@
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 			! set halos																	 !
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!		
-			call exchange_along_dim(ring_comm, id, kpp, jpp, ipp, &
-								r_h,r_h,r_h,r_h,r_h,r_h, psrc,0._sp, 0._sp, &
+			call exchange_along_dim_wo(ring_comm, id, kpp, jpp, ipp, &
+								r_h,r_h,r_h,r_h,r_h,r_h, psrc, &
 								dims,coords)
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!		
 
@@ -388,8 +388,8 @@
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 			! set halos																	 !
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!		
-			call exchange_along_dim(ring_comm, id, kpp, jpp, ipp, &
-								r_h,r_h,r_h,r_h,r_h,r_h, p,0._sp, 0._sp, dims,coords)
+			call exchange_along_dim_wo(ring_comm, id, kpp, jpp, ipp, &
+								r_h,r_h,r_h,r_h,r_h,r_h, p, dims,coords)
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!		
             
             
@@ -422,7 +422,7 @@
 			select case (advection_scheme)
 				case (0)
 					call first_order_upstream_3d(dt,dxn,dyn,dzn,rhoa,rhoan, &
-						ipp,jpp,kpp,l_h,r_h,u,v,w,th,1,dims,coords)
+						ipp,jpp,kpp,l_h,r_h,u,v,w,th,0,dims,coords)
                     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
                     ! set halos													   		 !
                     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!		
@@ -432,12 +432,12 @@
 				case (1)
 					call mpdata_3d(dt,dx,dy,dz,dxn,dyn,dzn,rhoa,rhoan, &
 						ipp,jpp,kpp,l_h,r_h,u,v,w,th,t1,t2, &
-						kord,monotone,1,ring_comm,id, &
+						kord,monotone,0,ring_comm,id, &
 						dims,coords)						
 				case(2)
 					call mpdata_3d_add(dt,dx,dy,dz,dxn,dyn,dzn,rhoa,rhoan, &
 						ipp,jpp,kpp,l_h,r_h,u,v,w,th,thetan,thbase,thtop, &
-						kord,monotone,1,ring_comm,id, &
+						kord,monotone,0,ring_comm,id, &
 						dims,coords)
 				case default
 					print *,'not coded'
@@ -458,7 +458,7 @@
                                 ipp,jpp,kpp,c_e(nqc)-c_s(nqc)+1, &
                                 l_h,r_h,u,v,w,q(:,:,:,c_s(nqc):c_e(nqc)), &
                                 q1(c_s(nqc):c_e(nqc)),q2(c_s(nqc):c_e(nqc)), &
-                                kord,monotone,1,ring_comm,id, &
+                                kord,monotone,0,ring_comm,id, &
                                 dims,coords)						
                         enddo
                     case default
@@ -580,17 +580,17 @@
 			call exchange_full(ring_comm, id, kpp, jpp, ipp, l_h,r_h,r_h,r_h,r_h,r_h,w,&
 								0._sp,0._sp,dims,coords)
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-			if(coords(3)==0) then
-                w(0,:,:)=-w(1,:,:)
-                u(1,:,:)=0._sp
-                v(1,:,:)=0._sp
+			if(coords(3)==0) then			
+                w(0,:,:)=0._sp ! the vertical velocity at the surface is zero
+                u(0,:,:)=-u(1,:,:) ! average results in zero horizontal velocity at ground
+                v(0,:,:)=-v(1,:,:)
             endif
             
             if(coords(3)==(dims(3)-1)) then
-                w(kpp,:,:)=-w(kpp-1,:,:)
+                !w(kpp,:,:)=-w(kpp-1,:,:)
                 w(kpp+1,:,:)=0._sp
-                u(kpp,:,:)=0._sp
-                v(kpp,:,:)=0._sp
+                u(kpp+1,:,:)=u(kpp,:,:)
+                v(kpp+1,:,:)=v(kpp,:,:)
             endif
 
 

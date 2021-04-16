@@ -99,29 +99,29 @@
                 !> the a_c (constant term is the part that doesn't depend on P)<br>
                 !> there are an additional two a_p terms (the \f$P_0\f$) terms <br>
                 !> and there is an additional a_u term (the \f$P_1\f$) term
-				if(coords(3)==0) then
-				    k=1
-					a_e(k,j,i)=0._sp !1._sp/( dx(i-1)*dxn(i) )
-					a_w(k,j,i)=0._sp !1._sp/( dx(i-1)*dxn(i-1) )
-					a_n(k,j,i)=0._sp !1._sp/( dy(j-1)*dyn(j) )
-					a_s(k,j,i)=0._sp !1._sp/( dy(j-1)*dyn(j-1) )
-					a_u(k,j,i)=1._sp/( dz(k-1)*dzn(k) )
-					a_d(k,j,i)=0._sp !1._sp/( dz(k-1)*dzn(k-1) )
-					a_p(k,j,i)=-1._sp/( dz(k-1)*dzn(k) ) -1._sp/( dz(k-1)*dzn(k-1) ) 
-
-                    ! constant component of P-1
-                    a_c(k,j,i)=-(dzn(k-1)*sw(k-1,j,i)+ &
-                            dzn(k-1)*rhoa(k-1)/(2._sp*dt)*&
-                            (zw(k,j,i)+zw(k-1,j,i)+2._sp*dt/rhoa(k)*(sw(k,j,i))) ) / &
-                            ( dz(k-1)*dzn(k-1) )
-                    ! in derivative format
-                    a_p(k,j,i)=a_p(k,j,i)+(1._sp - &
-                        dzn(k-1)*rhoa(k-1)/rhoa(k)/dzn(k))  /( dz(k-1)*dzn(k-1) )
-                    ! in derivative format
-                    a_u(k,j,i)= a_u(k,j,i)+ &
-                        dzn(k-1)*rhoa(k-1)/rhoa(k)/dzn(k)  /( dz(k-1)*dzn(k-1) )
-                                
-                endif
+! 				if(coords(3)==0) then
+! 				    k=1
+! 					a_e(k,j,i)=0._sp !1._sp/( dx(i-1)*dxn(i) )
+! 					a_w(k,j,i)=0._sp !1._sp/( dx(i-1)*dxn(i-1) )
+! 					a_n(k,j,i)=0._sp !1._sp/( dy(j-1)*dyn(j) )
+! 					a_s(k,j,i)=0._sp !1._sp/( dy(j-1)*dyn(j-1) )
+! 					a_u(k,j,i)=1._sp/( dz(k-1)*dzn(k) )
+! 					a_d(k,j,i)=0._sp !1._sp/( dz(k-1)*dzn(k-1) )
+! 					a_p(k,j,i)=-1._sp/( dz(k-1)*dzn(k) ) -1._sp/( dz(k-1)*dzn(k-1) ) 
+! 
+!                     ! constant component of P-1
+!                     a_c(k,j,i)=-(dzn(k-1)*sw(k-1,j,i)+ &
+!                             dzn(k-1)*rhoa(k-1)/(2._sp*dt)*&
+!                             (zw(k,j,i)+zw(k-1,j,i)+2._sp*dt/rhoa(k)*(sw(k,j,i))) ) / &
+!                             ( dz(k-1)*dzn(k-1) )
+!                     ! in derivative format
+!                     a_p(k,j,i)=a_p(k,j,i)+(1._sp - &
+!                         dzn(k-1)*rhoa(k-1)/rhoa(k)/dzn(k))  /( dz(k-1)*dzn(k-1) )
+!                     ! in derivative format
+!                     a_u(k,j,i)= a_u(k,j,i)+ &
+!                         dzn(k-1)*rhoa(k-1)/rhoa(k)/dzn(k)  /( dz(k-1)*dzn(k-1) )
+!                                 
+!                 endif
                 !> <br><br>
                 !> For the top b.c. we have:<br>
                 !> \f$ P_{kp+1}=P_{kp}+\Delta z_{kp} sw_{kp+1/2}-
@@ -134,31 +134,31 @@
                 !> the a_c (constant term is the part that doesn't depend on P)<br>
                 !> there are an additional two a_p terms (the \f$P_{kp}\f$) terms <br>
                 !> and there is an additional a_d term (the \f$P_{kp-1}\f$) term
-				if(coords(3)==(dims(3)-1)) then
-				    k=kp
-					a_e(k,j,i)=0._sp/( dx(i-1)*dxn(i) )
-					a_w(k,j,i)=0._sp/( dx(i-1)*dxn(i-1) )
-					a_n(k,j,i)=0._sp/( dy(j-1)*dyn(j) )
-					a_s(k,j,i)=0._sp/( dy(j-1)*dyn(j-1) )
-					a_u(k,j,i)=0._sp !1._sp/( dz(k-1)*dzn(k) )
-					a_d(k,j,i)=1._sp/( dz(k-1)*dzn(k-1) )
-					a_p(k,j,i)=-0._sp/( dx(i-1)*dxn(i) ) -0._sp/( dx(i-1)*dxn(i-1) ) &
-                            -0._sp/( dy(j-1)*dyn(j) ) -0._sp/( dy(j-1)*dyn(j-1) )  &
-                            -1._sp/( dz(k-1)*dzn(k) ) -1._sp/( dz(k-1)*dzn(k-1) ) 
-
-                    ! constant component of Pkp+1
-                    a_c(k,j,i)=(dzn(k)*sw(k,j,i)+ &
-                            dzn(k)*rhoa(k)/(2._sp*dt)*&
-                            (zw(k,j,i)+zw(k-1,j,i)+2._sp*dt/rhoa(k-1)*(sw(k-1,j,i))) ) / &
-                            ( dz(k-1)*dzn(k) )
-
-                    ! in derivative format
-                    a_p(k,j,i)=a_p(k,j,i)+(1._sp - &
-                        dzn(k)*rhoa(k)/rhoa(k-1)/dzn(k-1))  /( dz(k-1)*dzn(k) )
-                    ! in derivative format
-                    a_d(k,j,i)= a_d(k,j,i)+ &
-                        dzn(k)*rhoa(k)/rhoa(k-1)/dzn(k-1)  /( dz(k-1)*dzn(k) )                         
-                endif
+! 				if(coords(3)==(dims(3)-1)) then
+! 				    k=kp
+! 					a_e(k,j,i)=0._sp/( dx(i-1)*dxn(i) )
+! 					a_w(k,j,i)=0._sp/( dx(i-1)*dxn(i-1) )
+! 					a_n(k,j,i)=0._sp/( dy(j-1)*dyn(j) )
+! 					a_s(k,j,i)=0._sp/( dy(j-1)*dyn(j-1) )
+! 					a_u(k,j,i)=0._sp !1._sp/( dz(k-1)*dzn(k) )
+! 					a_d(k,j,i)=1._sp/( dz(k-1)*dzn(k-1) )
+! 					a_p(k,j,i)=-0._sp/( dx(i-1)*dxn(i) ) -0._sp/( dx(i-1)*dxn(i-1) ) &
+!                             -0._sp/( dy(j-1)*dyn(j) ) -0._sp/( dy(j-1)*dyn(j-1) )  &
+!                             -1._sp/( dz(k-1)*dzn(k) ) -1._sp/( dz(k-1)*dzn(k-1) ) 
+! 
+!                     ! constant component of Pkp+1
+!                     a_c(k,j,i)=(dzn(k)*sw(k,j,i)+ &
+!                             dzn(k)*rhoa(k)/(2._sp*dt)*&
+!                             (zw(k,j,i)+zw(k-1,j,i)+2._sp*dt/rhoa(k-1)*(sw(k-1,j,i))) ) / &
+!                             ( dz(k-1)*dzn(k) )
+! 
+!                     ! in derivative format
+!                     a_p(k,j,i)=a_p(k,j,i)+(1._sp - &
+!                         dzn(k)*rhoa(k)/rhoa(k-1)/dzn(k-1))  /( dz(k-1)*dzn(k) )
+!                     ! in derivative format
+!                     a_d(k,j,i)= a_d(k,j,i)+ &
+!                         dzn(k)*rhoa(k)/rhoa(k-1)/dzn(k-1)  /( dz(k-1)*dzn(k) )                         
+!                 endif
 			enddo
 		enddo
 !$omp end simd
@@ -195,8 +195,16 @@
 		
 		call exchange_along_dim(comm3d, id, kp, jp, ip, &
 			halo,halo,halo,halo,halo,halo, x,0._sp,0._sp,dims,coords)
-
+		
+		if(coords(3)==0) then
+            x(0,:,:)=x(1,:,:)
+		endif
+		if(coords(3)==(dims(3)-1)) then
+            x(kp+1,:,:)=x(kp,:,:)
+		endif
+        
 		ax=0._sp
+		! calculates the laplacian
 !$omp simd		
 		do i=1,ip
 			do j=1,jp
@@ -280,6 +288,7 @@
 			ip,jp,kp,l_h,r_h,su,sv,sw,zu,zv,zw,x,b,tol,&
 			test_solver)
 		use nrtype
+		use mpi_module
 		implicit none
 		integer(i4b), intent(in) :: id, comm3d, rank
 		integer(i4b), dimension(3), intent(in) :: dims,coords
@@ -417,15 +426,12 @@
 			stop
 		endif
 		
+
 		if(coords(3)==(dims(3)-1)) then
-		    x(kp+1,:,:)=x(kp,:,:)+dzn(kp)*sw(kp,:,:)+dzn(kp)*rhoa(kp)/(2._sp*dt) * &
-		        (zw(kp,:,:)+zw(kp-1,:,:)+&
-		        2._sp*dt/rhoa(kp-1)*(sw(kp-1,:,:)+(x(kp-1,:,:)-x(kp,:,:))/dzn(kp-1)))
+            x(kp+1,:,:)=x(kp,:,:)
 		endif
 		if(coords(3)==0) then
-		    x(0,:,:)=x(1,:,:)-dzn(0)*sw(0,:,:)-dzn(0)*rhoa(0)/(2._sp*dt) * &
-		        (zw(1,:,:)+zw(0,:,:)+&
-		        2._sp*dt/rhoa(1)*(sw(1,:,:)+(x(1,:,:)-x(2,:,:))/dzn(1)))
+            x(0,:,:)=x(1,:,:)-sw(0,:,:)*dzn(0)
 		endif
 
 	end subroutine bicgstab
@@ -887,13 +893,58 @@
         
 
 		! su, sv, and su are now centred on i+1/2        
-        if(coords(3)==0) sw(0,:,:)=-sw(1,:,:)/rhoa(1)*rhoa(0)
-        if(coords(3)==(dims(3)-1)) then 
-            sw(kp,:,:)=-sw(kp-1,:,:)/rhoa(kp-1)*rhoa(kp)
-            sw(kp+1,:,:)=0._sp
+        if(coords(3)==0) then 
+            ! there should be no source to vertical wind at the surface
+                    
+            k=0
+            su(k,:,:)=-su(k+1,:,:)*rhoan(k+1)/rhoan(k)
+            sv(k,:,:)=-sv(k+1,:,:)*rhoan(k+1)/rhoan(k)
+            sw(k,:,:)=0._sp
+!             do i=1,ip
+!                 do j=1,jp
+!                     ! this assumes w-1/2 = -w3/2
+!                     ! and v0=-v1
+!                     
+! 					su(k,j,i)=rhoan(k)* ( ( ( u(k,j,i-1)*(u(k,j,i)+u(k,j,i-1)) - &
+! 								u(k,j,i+1)*(u(k,j,i)+u(k,j,i+1)) ) / &
+! 								(2._sp*(dx(i)+dx(i-1))) + &
+! 							  ( u(k,j-1,i)*(v(k,j-1,i)+v(k,j-1,i+1)) - &
+! 								u(k,j+1,i)*(v(k,j,i)+v(k,j,i+1)) ) / &
+! 								(2._sp*(dyn(j)+dyn(j-1))) + &
+! 							  ( -u(k,j,i)*(-w(k+1,j,i)-w(k+1,j,i+1)) - &
+! 								u(k+1,j,i)*(w(k,j,i)+w(k,j,i+1)) ) / &
+! 								(2._sp*(dzn(k)+dzn(k+1))) ) )
+!                     
+!                     
+! 					sv(k,j,i)=rhoan(k)* ( ( ( v(k,j,i-1)*(u(k,j,i-1)+u(k,j+1,i-1)) - &
+! 								v(k,j,i+1)*(u(k,j,i)+u(k,j+1,i)) ) / &
+! 								(2._sp*(dxn(i)+dxn(i-1))) + &
+! 							  ( v(k,j-1,i)*(v(k,j,i)+v(k,j-1,i)) - &
+! 								v(k,j+1,i)*(v(k,j,i)+v(k,j+1,i)) ) / &
+! 								(2._sp*(dy(j)+dy(j-1))) + &
+! 							  ( -v(k,j,i)*(-w(k+1,j,i)-w(k+1,j+1,i)) - &
+! 								v(k+1,j,i)*(w(k,j,i)+w(k,j+1,i)) ) / &
+! 								(2._sp*(dzn(k)+dzn(k+1))) ) )
+!                     
+!                     sw(k,j,i)=rhoa(k)* ( ( ( w(k,j,i-1)*(u(k,j,i-1)+u(k+1,j,i-1)) - &
+!                                 w(k,j,i+1)*(u(k,j,i)+u(k+1,j,i)) ) / &
+!                                 (2._sp*(dxn(i)+dxn(i-1))) + &
+!                               ( w(k,j-1,i)*(v(k,j-1,i)+v(k+1,j-1,i)) - &
+!                                 w(k,j+1,i)*(v(k,j,i)+v(k+1,j,i)) ) / &
+!                                 (2._sp*(dyn(j)+dyn(j-1))) + &
+!                               ( -w(k+1,j,i)*(w(k,j,i)-w(k+1,j,i)) - &
+!                                 w(k+1,j,i)*(w(k,j,i)+w(k+1,j,i)) ) / &
+!                                 (2._sp*(dz(k)+dz(k+1))) )) !+ &
+!                                 !grav*(th(k,j,i)+th(k+1,j,i) ) / &
+!                                     !(2._sp*theta(k) +thbar(k)+thbar(K+1)) )
+!                 enddo
+!             enddo		
         endif
-!         if(coords(3)==(dims(3)-1)) su(kp:kp+1,:,:)=0._sp
-!         if(coords(3)==(dims(3)-1)) sv(kp:kp+1,:,:)=0._sp
+        if(coords(3)==(dims(3)-1)) then 
+            sw(kp,:,:)=0._sp
+        endif
+        if(coords(3)==(dims(3)-1)) su(kp:kp+1,:,:)=0._sp
+        if(coords(3)==(dims(3)-1)) sv(kp:kp+1,:,:)=0._sp
         
 		! rhs of poisson (centred difference):
 !$omp simd	
@@ -904,13 +955,21 @@
 							 ( sv(k,j,i)-sv(k,j-1,i) )/ dy(j-1) + &
 							 ( sw(k,j,i)-sw(k-1,j,i) )/ dz(k-1) )
 				enddo
-				if(coords(3)==0) then
-                    rhs(0,j,i)=rhs(1,j,i)
-                endif
 			enddo
 		enddo
 !$omp end simd	
 
+        if(coords(3)==0) then
+            ! this assumes that the vertical wind at -1/2 is opposite that at 3/2
+            k=0
+            do i=1,ip
+                do j=1,jp
+                    rhs(k,j,i)=( ( su(k,j,i)-su(k,j,i-1) )/ dx(i-1) + &
+                         ( sv(k,j,i)-sv(k,j-1,i) )/ dy(j-1) + &
+                         ( sw(k,j,i)+sw(k+1,j,i) )/ dz(k+1) )
+                enddo
+            enddo
+        endif
 
 	end subroutine sources	
 	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
