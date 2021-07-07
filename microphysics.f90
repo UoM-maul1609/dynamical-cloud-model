@@ -168,6 +168,7 @@
 	!>calculate the partial kth integral moment of a lognormal distribution
 	!>see:
 	!>https://en.wikipedia.org/wiki/Log-normal_distribution#Partial_expectation
+	!> https://math.stackexchange.com/questions/2055782/partial-expectations-of-lognormal-distributions
 	!>@param[in] k: moment to calculate
 	!>@param[in] n,sig,d: parameters of the lognormal distribution
 	!>@param[out] mom: the integral moment to calculate
@@ -177,12 +178,13 @@
         real(sp), intent(in) :: a,n,sig,d
         real(sp) :: ln_part_mom
         
-        real(sp) :: x, phi
+        real(sp) :: x1, phi1
         
-        x=(log(a)-log(d)-sig**2*real(k,sp))/sig
-        phi=0.5_sp*(1._sp+erf(x/sqrt(2._sp)))
+        x1=(log(a)-log(d)-sig**2*real(k,sp))/(sig*sqrt(2._sp))
+        phi1=0.5_sp*(1._sp+erf(x1))
+
         ln_part_mom= &
-            n*(exp(log(d)*real(k,sp)+sig**2*real(k,sp)**2/2._sp)* (1._sp-phi))
+            max(n*exp(log(d)*real(k,sp)+sig**2*real(k,sp)**2*0.5_sp)* (1._sp-phi1), 0._sp)
         
     end function ln_part_mom
     
@@ -2145,6 +2147,7 @@
                 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
                 ! number in aerosol modes
                 dummy1=ln_part_mom(0,dcrit2(i),q(k,cst(i+1)), sig_aer1(i),d_aer1(i))
+                !print *,dummy1, dcrit2(i), act_frac1*q(k,cst(i+1))
                 q(k,cst(i+1))=q(k,cst(i+1))-dummy1 
                     
                 ! surface area in aerosol modes
