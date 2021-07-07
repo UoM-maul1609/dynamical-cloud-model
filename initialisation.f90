@@ -501,10 +501,10 @@
                 ! solve the hydrostatic equation on staggered points					 !
                 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
                 psolve=psurf
-                if( z(i) < 0._sp ) then
+                if( z(i) <= 0._sp ) then
                     hmin=-1.e-2_sp
-                    htry=-dz(i)
-                    call odeint(psolve,0._sp,z(i),eps2,htry,hmin,hydrostatic1a,rkqs)
+                    !htry=-dz(i)
+                    !call odeint(psolve,0._sp,z(i),eps2,htry,hmin,hydrostatic1a,rkqs)
                 else
                     hmin=1.e-2_sp
                     htry=dz(i)
@@ -527,9 +527,9 @@
                             min(z(i),z_read(n_levels)), var,dummy)
     !			th(:,:,i)=var
                 theta(i)=var
-                rhoa(i)=psolve(1)/(ra*theta(i)*(psolve(1)/psurf)**(ra/cp))
+                rhoa(i)=psolve(1)/(ra*theta(i)*(psolve(1)/100000.)**(ra/cp))
                 pref(i)=psolve(1)
-                tref(i)=(theta(i)*(psolve(1)/psurf)**(ra/cp))
+                tref(i)=(theta(i)*(psolve(1)/100000.)**(ra/cp))
                 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 
@@ -561,9 +561,9 @@
                 call polint(z_read(iloc:iloc+1), theta_read(iloc:iloc+1), &
                             min(zn(i),z_read(n_levels)), var,dummy)
                 thetan(i)=var
-                rhoan(i)=psolve(1)/(ra*thetan(i)*(psolve(1)/psurf)**(ra/cp))
+                rhoan(i)=psolve(1)/(ra*thetan(i)*(psolve(1)/100000.)**(ra/cp))
                 prefn(i)=psolve(1)
-                trefn(i)=(thetan(i)*(psolve(1)/psurf)**(ra/cp))
+                trefn(i)=(thetan(i)*(psolve(1)/100000.)**(ra/cp))
                 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
             enddo
@@ -720,12 +720,14 @@
                             if ( (z(k-kpstart)>param_z) .and. &
                                 (z(k-kpstart)<=param_z+param_delz) ) &
                                 th(k-kpstart,j-jpstart,i-ipstart) = &
-                                    -0.001_sp+(r-0.5_sp)/100._sp
+                                    -0.001_sp+(r-0.5_sp)/20._sp
+                                    !-0.001_sp+(r-0.5_sp)/100._sp
 
                             if ( (z(k-kpstart)>param_z-param_delz) .and. &
                                 (z(k-kpstart)<=param_z) ) &
                                 th(k-kpstart,j-jpstart,i-ipstart) = &
-                                    0.001_sp-(r-0.5_sp)/100._sp
+                                    0.001_sp-(r-0.5_sp)/20._sp
+                                    !0.001_sp-(r-0.5_sp)/100._sp
                         
 
                         endif
@@ -762,28 +764,30 @@
             enddo
         endif
         
-!  		th=0._sp
-! 		
-! 		
-! 		do i=1-r_h,ipp+r_h
-! 			do j=1-r_h,jpp+r_h
-! 				do k=1-r_h,kpp+r_h
-! 					!th(k,j,i)=theta(k)
-! 				
-! 					rad = (zn(k)-3000._sp)**2._sp
-! 						
-! 					if (ip > 1) rad=rad+xn(i)**2._sp
-! 					if (jp > 1) rad=rad+yn(j)**2._sp
-! 					
-! 					rad=sqrt(rad)
-! 					if(rad<=1000._sp) then
-! 						th(k,j,i)=th(k,j,i)+0.1_sp
-! 					else
-! 						!th(k,j,i)=0._sp
-! 					endif
-! 				enddo
-! 			enddo
-! 		enddo
+        if (.not.param_wind) then
+            th=0._sp
+            do i=1-r_h,ipp+r_h
+                do j=1-r_h,jpp+r_h
+                    do k=1-r_h,kpp+r_h
+                        !th(k,j,i)=theta(k)
+                
+                        rad = (zn(k)-500._sp)**2._sp
+                        
+                        if (ip > 1) rad=rad+xn(i)**2._sp
+                        if (jp > 1) rad=rad+yn(j)**2._sp
+                    
+                        rad=sqrt(rad)
+                        if(rad<=300._sp) then
+                            th(k,j,i)=th(k,j,i)+2.5_sp
+                            q(k,j,i,1)=q(k,j,i,1)*3.5_sp
+                            !th(k,j,i)=th(k,j,i)+0.1_sp
+                        else
+                            !th(k,j,i)=0._sp
+                        endif
+                    enddo
+                enddo
+            enddo
+        endif
 		deallocate(seed)
 		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!		
 
@@ -818,6 +822,8 @@
 		call exchange_full(comm3d, id, kpp, jpp, ipp, l_h,r_h,r_h,r_h,r_h,r_h, w,&
 		        0._sp,0._sp, dims,coords)
 		call exchange_full(comm3d, id, kpp, jpp, ipp, r_h,r_h,r_h,r_h,r_h,r_h, th,&
+		        0._sp,0._sp, dims,coords)
+		call exchange_full(comm3d, id, kpp, jpp, ipp, r_h,r_h,r_h,r_h,r_h,r_h, q(:,:,:,1),&
 		        0._sp,0._sp, dims,coords)
 		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!		
 

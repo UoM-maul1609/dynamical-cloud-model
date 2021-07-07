@@ -1,0 +1,50 @@
+
+ &run_vars
+	nm1%outputfile = '/tmp/output.nc',
+	nm1%subgrid_model=2, ! 1 = constant viscosity, 2=smagorinsky
+	nm1%viscous_dissipation=.true.,
+	nm1%restart=.false.,
+	nm1%cvis=0.1, ! usually between 0.1 and 0.2 - think LEM has factor of 2 higher because
+	              ! of definition of Sij
+	nm1%runtime= 86400.,
+	nm1%dt=5.,
+	nm1%advection_scheme=1, ! 0=upstream, 1=mpdata (for scalars)
+	nm1%monotone=.true.,    ! monotone advection   (for scalars)
+	nm1%kord=3,    			! order for mpdata advection scheme
+	nm1%output_interval=1000.,
+	nm1%rotation_period_hours=24.,
+	nm1%ip=1,
+	nm1%jp=100,
+	nm1%kp=120,
+	nm1%dx=200.,
+	nm1%dy=200.,
+	nm1%dz=100.,
+ 	nm1%psurf=100000.,
+ 	nm1%tsurf=297.9,
+    nm1%n_levels = 4,
+	nm1%q_read(1,1:4)   = 0.015, 0.0138, 0.0138, 0.0024,
+	nm1%theta_read(1:4) = 297.9, 297.9, 297.9, 312.95, !312.66,
+	nm1%z_read(1:4)     = 0.,740,6260, 6261/ ! 3260
+	
+ &rad_vars
+ 	nm2%start_year=2009,
+ 	nm2%start_mon=2,
+ 	nm2%start_day=18,
+ 	nm2%start_hour=11,
+ 	nm2%start_min=0,
+ 	nm2%start_sec=0,
+ 	nm2%lat_ref=51.159330,
+ 	nm2%lon_ref=-1.436290,
+ 	nm2%quad_flag=0, ! 0 is quadrature, 1 is Eddington
+ 	nm2%albedo="Grass",
+ 	nm2%emissivity="Grass",
+ 	nm2%asymmetry_water=0.85,
+ 	nm2%ns=10,
+ 	nm2%nl=10,
+ 	nm2%lambda_s_low=10.e-9,
+ 	nm2%lambda_s_high=705.e-9,
+	nm2%lambda_read_s(1:10)=100.e-9,200.e-9,300.e-9,350.e-9,400.e-9,450.e-9,500.e-9,550.e-9,600.e-9,700.e-9,
+ 	nm2%lambda_l_low=705.e-9,
+ 	nm2%lambda_l_high=150000.e-9,
+	nm2%lambda_read_l(1:10)=800.e-9,900.e-9,1000.e-9,1100.e-9,1200.e-9,1300.e-9,1400.e-9,10500.e-9,16000.e-9,120000.e-9/ 
+	
