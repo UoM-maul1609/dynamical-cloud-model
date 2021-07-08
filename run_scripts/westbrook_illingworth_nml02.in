@@ -1,5 +1,5 @@
 &run_vars
-	nm1%outputfile = '/tmp/output_pc02.nc',
+	nm1%outputfile = '/tmp/output_pc04.nc',
 	nm1%subgrid_model=2, ! 1 = constant viscosity, 2=smagorinsky
 	nm1%viscous_dissipation=.true.,
 	nm1%damping_layer=.true.,
@@ -35,6 +35,7 @@
 	nm1%ice_nuc_flag=1,             ! 1 is for Demott, 2 is for const stochastic 
 	nm1%hm_flag=.false.,             ! hm process
 	nm1%mode2_ice_flag=0,           ! 0 is off; 1 is on - experimental
+	nm1%coll_breakup_flag1=1,        ! 0 is off; 1 is on - experimental
 	nm1%heyms_west=.true.,          ! flag for new fall-speeds
 	nm1%rad_nmlfile='run_scripts/westbrook_illingworth_rad_nml.in',       ! filename for radiation namelist
 	nm1%bam_nmlfile='run_scripts/westbrook_illingworth_bam_nml.in',  ! filename of bam namelist

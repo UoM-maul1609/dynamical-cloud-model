@@ -56,7 +56,7 @@
 	!>@param[in] forcing: flag for large-scale forcing of horizontal winds
 	!>@param[in] divergence: flag for large-scale divergence
 	!>@param[in] radiation: radiation scheme
-	!>@param[in] j_stochastic, ice_nuc_flag, mode2_ice_flag, heyms_west
+	!>@param[in] j_stochastic, ice_nuc_flag, mode2_ice_flag, coll_breakup_flag1,heyms_west
 	!>@param[in] nq,nprec,ncat: number of q-variables
 	!>@param[in] tdstart, tdend: start and end array indices - parallel ts
 	!>@param[inout] a, b, c, r, usol: tridag
@@ -104,7 +104,8 @@
 				advection_scheme, kord, monotone, &
 				moisture, microphysics_flag, ice_flag, hm_flag, theta_flag, &
 				damping_layer,forcing, divergence, radiation, &
-				j_stochastic, ice_nuc_flag, mode2_ice_flag, heyms_west, &
+				j_stochastic, ice_nuc_flag, mode2_ice_flag, coll_breakup_flag1, &
+				heyms_west, &
 				nq, nprec, ncat, &
                     tdstart,tdend, &
                     a,b,c,r,usol, &
@@ -135,7 +136,7 @@
 		logical, intent(in) :: viscous, monotone, moisture, &
 		                    damping_layer, forcing, theta_flag, ice_flag, hm_flag, &
 		                    divergence, radiation, heyms_west
-		integer(i4b), intent(in) :: ice_nuc_flag, nrad, mode2_ice_flag
+		integer(i4b), intent(in) :: ice_nuc_flag, nrad, mode2_ice_flag, coll_breakup_flag1
 		logical, intent(inout) :: micro_init
 		integer(i4b), intent(in) :: ntim,ip,jp,kp, ipp,jpp,kpp, &
 						l_h,r_h, ipstart, jpstart, kpstart, &
@@ -526,6 +527,7 @@
                                         micro_init,hm_flag,1.e-14_sp, &
                                         ice_flag, theta_flag, &
                                         j_stochastic, ice_nuc_flag, mode2_ice_flag, &
+                                        coll_breakup_flag1, &
                                         heyms_west, &
                                         radiation, &
                                         ring_comm,sub_vert_comm,id,dims,coords)		
