@@ -47,6 +47,24 @@
          1.477272813054374_sp, 1.038600921563425_sp, -0.457007828432810_sp]
     real(sp), dimension(2), parameter :: gam_mu_cl=[260.163817050062335_sp, &
                                                 8.274747821396463_sp]
+                                                
+    ! Vardiman (1978) fits to figure 6 - note delta M in units on g cm s-1
+    real(sp), dimension(3), parameter :: vard01=[0.000495314304309_sp, &
+                                                 0.281199363154805_sp, &
+                                                 3.380130133900658_sp], &
+                                         vard02=[0.304288838581395_sp, &
+                                                 4.452491028368538_sp, &
+                                                 17.511640705855431_sp], &
+                                         vard03=[1.549508244781713_sp, &
+                                                 21.756014605694737_sp, &
+                                                 77.539493556502251_sp], &
+                                         vard04=[0.924318964759507_sp, &
+                                                 15.774108106443462_sp, &
+                                                 68.805308506959534_sp], &
+                                         vard05=[0.162609020092783_sp, &
+                                                 3.031949785103254_sp, &
+                                                 15.296369750198556_sp]
+                                          
     
     ! physical constants
     real(sp), parameter :: rhow=1000._sp, rhoi=920._sp,lv=2.5e6_sp,ls=2.8e6_sp,lf=ls-lv, &
@@ -1299,7 +1317,8 @@
 	!>@param[in] mass_ice: mass of a single ice crystal (override)
 	!>@param[in] ice_flag: ice microphysics
 	!>@param[in] theta_flag: whether to alter theta
-	!>@param[in] j_stochastic, ice_nuc_flag, mode2_ice_flag, heyms_west, calc_params
+	!>@param[in] j_stochastic, ice_nuc_flag, mode2_ice_flag, 
+	!>@param[in] coll_breakup_flag1,heyms_west, calc_params
     subroutine p_microphysics_3d(nq,ncat,n_mode,cst,cen,inc,iqc, inr,iqr,ini,iqi,iai, &
                     cat_am,cat_c, cat_r, cat_i,&
                     nprec, &
@@ -1307,7 +1326,8 @@
                     nrad,ngs,lamgs,mugs, &
                     precip,th,prefn, z,thetan,rhoa,rhoan,w, &
     				micro_init,hm_flag, mass_ice, ice_flag, theta_flag, &
-    				j_stochastic,ice_nuc_flag,mode2_ice_flag, heyms_west, calc_params)
+    				j_stochastic,ice_nuc_flag,mode2_ice_flag, &
+    				coll_breakup_flag1, heyms_west, calc_params)
 #else
 	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 	!>@author
@@ -1342,7 +1362,8 @@
 	!>@param[in] mass_ice: mass of a single ice crystal (override)
 	!>@param[in] ice_flag: ice microphysics
 	!>@param[in] theta_flag: whether to alter theta
-	!>@param[in] j_stochastic, ice_nuc_flag, mode2_ice_flag, heyms_west, calc_parms
+	!>@param[in] j_stochastic, ice_nuc_flag, mode2_ice_flag, 
+	!>@param[in] coll_breakup_flag1, heyms_west, calc_parms
 	!>@param[in] comm,comm_vert,id,dims,coords: MPI variables
     subroutine p_microphysics_3d(nq,ncat,n_mode,cst,cen,inc,iqc, inr,iqr,ini,iqi,iai, &
                     cat_am,cat_c, cat_r, cat_i,&
@@ -1351,7 +1372,8 @@
                     nrad,ngs,lamgs,mugs, &
                     th,prefn, z,thetan,rhoa,rhoan,w, &
     				micro_init,hm_flag, mass_ice, ice_flag, theta_flag, &
-    				j_stochastic,ice_nuc_flag, mode2_ice_flag, heyms_west, calc_params, &
+    				j_stochastic,ice_nuc_flag, mode2_ice_flag, coll_breakup_flag1, &
+    				heyms_west, calc_params, &
     				comm,comm_vert,id,dims,coords)
     use mpi
 	use advection_s_3d, only : mpdata_vec_vert_3d, mpdata_vert_3d
@@ -1373,7 +1395,7 @@
         prefn
     real(sp), dimension(-l_h+1:kp+r_h,-l_h+1:jp+r_h,-l_h+1:ip+r_h), intent(in) :: w
     logical, intent(in) :: ice_flag, hm_flag, theta_flag, calc_params, heyms_west
-    integer(i4b), intent(in) :: ice_nuc_flag, mode2_ice_flag
+    integer(i4b), intent(in) :: ice_nuc_flag, mode2_ice_flag, coll_breakup_flag1
     logical , intent(inout) :: micro_init
     real(sp), intent(in) :: mass_ice, j_stochastic
     
@@ -1409,7 +1431,8 @@
 							z(:),thetan,rhoa(:),rhoan(:),w(:,j,i), &
     						micro_init,hm_flag, mass_ice, ice_flag, &
     						.true.,.true.,theta_flag, &
-    						j_stochastic,ice_nuc_flag,mode2_ice_flag,heyms_west)
+    						j_stochastic,ice_nuc_flag,mode2_ice_flag, &
+    						coll_breakup_flag1, heyms_west)
 #else
 
     		call p_microphysics_1d(nq,ncat,n_mode,cst,cen,inc,iqc,inr,iqr, ini,iqi,iai, &
@@ -1421,7 +1444,8 @@
 							coords, &
     						micro_init,hm_flag, mass_ice, ice_flag, &
     						.true.,.true.,theta_flag, &
-    						j_stochastic,ice_nuc_flag, mode2_ice_flag,heyms_west)
+    						j_stochastic,ice_nuc_flag, mode2_ice_flag, &
+    						coll_breakup_flag1, heyms_west)
     		n_step_o=max(n_step,n_step_o)
 
     		adv_l_o=adv_l_o .or. adv_l ! if there has been a true at any point, 
@@ -1579,13 +1603,15 @@
 	!>@param[in] wr_flag: warm rain on /off
 	!>@param[in] rm_flag: riming on /off
 	!>@param[in] theta_flag: whether to alter theta
-	!>@param[in] j_stochastic, ice_nuc_flag, mode2_ice_flag, heyms_west
+	!>@param[in] j_stochastic, ice_nuc_flag, mode2_ice_flag, 
+	!>@param[in] coll_breakup_flag1, heyms_west
     subroutine p_microphysics_2d(nq,ncat,n_mode,cst,cen,inc,iqc,inr,iqr,ini,iqi,iai, &
                     cat_am,cat_c, cat_r, cat_i,nprec, &
                     ip,kp,o_halo,dt,dz,dzn,q,precip,theta,p, z,theta_ref,rho,rhon,w, &
     						micro_init,hm_flag, mass_ice, ice_flag, &
     						wr_flag, rm_flag, theta_flag, &
-    						j_stochastic,ice_nuc_flag,mode2_ice_flag,heyms_west)
+    						j_stochastic,ice_nuc_flag,mode2_ice_flag, &
+    						coll_breakup_flag1, heyms_west)
     implicit none
     ! arguments:
     integer(i4b), intent(in) :: nq, ncat, n_mode, ip,kp, o_halo, inc, iqc, inr,iqr, &
@@ -1601,7 +1627,7 @@
                     rhon, theta_ref
     real(sp), dimension(-o_halo+1:kp+o_halo,-o_halo+1:ip+o_halo), intent(in) :: w
     logical, intent(in) :: hm_flag, ice_flag, wr_flag, rm_flag, theta_flag, heyms_west
-    integer(i4b), intent(in) :: ice_nuc_flag, mode2_ice_flag
+    integer(i4b), intent(in) :: ice_nuc_flag, mode2_ice_flag, coll_breakup_flag1
     logical , intent(inout) :: micro_init
     real(sp), intent(in) :: mass_ice, j_stochastic
 
@@ -1627,7 +1653,8 @@
 							z(:),theta_ref,rho(:,i),rhon(:),w(:,i), &
     						micro_init,hm_flag, mass_ice, ice_flag, &
     						wr_flag,rm_flag,theta_flag, &
-    						j_stochastic,ice_nuc_flag,mode2_ice_flag, heyms_west)
+    						j_stochastic,ice_nuc_flag,mode2_ice_flag, &
+    						coll_breakup_flag1, heyms_west)
 #else
 		call p_microphysics_1d(nq,ncat,n_mode,cst,cen,inc,iqc,inr,iqr, ini,iqi,iai,&
 		                cat_am,cat_c, cat_r, cat_i,nprec, &
@@ -1636,7 +1663,8 @@
 							vqc(:,i),vqr(:,i),vqi(:,i), vni(:,i), n_step, adv_l, coords,&
     						micro_init,hm_flag, mass_ice, ice_flag, &
     						wr_flag,rm_flag,theta_flag, &
-    						j_stochastic,ice_nuc_flag,mode2_ice_flag, heyms_west)
+    						j_stochastic,ice_nuc_flag,mode2_ice_flag, &
+    						coll_breakup_flag1, heyms_west)
     	n_step_o=max(n_step_o,n_step)
 #endif	
 	enddo
@@ -1682,13 +1710,14 @@
 	!>@param[in] wr_flag: warm rain
 	!>@param[in] rm_flag: riming flag
 	!>@param[in] theta_flag: whether to alter theta
-	!>@param[in] j_stochastic, ice_nuc_flag,mode2_ice_flag, heyms_west
+	!>@param[in] j_stochastic, ice_nuc_flag,mode2_ice_flag, coll_breakup_flag1, heyms_west
     subroutine p_microphysics_1d(nq,ncat,n_mode,cst,cen, inc, iqc, inr,iqr, ini,iqi,iai,&
                             cat_am,cat_c, cat_r, cat_i,nprec, &
                             kp,o_halo,dt,dz,dzn,q,precip,th,p, z,theta,rhoa,rhon,u, &
     						micro_init,hm_flag, mass_ice,ice_flag, &
     						wr_flag, rm_flag, theta_flag, &
-    						j_stochastic,ice_nuc_flag,mode2_ice_flag, heyms_west)
+    						j_stochastic,ice_nuc_flag,mode2_ice_flag, &
+    						coll_breakup_flag1, heyms_west)
 #else
 	!>@author
 	!>Paul J. Connolly, The University of Manchester
@@ -1725,14 +1754,15 @@
 	!>@param[in] wr_flag: warm rain
 	!>@param[in] rm_flag: riming flag
 	!>@param[in] theta_flag: whether to alter theta
-	!>@param[in] j_stochastic, ice_nuc_flag,mode2_ice_flag, heyms_west
+	!>@param[in] j_stochastic, ice_nuc_flag,mode2_ice_flag, coll_breakup_flag1, heyms_west
     subroutine p_microphysics_1d(nq,ncat,n_mode,cst,cen, inc, iqc, inr,iqr,ini,iqi,iai,&
                             cat_am,cat_c, cat_r, cat_i,nprec,&
                             kp,o_halo,dt,dz,dzn,q,precip,th,p, z,theta,rhoa,rhon,u, &
                             vqc,vqr,vqi,vni,n_step, adv_l, coords,&
     						micro_init,hm_flag, mass_ice,ice_flag, &
     						wr_flag, rm_flag, theta_flag, &
-    						j_stochastic,ice_nuc_flag,mode2_ice_flag, heyms_west)
+    						j_stochastic,ice_nuc_flag,mode2_ice_flag, &
+    						coll_breakup_flag1, heyms_west)
 #endif
 
 	use advection_1d
@@ -1752,7 +1782,7 @@
                                                     rhon, theta,p
     real(sp), dimension(-o_halo+1:kp+o_halo), intent(in) :: u
     logical, intent(in) :: hm_flag, ice_flag, wr_flag, rm_flag, theta_flag, heyms_west
-    integer(i4b), intent(in) :: ice_nuc_flag, mode2_ice_flag
+    integer(i4b), intent(in) :: ice_nuc_flag, mode2_ice_flag, coll_breakup_flag1
     logical , intent(inout) :: micro_init
     real(sp), intent(in) :: mass_ice, j_stochastic
     ! locals:
@@ -2311,7 +2341,9 @@
             q(k,  iqr)  =q(k, iqr)-piacr(k)*dt
             q(k,  inr)  =q(k, inr)-riacr(k)*dt
             
-            
+            !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+            ! Mode 2 secondary ice                                                       !
+            !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
             if(mode2_ice_flag.eq.1) then
             
                 ! calculate the number of fragments
@@ -2350,8 +2382,8 @@
                     ! increase ice crystal monomers
                     q(k  ,iqi+3)=q(k  ,iqi+3)+nfrag
                 endif
-            endif            
-            
+            endif
+            !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
             
             
             
@@ -2744,23 +2776,71 @@
 
 
 
-		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-		! ice aggregation see Ferrier (1994)                                             !
-		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-		if(ice_flag.and.(t(k).lt.ttr).and.(lam_i(k).lt.1.e5_sp)) then
-		    if(heyms_west) then
-                ! collisions
-                dummy1=max(a_hw1(k)*a_hw1(k)*pre_hw(k)*iice2*n_i(k)*n_i(k) / &
-                        lam_i(k)**(3._sp+2.*sp*alpha_i+di),0._sp)
-            else
-                ! collisions
-                dummy1=max(iice*n_i(k)**2._sp*rho_fac(k) / &
-                        lam_i(k)**(4._sp+2.*sp*alpha_i+b_i),0._sp)
-            endif                                    
+		
+		if(ice_flag.and.(t(k).lt.ttr)) then
+            !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+            ! Collisional break-up of ice                                                !
+            !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+            if(coll_breakup_flag1==1) then
             
-            ! aggregation rate
-            riaci(k)=eii(k)*dummy1
+                ! calculate the number of fragments
+                lambda0r=lam_i(k)
+                lambda0i=lam_i(k)
+                mrthresh=0._sp
+                mrupper=ci*(pthreshi/lambda0r)**di
+                miupper=ci*(pthreshi/lambda0i)**di
+                mrupper=min(mrupper,miupper)
             
+                ! only call integral if mrupper gt mrthresh
+                if((mrupper.gt.mrthresh).and.(q(k,iqi).gt.qsmall)) then
+
+                    f_mode2=1._sp !eii(k) ! only need to consider collision, not sticking
+                    n0r=n_i(k)
+                    n0i=n_i(k)
+                    
+                    if(heyms_west) then
+                        ci_new=pi/6._sp*910._sp
+                        a_hw_new=a_hw1(k)
+                        pre_hw_new=pre_hw(k)
+                        call quad2d_qgaus(dintegral_collisional_breakup_hw, &
+                            limit1_collisional,limit2_mode2,mrthresh,mrupper,dummy3)
+                    else
+                        call quad2d_qgaus(dintegral_collisional_breakup, &
+                            limit1_collisional,limit2_mode2,mrthresh,mrupper,dummy3)                    
+                    endif
+                    ! multiplication according to Vardiman (1978)
+                    nfrag=dummy3
+                    ! increase ice crystal number
+                    q(k  ,ini)=q(k  ,ini)+nfrag
+                    ! increase ice crystal shape factor
+                    q(k  ,iqi+1)=q(k  ,iqi+1)+nfrag
+                    ! increase ice crystal monomers
+                    q(k  ,iqi+3)=q(k  ,iqi+3)+nfrag
+                endif
+            endif
+            !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+            
+            !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+            ! ice aggregation see Ferrier (1994)                                         !
+            !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+            if(lam_i(k).lt.1.e5_sp) then
+                if(heyms_west) then
+                    ! collisions
+                    dummy1=max(a_hw1(k)*a_hw1(k)*pre_hw(k)*iice2*n_i(k)*n_i(k) / &
+                            lam_i(k)**(3._sp+2.*sp*alpha_i+di),0._sp)
+                else
+                    ! collisions
+                    dummy1=max(iice*n_i(k)**2._sp*rho_fac(k) / &
+                            lam_i(k)**(4._sp+2.*sp*alpha_i+b_i),0._sp)
+                endif                                    
+            
+                ! aggregation rate
+                riaci(k)=eii(k)*dummy1
+            endif
+            !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+            ! end ice aggregation                                                        !
+            !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+                        
             ! Vardiman approximate - 3 particles for every collision that doesn't aggregate
 !             dummy2=min(dummy1*(1._sp-eii(K))*3._sp*dt,q(k,ini)*0.1_sp)
 ! 
@@ -2772,9 +2852,6 @@
             
             
         endif
-		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-		! end ice aggregation                                                            !
-		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 
 
@@ -3751,6 +3828,14 @@
         limit1_mode2=x
     end function limit1_mode2
 !
+    function limit1_collisional(x)
+        use numerics_type, only : wp
+        implicit none
+        real(wp), intent(in) :: x
+        real(wp) :: limit1_collisional
+        limit1_collisional=0._sp
+    end function limit1_collisional
+!
     function limit2_mode2(x)
         use numerics_type, only : wp
         implicit none
@@ -3758,6 +3843,92 @@
         real(wp) :: limit2_mode2
         limit2_mode2=miupper
     end function limit2_mode2
+
+	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    ! This evaluates the integrand                                                       !
+    ! for collisional breakup following vardiman 1978                                    !
+	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    function dintegral_collisional_breakup(x,y)
+        use numerics_type, only : wp
+        implicit none
+        real(wp), intent(in) :: x
+        real(wp), dimension(:), intent(in) :: y
+        real(wp), dimension(size(y)) :: dintegral_collisional_breakup
+        real(wp) :: diamr, mr, vr
+        real(wp), dimension(size(y)) :: mi, diami, delv, vi, k0, de, nfrag, delm
+
+
+        mr=x
+        mi=y
+        diamr=(mr/ci_new)**(1.0_wp/di)
+        diami=(mi/ci_new)**(1.0_wp/di)
+        ! fall-speeds
+        vr=a_i*diamr**b_i
+        vi=a_i*diami**b_i
+        delv=abs(vr-vi)
+
+        ! last bit is to convert to integral over m
+        ! need to multiply by eii(k) - f_mode2
+        dintegral_collisional_breakup=f_mode2*pi/4.0_wp*(diamr+diami)**2* &
+            delv*n0i*diamr**alpha_i* &
+            exp(-lambda0i*diamr)*n0i*diami**alpha_i*exp(-lambda0i*diami)* &
+            (diamr**(1.0_wp-di)) / (ci_new*di)*(diami**(1.0_wp-di)) / (ci_new*di)
+        
+        ! calculate the change in momentum - equation 7
+        ! assume a coefficient of restitution of 0.5?
+        ! units are g cm s-1
+        delm = 1.25_sp*pi*mr*mi/(mr+mi)*(1._sp+0.5_sp)*abs(vr-vi)*1.e5_sp 
+        nfrag = vard02(1)*(log(delm)**2)+vard02(2)*log(delm)+vard02(3)
+        
+        dintegral_collisional_breakup = dintegral_collisional_breakup * nfrag
+            
+             
+    end function dintegral_collisional_breakup
+	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    ! This evaluates the integrand                                                       !
+    ! for collisional breakup following vardiman 1978                                    !
+	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    function dintegral_collisional_breakup_hw(x,y)
+        use numerics_type, only : wp
+        implicit none
+        real(wp), intent(in) :: x
+        real(wp), dimension(:), intent(in) :: y
+        real(wp), dimension(size(y)) :: dintegral_collisional_breakup_hw
+        real(wp) :: diamr, mr, vr
+        real(wp), dimension(size(y)) :: mi, diami, delv, vi, k0, de, nfrag, delm
+
+
+        mr=x
+        mi=y
+        diamr=(mr/ci_new)**(1.0_wp/di)
+        diami=(mi/ci_new)**(1.0_wp/di)
+        ! fall-speeds
+        vr=pre_hw_new*(diamr**-1)*((1._sp+a_hw_new*diamr**(0.5_sp*di))**0.5_sp-1._sp)**2
+        vi=pre_hw_new*(diami**-1)*((1._sp+a_hw_new*diami**(0.5_sp*di))**0.5_sp-1._sp)**2
+        delv=abs(vr-vi)
+
+        ! last bit is to convert to integral over m
+        ! need to multiply by eii(k) - f_mode2
+        dintegral_collisional_breakup_hw=f_mode2*pi/4.0_wp*(diamr+diami)**2* &
+            delv*n0i*diamr**alpha_i* &
+            exp(-lambda0i*diamr)*n0i*diami**alpha_i*exp(-lambda0i*diami)* &
+            (diamr**(1.0_wp-di)) / (ci_new*di)*(diami**(1.0_wp-di)) / (ci_new*di)
+        
+        ! calculate the change in momentum - equation 7
+        ! assume a coefficient of restitution of 0.5?
+        ! units are g cm s-1
+        delm = 0.125_sp*pi*mr*mi/(mr+mi)*(1._sp+0.5_sp)*delv*1.e5_sp 
+        delm = min(max(delm,exp(-vard02(2)/(2*vard02(1)))),1._sp)
+        
+        nfrag = vard02(1)*(log(delm)**2)+vard02(2)*log(delm)+vard02(3)
+        
+        dintegral_collisional_breakup_hw = dintegral_collisional_breakup_hw * nfrag
+            
+             
+    end function dintegral_collisional_breakup_hw
+	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 
 
