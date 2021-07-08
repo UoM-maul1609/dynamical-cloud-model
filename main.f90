@@ -210,7 +210,6 @@
 			grid1%coords,mp1%dims, mp1%id, mp1%ring_comm)
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         ! Radiation                                                            !
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -243,10 +242,6 @@
         endif
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-
-
-
-
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         ! set initial q-variable properties                                    !
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -261,7 +256,7 @@
                         grid1%inc, grid1%ip,grid1%jp,grid1%kp,grid1%l_halo, &
                         grid1%x,grid1%y,grid1%z,grid1%rhoan,grid1%prefn,grid1%trefn,&
                         grid1%q)  
-                    if(nm1%radiation) then
+                    if((mp1%id < mp1%dx * mp1%dy * mp1%dz).and.(nm1%radiation)) then
                         call calculate_gamma_params(grid1%nq,grid1%ncat,grid1%n_mode,&
                             grid1%c_s,grid1%c_e,grid1%inc,grid1%iqc, &
                             grid1%inr,grid1%iqr,grid1%ini,grid1%iqi,grid1%iai, &
