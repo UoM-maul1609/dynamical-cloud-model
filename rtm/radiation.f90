@@ -1525,7 +1525,7 @@
 								tdstart,tdend,a,b,c,r,u, &
 								lambda_low, lambda_high, lambda,nrwbin, niwbin, &
 								b_s_g, sflux_l,&
-								rhoan, trefn, dz,dzn, albedo, emiss, &
+								rhoan, tref, trefn, dz,dzn, albedo, emiss, &
 								quad_flag, th, flux_u, flux_d, &
 								asymmetry_water, nrad, ngs,lamgs,mugs, &
 								cloud_flag, &
@@ -1542,7 +1542,7 @@
 			real(sp), intent(in), dimension(nprocv) :: mvrecv
 			real(sp), dimension(nbands), intent(in) :: &
 					lambda_low, lambda_high, lambda, nrwbin, niwbin, b_s_g, sflux_l
-			real(sp), intent(in), dimension(1-r_h:kp+r_h) :: rhoan, trefn, dz,dzn
+			real(sp), intent(in), dimension(1-r_h:kp+r_h) :: rhoan, trefn, tref, dz,dzn
 			real(sp), intent(in), &
 					dimension(1-r_h:kp+r_h, 1-r_h:jp+r_h, 1-r_h:ip+r_h) :: th
 			real(sp), intent(inout), &
@@ -1569,6 +1569,7 @@
 			real(sp), dimension(0:kp+1) :: sigma_ray, sigma_tot,taun,dtau,dtaun
 			real(sp), dimension(0:kp+1) :: tau,direct
 			real(sp), dimension(kp+1,nbands) :: blt
+			real(sp), dimension(nbands) :: blt_surf ! blt at the surface
 			real(sp), dimension(1-r_h:kp+r_h, 1-r_h:jp+r_h, 1-r_h:ip+r_h,1:nbands) :: &
 			        sigma_s_clouds, sigma_a_clouds
 			real(sp), dimension(1:kp) :: gamma1, gamma2, gamma3, omg_s
@@ -1630,6 +1631,15 @@
                                                     trefn(k)+th(k,j,i),blt(k,m))
                             !if(k==1.and.i==1.and.j==1) print *,blt(k,m)
                         enddo
+                        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+                        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+                        ! calculate planck function at surface          				 !
+                        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+                        if(coords(3)==0) then
+                            call inband_planck(1,lambda_low(m),lambda_high(m), &
+                                                    tref(0),blt_surf(m))
+                        endif
                         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 
@@ -1837,7 +1847,7 @@
                                 r(1)=-albedo*cos_theta_s*sflux_l(m)* &
                                     exp(-tau(0)/cos_theta_s)
                             endif
-                            r(1)=r(1)-emiss*pi*blt(1,m) 
+                            r(1)=r(1)-emiss*pi*blt_surf(m) 
                                                 ! this needs to be for the surface, i.e. 
                                                 ! blt at tref(0)
                         endif

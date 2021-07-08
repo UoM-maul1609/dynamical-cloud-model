@@ -119,7 +119,7 @@
 								tdstart,tdend,a,b,c,r,usol, &
 								lambda_low, lambda_high, lambda,nrwbin, niwbin, &
 								b_s_g,sflux_l, &
-								rhoan, trefn, dz,dzn, albedo, emiss, &
+								rhoan, tref, trefn, dz,dzn, albedo, emiss, &
 								quad_flag, th, flux_u, flux_d, &
 								asymmetry_water, 0, ngs,lamgs,mugs, &
 								.false., &
