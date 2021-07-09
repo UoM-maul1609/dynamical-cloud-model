@@ -51,6 +51,7 @@
 	!>@param[in] microphysics_flag: flag for microphysics
 	!>@param[in] ice_flag: flag for ice microphysics
 	!>@param[in] hm_flag: flag for hallett-mossop (not always used)
+	!>@param[in] wr_flag: flag for warm rain
 	!>@param[in] theta_flag: flag for adjusting theta
 	!>@param[in] damping_layer: flag for damping layer
 	!>@param[in] forcing: flag for large-scale forcing of horizontal winds
@@ -102,7 +103,7 @@
 				new_file,outputfile, output_interval, &
 				viscous, &
 				advection_scheme, kord, monotone, &
-				moisture, microphysics_flag, ice_flag, hm_flag, theta_flag, &
+				moisture, microphysics_flag, ice_flag, hm_flag, wr_flag, theta_flag, &
 				damping_layer,forcing, divergence, radiation, &
 				j_stochastic, ice_nuc_flag, mode2_ice_flag, coll_breakup_flag1, &
 				heyms_west, &
@@ -135,7 +136,7 @@
 		logical, intent(inout) :: new_file
 		logical, intent(in) :: viscous, monotone, moisture, &
 		                    damping_layer, forcing, theta_flag, ice_flag, hm_flag, &
-		                    divergence, radiation, heyms_west
+		                    wr_flag, divergence, radiation, heyms_west
 		integer(i4b), intent(in) :: ice_nuc_flag, nrad, mode2_ice_flag, coll_breakup_flag1
 		logical, intent(inout) :: micro_init
 		integer(i4b), intent(in) :: ntim,ip,jp,kp, ipp,jpp,kpp, &
@@ -524,7 +525,7 @@
                                         nrad,ngs(:,:,:,:),lamgs(:,:,:,:),mugs(:,:,:,:), &
                                         th(:,:,:),prefn, &
                                         zn(:),thetan,rhoa,rhoan,w(:,:,:), &
-                                        micro_init,hm_flag,1.e-14_sp, &
+                                        micro_init,hm_flag,wr_flag, 1.e-14_sp, &
                                         ice_flag, theta_flag, &
                                         j_stochastic, ice_nuc_flag, mode2_ice_flag, &
                                         coll_breakup_flag1, &

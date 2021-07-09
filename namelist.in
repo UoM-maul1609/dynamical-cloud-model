@@ -34,6 +34,7 @@
 	nm1%j_stochastic=0.5e-9,        ! nucleation rate s-1
 	nm1%ice_nuc_flag=1,             ! 1 is for Demott, 2 is for const stochastic 
 	nm1%hm_flag=.true.,             ! hm process
+	nm1%wr_flag=.true.,             ! switch for warm rain process
 	nm1%mode2_ice_flag=0,           ! 0 is off; 1 is on - experimental
 	nm1%coll_breakup_flag1=0,        ! 0 is off; 1 is on - experimental
 	nm1%heyms_west=.true.,          ! flag for new fall-speeds

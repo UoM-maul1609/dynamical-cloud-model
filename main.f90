@@ -337,7 +337,7 @@
 				nm1%advection_scheme, nm1%kord, nm1%monotone, &
 				nm1%moisture, nm1%microphysics_flag, &
 				nm1%ice_flag, &
-				nm1%hm_flag, &
+				nm1%hm_flag, nm1%wr_flag, &
 				nm1%theta_flag, &
 				nm1%damping_layer,  nm1%forcing, nm1%divergence, nm1%radiation, &
 				nm1%j_stochastic, nm1%ice_nuc_flag, nm1%mode2_ice_flag, &

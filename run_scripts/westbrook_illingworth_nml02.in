@@ -1,5 +1,5 @@
 &run_vars
-	nm1%outputfile = '/tmp/output_pc04.nc',
+	nm1%outputfile = '/tmp/output_pc01.nc',
 	nm1%subgrid_model=2, ! 1 = constant viscosity, 2=smagorinsky
 	nm1%viscous_dissipation=.true.,
 	nm1%damping_layer=.true.,
@@ -34,15 +34,16 @@
 	nm1%j_stochastic=0.5e-9,        ! nucleation rate s-1
 	nm1%ice_nuc_flag=1,             ! 1 is for Demott, 2 is for const stochastic 
 	nm1%hm_flag=.false.,             ! hm process
+	nm1%wr_flag=.true.,             ! switch for warm rain process
 	nm1%mode2_ice_flag=0,           ! 0 is off; 1 is on - experimental
-	nm1%coll_breakup_flag1=1,        ! 0 is off; 1 is on - experimental
+	nm1%coll_breakup_flag1=0,        ! 0 is off; 1 is on - experimental
 	nm1%heyms_west=.true.,          ! flag for new fall-speeds
 	nm1%rad_nmlfile='run_scripts/westbrook_illingworth_rad_nml.in',       ! filename for radiation namelist
 	nm1%bam_nmlfile='run_scripts/westbrook_illingworth_bam_nml.in',  ! filename of bam namelist
 	nm1%aero_nmlfile='run_scripts/westbrook_illingworth_pamm_nml.in',     ! filename of aerosol profile namelist
 	nm1%aero_prof_flag=.true.,              ! flag to read in a profile of aerosol
 	nm1%drop_num_init=.true.,       ! only works for microphysics_flag=2,3
-	nm1%drop_num=300.e6,            ! initial drop number concentration
+	nm1%drop_num=100.e6,            ! initial drop number concentration
 	nm1%output_interval=100.,
 	nm1%rotation_period_hours=24.,
 	nm1%moisture=.true.,
