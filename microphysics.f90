@@ -1313,7 +1313,7 @@
 	!>@param[inout] rho, rhon: density 
 	!>@param[in] w: vertical wind 
 	!>@param[inout] micro_init: boolean to initialise microphysics 
-	!>@param[in] hm_flag: switch hm-process on and off
+	!>@param[in] hm_flag, wr_flag: switch hm-process and warm rain on and off
 	!>@param[in] mass_ice: mass of a single ice crystal (override)
 	!>@param[in] ice_flag: ice microphysics
 	!>@param[in] theta_flag: whether to alter theta
@@ -1325,7 +1325,7 @@
                     ip,jp,kp,l_h,r_h,dt,dz,dzn,q, &
                     nrad,ngs,lamgs,mugs, &
                     precip,th,prefn, z,thetan,rhoa,rhoan,w, &
-    				micro_init,hm_flag, mass_ice, ice_flag, theta_flag, &
+    				micro_init,hm_flag, wr_flag, mass_ice, ice_flag, theta_flag, &
     				j_stochastic,ice_nuc_flag,mode2_ice_flag, &
     				coll_breakup_flag1, heyms_west, calc_params)
 #else
@@ -1358,7 +1358,7 @@
 	!>@param[inout] rho, rhon: density 
 	!>@param[in] w: vertical wind 
 	!>@param[inout] micro_init: boolean to initialise microphysics 
-	!>@param[in] hm_flag: switch hm-process on and off
+	!>@param[in] hm_flag, wr_flag: switch hm-process and warm rain on and off
 	!>@param[in] mass_ice: mass of a single ice crystal (override)
 	!>@param[in] ice_flag: ice microphysics
 	!>@param[in] theta_flag: whether to alter theta
@@ -1371,7 +1371,7 @@
                     ip,jp,kp,l_h,r_h,dt,dz,dzn,q,precip,&
                     nrad,ngs,lamgs,mugs, &
                     th,prefn, z,thetan,rhoa,rhoan,w, &
-    				micro_init,hm_flag, mass_ice, ice_flag, theta_flag, &
+    				micro_init,hm_flag, wr_flag, mass_ice, ice_flag, theta_flag, &
     				j_stochastic,ice_nuc_flag, mode2_ice_flag, coll_breakup_flag1, &
     				heyms_west, calc_params, &
     				comm,comm_vert,id,dims,coords)
@@ -1394,7 +1394,7 @@
     real(sp), dimension(-l_h+1:kp+r_h), intent(in) :: z, dz, dzn, rhoa,rhoan, thetan, &
         prefn
     real(sp), dimension(-l_h+1:kp+r_h,-l_h+1:jp+r_h,-l_h+1:ip+r_h), intent(in) :: w
-    logical, intent(in) :: ice_flag, hm_flag, theta_flag, calc_params, heyms_west
+    logical, intent(in) :: ice_flag, hm_flag, wr_flag, theta_flag, calc_params, heyms_west
     integer(i4b), intent(in) :: ice_nuc_flag, mode2_ice_flag, coll_breakup_flag1
     logical , intent(inout) :: micro_init
     real(sp), intent(in) :: mass_ice, j_stochastic
@@ -1430,7 +1430,7 @@
 		                    prefn, &
 							z(:),thetan,rhoa(:),rhoan(:),w(:,j,i), &
     						micro_init,hm_flag, mass_ice, ice_flag, &
-    						.true.,.true.,theta_flag, &
+    						wr_flag,.true.,theta_flag, &
     						j_stochastic,ice_nuc_flag,mode2_ice_flag, &
     						coll_breakup_flag1, heyms_west)
 #else
@@ -1443,7 +1443,7 @@
 							vqc(:,j,i),vqr(:,j,i),vqi(:,j,i),vni(:,j,i),n_step, adv_l, &
 							coords, &
     						micro_init,hm_flag, mass_ice, ice_flag, &
-    						.true.,.true.,theta_flag, &
+    						wr_flag,.true.,theta_flag, &
     						j_stochastic,ice_nuc_flag, mode2_ice_flag, &
     						coll_breakup_flag1, heyms_west)
     		n_step_o=max(n_step,n_step_o)
