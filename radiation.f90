@@ -29,11 +29,11 @@
             							 
         end type radg
 
-
+        logical, parameter :: deltaScaling=.true.
 
 		real(sp), parameter :: r_gas=8.314_sp, ma=29e-3_sp, ra=r_gas / ma, &
 								t_stp=288._sp, p_stp=101300._sp, navog=6.022e23_sp, &
-								sflux=1370._sp, mu1=1._sp/sqrt(3._sp)
+								sflux=1370._sp
 		!>@brief
 		!>variables for namelist radiation input
         type namelist_rad
@@ -59,7 +59,7 @@
         	real(sp), dimension(nemiss) :: emiss=[1.0,0.99,0.82,0.25,0.1,0.96, &
         									0.94,0.925,0.88,0.96,0.80,0.96]
         	character(len=18), dimension(nemiss) :: emiss_des = &
-        	   ["liquid water       ", &
+        	   ["Liquid water       ", &
         		"Fresh snow         ",&
         		"Old snow           ",&
         		"Liquid water clouds",&
@@ -112,6 +112,7 @@
 							
 		real(sp), parameter :: diy_exact = 365.242199_sp
 		
+		real(sp), parameter :: eps1 = epsilon(1._sp)
 		real(sp), dimension(:), allocatable :: flux_down, flux_up
 		real(sp), dimension(12) :: di_mn=[31, 28, 31,30,31,30,31,31,30,31,30,31], &
 								   di_ml=[31, 29, 31,30,31,30,31,31,30,31,30,31]
@@ -818,6 +819,9 @@
 			    ! calculate the bin averaged imaginary refractive index 
 			    niwbin(i)=qromb(imag_refractive_h2o,lambda_low(i),lambda_high(i)) / &
 			                (lambda_high(i)-lambda_low(i))
+			                
+! 			    nrwbin(i:i)=real_refractive_h2o((lambda_low(i)+lambda_high(i:i))*0.5_sp)
+! 			    niwbin(i:i)=imag_refractive_h2o((lambda_low(i)+lambda_high(i:i))*0.5_sp)
 			enddo
 
 			! 6. Optical depth
@@ -1277,7 +1281,8 @@
 			! note, the integral result is the same no matter form of BB function        !
 			! but the value of x is what is in the exponential                           !
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-			fac=fac_planck * temp**4
+			! fac_planck=2._sp*k_boltz**4/(h_planck**3*c_light**2)*pi
+			fac=fac_planck * temp**4/pi
 			do i=1,nbands
 				x_upper=h_planck*c_light/(k_boltz*temp*lambda_high(i))
 				x_lower=h_planck*c_light/(k_boltz*temp*lambda_low(i))
@@ -1331,7 +1336,7 @@
 			! note, the integral result is the same no matter form of BB function        !
 			! but the value of x is what is in the exponential                           !
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-			fac=fac_planck * temp**4
+			fac=fac_planck * temp**4 / pi
 			do i=1,nbands
 				x_upper=h_planck*c_light/(k_boltz*temp*lambda_high(i))
 				x_lower=h_planck*c_light/(k_boltz*temp*lambda_low(i))
@@ -1379,7 +1384,7 @@
 			integer(i4b) :: i,j,k,m,n
 			real(sp) :: gam_a_1,gam_a_2, gam_3,gam_4,gam_5,gam_6,gam_7, gam_m, &
 			            g,e,e0,a1,a2,a3,a4,a5,a6,ra,rext, kmax, dmm, test
-			real(sp), parameter :: mtun=0.5_sp
+			real(sp), parameter :: mtun=0.5_sp, sigma=pi*0.25_sp
 			complex(sp) :: q,ncom
 			complex(sp), parameter :: imag1=complex(0._sp,1._sp)
 			
@@ -1390,7 +1395,7 @@
 			    e0=0.25_sp+0.6_sp*(1._sp-exp(-8._sp*pi*niwbin(m)/3._sp))**2 ! eq 8
 			    e=e0/lambda(m) ! equation 28
 			    ra=0.7393_sp*nrwbin(m)-0.6069_sp ! equation 6
-			    rext=ra/2._sp ! equation 11
+			    rext=ra*0.5_sp ! equation 11
 			    a1=0.25_sp+0.25_sp*exp(-1167._sp*niwbin(m)) ! equation5
 			    kmax=mtun/e0 ! equation 9
 			    a2=ra/(kmax**mtun*exp(-mtun)*lambda(m)**mtun)
@@ -1398,12 +1403,27 @@
 			    a4=0.06_sp*pi/lambda(m)
 			    a5=(pi/lambda(m))**(-2._sp/3._sp)
 			    a6=1._sp
-			    ncom=complex(nrwbin(m),niwbin(m))
+			    ncom=complex(nrwbin(m),-niwbin(m))
 			    q=imag1*(ncom-complex(1._sp,0._sp))*complex(2._sp*pi/lambda(m),0._sp)
 			    do n=1,2 ! cloud, rain, ice
                     do i=1,ip
                         do j=1,jp
                             do k=1-r_h,kp+r_h
+                                ! Arbitrary scattering parameters
+!                                 if((k>30).and.(k<35)) then
+!                                     sigma_s_clouds(k,j,i,m)=&
+!                                         sigma*2._sp*100.e6*10.e-6_sp**2
+!                                     sigma_a_clouds(k,j,i,m)=0._sp
+!                                     if(m>16) then
+!                                         sigma_a_clouds(k,j,i,m)= &
+!                                             sigma_s_clouds(k,j,i,m)*1.0_sp
+!                                     endif
+!                                 else
+!                                     sigma_s_clouds(k,j,i,m)=0._sp
+!                                     sigma_a_clouds(k,j,i,m)=0._sp
+!                                 endif     
+!                                 cycle                           
+
                                 if(isnan(lamgs(k,j,i,n))) cycle
                                 if(isnan(mugs(k,j,i,n))) cycle
                                 if(isnan(ngs(k,j,i,n))) cycle
@@ -1412,30 +1432,30 @@
                                 gam_7=gamma(mtun+mugs(k,j,i,n)+1._sp)
                                 gam_6=gam_7*(mtun+mugs(k,j,i,n)+1._sp) ! gamma m+mu+2
                                 gam_5=gamma(mugs(k,j,i,n)+1._sp)
-                                gam_4=gam_5*1._sp ! gamma mu+2
-                                gam_a_1=gam_4*2._sp ! gamma mu+3
-                                gam_m=gam_a_1*3._sp ! gamma mu+4
+                                gam_4=gam_5*(mugs(k,j,i,n)+1._sp) ! gamma mu+2
+                                gam_a_1=gam_4*(mugs(k,j,i,n)+2._sp) ! gamma mu+3
+                                gam_m=gam_a_1*(mugs(k,j,i,n)+3._sp) ! gamma mu+4
                                 gam_a_2=gamma(3._sp+mtun+mugs(k,j,i,n))
                                 gam_3=gamma(mugs(k,j,i,n)+7._sp/3._sp)
                             
                                 ! equation 22 
                                 test= &
-                                    pi/4._sp*ngs(k,j,i,n) * &
+                                    sigma*ngs(k,j,i,n) * &
                                         gam_a_1 / &
                                         (lamgs(k,j,i,n)**(3._sp+mugs(k,j,i,n))) - &
-                                    pi/4._sp*ngs(k,j,i,n) * &
+                                    sigma*ngs(k,j,i,n) * &
                                         gam_a_1 / &
                                         ((lamgs(k,j,i,n)+g)**(3._sp+mugs(k,j,i,n))) + &
-                                    a1*pi/4._sp*ngs(k,j,i,n) * &
+                                    a1*sigma*ngs(k,j,i,n) * &
                                         gam_a_1 / &
                                         ((lamgs(k,j,i,n)+g)**(3._sp+mugs(k,j,i,n))) - &
-                                    a1*pi/4._sp*ngs(k,j,i,n) * &
+                                    a1*sigma*ngs(k,j,i,n) * &
                                         gam_a_1 / &
                                         ((lamgs(k,j,i,n)+2._sp*g)**(3._sp+mugs(k,j,i,n))) + &
-                                    a2*pi/4._sp*ngs(k,j,i,n) * &
+                                    a2*sigma*ngs(k,j,i,n) * &
                                         gam_a_2 / &
                                         ((lamgs(k,j,i,n)+e)**(3._sp+mugs(k,j,i,n)+mtun)) - &
-                                    a2*pi/4._sp*ngs(k,j,i,n) * &
+                                    a2*sigma*ngs(k,j,i,n) * &
                                         gam_a_2 / &
                                         ((lamgs(k,j,i,n)+e+g)**(3._sp+mugs(k,j,i,n)+mtun))
 
@@ -1451,7 +1471,7 @@
                                     a3*pi*ngs(k,j,i,n)*gam_a_2 / &
                                         (2._sp*(lamgs(k,j,i,n)+&
                                         e)**(3._sp+mugs(k,j,i,n)+mtun)) + &
-                                    a6*pi/4._sp*a5*ngs(k,j,i,n)*gam_3*&
+                                    a6*sigma*a5*ngs(k,j,i,n)*gam_3*&
                                         (lamgs(k,j,i,n)**(-(mugs(k,j,i,n)+7._sp/3._sp))- &
                                         (lamgs(k,j,i,n)+a4)**(-(mugs(k,j,i,n)+7._sp/3._sp)))+&
                                     pi*ngs(k,j,i,n)*real( &
@@ -1472,14 +1492,19 @@
                                         ((complex(lamgs(k,j,i,n)+e,0._sp)+q)**(&
                                         -complex(mugs(k,j,i,n)+mtun+1._sp,0._sp)) - &
                                         complex(lamgs(k,j,i,n)+e,0._sp)**(&
-                                        -complex(mugs(k,j,i,n)+1._sp,0._sp))),sp)
+                                        -complex(mugs(k,j,i,n)+mtun+1._sp,0._sp))),sp)
+
 
                                 if(.not.isnan(test)) &
                                     sigma_s_clouds(k,j,i,m)=sigma_s_clouds(k,j,i,m)+test
-
+!                                 if(.not.isnan(test)) then
+!                                     print *,test,sigma_a_clouds(k,j,i,m),mugs(k,j,i,n), &
+!                                         lamgs(k,j,i,n),ngs(k,j,i,n),lambda(m)
+!                                     pause
+!                                 endif
                                 ! Geometric approximation
 !                                 sigma_s_clouds(k,j,i,m)=sigma_s_clouds(k,j,i,m)+&
-!                                     pi/4._sp* &
+!                                     sigma* &
 !                                     2._sp*ngs(k,j,i,n)*gamma(mugs(k,j,i,n)+3._sp) / &
 !                                     lamgs(k,j,i,n)**(mugs(k,j,i,n)+3._sp)
                                 
@@ -1565,22 +1590,25 @@
 			
 			! local variables:
 			integer(i4b) :: doy,diy, year,error
-			real(sp) :: tod, cos_theta_s, frac,msend
-			real(sp), dimension(0:kp+1) :: sigma_ray, sigma_tot,taun,dtau,dtaun
-			real(sp), dimension(0:kp+1) :: tau,direct
-			real(sp), dimension(kp+1,nbands) :: blt
+			real(sp) :: tod, cos_theta_s, frac,msend, mu1, factor, alpha1, alpha2, &
+			    k_exponent, mu0_local, od_over_mu0, k_mu0, k_gamma3, k_gamma4, &
+			    exponential0, exponential, exponential2, k_2_exponential, &
+			    reftrans_factor, coeff, coeff_up_top, coeff_dn_top, coeff_up_bot, &
+			    coeff_dn_bot
+			real(sp), dimension(1:kp+1) :: sigma_ray, sigma_tot,taun,dtau,dtaun
+			real(sp), dimension(1:kp+1) :: tau, ref_diff, trans_dir_dir, trans_diff, &
+			    ref_dir, trans_dir_diff, inv_denominator
+			real(sp), dimension(kp+1,nbands) :: blt, blt_top, blt_bot
 			real(sp), dimension(nbands) :: blt_surf ! blt at the surface
 			real(sp), dimension(1-r_h:kp+r_h, 1-r_h:jp+r_h, 1-r_h:ip+r_h,1:nbands) :: &
 			        sigma_s_clouds, sigma_a_clouds
-			real(sp), dimension(1:kp) :: gamma1, gamma2, gamma3, omg_s
+			real(sp), dimension(1-r_h:kp+r_h) :: gamma1_sw, gamma2_sw, gamma3_sw, &
+			    gamma4_sw, gamma1_lw, gamma2_lw, omg_s, ga, &
+			    reflectance, transmittance, source_up, source_dn, source, albedo_atmos, &
+			    flux_dn_direct, flux_dn_diffuse, flux_up
 			logical :: leap
-			real(sp) :: ga=0._sp
 			
-			integer(i4b) :: it, itermax=1, k, m,j,i,kend,kstart
-			real(sp) :: Ac, Bc, Cc, Dc, alp, bet, gam, del, &
-						Ak, Bk, Ck, Dk, Ek, Fk, Gk, Hk, Skp, Skm
-			!real(sp), dimension(2*(kp+1)) :: b,r,u
-			!real(sp), dimension(2*kp+1) :: a,c
+			integer(i4b) :: it, itermax=1, k, m,j,i,kend,kstart, shortWave
 			
 			
 			
@@ -1610,31 +1638,32 @@
             endif
             !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-
-			do m=1,nbands
-                !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-                ! extinction:							    					 !
-                !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-                do k=1,kend 
+            do m=1,nbands
+                !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+                ! extinction:							    					         !
+                !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+                do k=1,kp 
                     ! number of molecules per cubic metre of air multiplied by 
                     ! collision cross-section:
                     sigma_ray(k)=rhoan(k)*navog/ma*b_s_g(m)
                 enddo
                 do i=1,ip
                     do j=1,jp
-                
                         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-                        ! calculate planck function at all levels p-points:				 !
+                        ! calculate planck function at all levels bottom-points:			     !
                         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-                        do k=1,kp+1 
+                        do k=1,kp
                             call inband_planck(1,lambda_low(m),lambda_high(m), &
-                                                    trefn(k)+th(k,j,i),blt(k,m))
-                            !if(k==1.and.i==1.and.j==1) print *,blt(k,m)
+                                    tref(k-1)+0.5_sp*(th(k-1,j,i)+th(k,j,i)),blt_bot(k,m))
+                        enddo
+                        do k=1,kp
+                            call inband_planck(1,lambda_low(m),lambda_high(m), &
+                                    tref(k)+0.5_sp*(th(k,j,i)+th(k+1,j,i)),blt_top(k,m))
                         enddo
                         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
                         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-                        ! calculate planck function at surface          				 !
+                        ! calculate planck function at surface          			     !
                         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
                         if(coords(3)==0) then
                             call inband_planck(1,lambda_low(m),lambda_high(m), &
@@ -1646,273 +1675,299 @@
 
 
                         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-                        ! extinction:							    					 !
+                        ! extinction:							    				     !
                         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-                        do k=1,kend 
+                        do k=1,kp
                             sigma_tot(k)=sigma_ray(k)
                             if(cloud_flag) then
-                                sigma_tot(k)=sigma_tot(k)+sigma_s_clouds(k,j,i,m) + &
-                                    sigma_a_clouds(k,j,i,m)
+                                sigma_tot(k)=sigma_tot(k)+(sigma_s_clouds(k,j,i,m) + &
+                                    sigma_a_clouds(k,j,i,m))
                             endif
                         enddo
                         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-            
-            
+
+        
                         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-                        ! optical depth:					    						 !
+                        ! optical depth, etc:					    				     !
                         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-                        ! sigma_ray is the extinction on p-points
-                        ! tau is optical depth on w-points
-                        ! mpi - add bottom taus to all and add cumulative
-!                         dtau(kp+1)=0._sp
-                        tau(kp+1)=0._sp
-                        tau(kp)=0._sp ! for top level tau(kp) needs to be defined taking into 
-                                      ! account the atmosphere above domain
-                        if(dims(3)==(coords(3)+1)) then
+                        do k=1,kp+1
+                            ! equation 9.103, Jacobson - single scattering albedo
+                            omg_s(k)=min((sigma_ray(k)+sigma_s_clouds(k,j,i,m)) / &
+                                (sigma_tot(k)),1._sp-1.e-10_sp)
+
+                            ! equation 9.115, Jacobson - effective asymmetry param
+                            ga(k)=(sigma_s_clouds(k,j,i,m)*asymmetry_water) / &
+                                (sigma_ray(k)+sigma_s_clouds(k,j,i,m)) 
+
+                            tau(k)=sigma_tot(k)*dz(k)
+                        enddo
+
+                        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+                        ! delta scaling                                                  !
+                        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+                        if (deltaScaling) then 
+                            do k=1,kp+1
+                                ! delta scaling - page 332, Jacobson
+                                tau(k)=(1._sp-omg_s(k)*ga(k)*ga(k))*tau(k)
+                                omg_s(k)=(1._sp-ga(k)*ga(k))*omg_s(k)/ &
+                                    (1._sp-omg_s(k)*ga(k)*ga(k))
+                                ga(k)=ga(k)/(ga(k)+1._sp)
+                            enddo
+                        endif
+                        if (coords(3)==(dims(3)-1)) then
                             tau(kp+1)=1.e-2_sp
-!                             dtau(kp+1)=-tau(kp+1)
-                        endif
-                        do k=kend-1,0,-1 
-                            ! cumulative extinction x dz
-                            tau(k)=tau(k+1)+sigma_tot(k+1)*dz(k)
-                        enddo
-                
-            
-                        ! for parallel solver tau and dtau need some parallel communication:
-                        ! http://mpitutorial.com/tutorials/mpi-scatter-gather-and-allgather/
-                        msend=tau(1)  ! message to send
-                        call MPI_allgather(msend,1,MPI_REAL8,mvrecv,1,MPI_REAL8,&
-                            comm3d,error)
-                        tau=tau+sum(mvrecv(  coords(3)+2:dims(3)  ))
-                
-                
-                
-                
-                        ! change in optical depth on w-points
-!                         do k=kp,0,-1 
-!                             dtau(k)=(tau(k+1)-tau(k) ) 
-!                                                 ! tau = 0 at top, so set to negative 
-!                                                 ! to get derivative in correct direction
-!                         enddo
-!                         msend=dtau(1)  ! message to send
-!                         call MPI_allgather(msend,1,MPI_REAL8,mvrecv,1,MPI_REAL8,&
-!                             comm3d,error)
-!                         if((coords(3)+1).lt.(dims(3))) dtau(kp+1)=mvrecv(coords(3)+2)
-                        !if(coords(3)==(dims(3)-1)) dtau(kp)=0._sp
-                        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-
-
-                
-                
-                
-                
-                        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-                        ! diffuse phase function scaling on p-points:					 !
-                        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-                        select case (quad_flag)
-                            case(0) ! quadrature
-                                do k=1,kp
-                                    ! equation 9.103, Jacobson - single scattering albedo
-                                    omg_s(k)=(sigma_ray(k)+sigma_s_clouds(k,j,i,m)) / &
-                                        (sigma_ray(k)+sigma_s_clouds(k,j,i,m)+&
-                                        sigma_a_clouds(k,j,i,m))
-                                    ! equation 9.115, Jacobson - effective asymmetry param
-                                    ga=(sigma_s_clouds(k,j,i,m)*asymmetry_water) / &
-                                        (sigma_ray(k)+sigma_s_clouds(k,j,i,m))
-                                    
-                                    gamma1(k)=(1._sp-omg_s(k)*(1._sp+ga)/2._sp)/mu1
-                                    gamma2(k)=omg_s(k)*(1._sp-ga)/(2._sp*mu1)
-                                    gamma3(k)=(1._sp-3._sp*ga*mu1*cos_theta_s)/2._sp
-                                enddo
-                            case(1) ! eddington
-                                do k=1,kp
-                                    ! equation 9.103, Jacobson - single scattering albedo
-                                    omg_s(k)=(sigma_ray(k)+sigma_s_clouds(k,j,i,m)) / &
-                                        (sigma_ray(k)+sigma_s_clouds(k,j,i,m)+&
-                                        sigma_a_clouds(k,j,i,m))
-                                    ! equation 9.115, Jacobson - effective asymmetry param
-                                    ga=(sigma_s_clouds(k,j,i,m)*asymmetry_water) / &
-                                        (sigma_ray(k)+sigma_s_clouds(k,j,i,m))
-
-                                    gamma1(k)=(7._sp-omg_s(k)*(4._sp+3._sp*ga))/4._sp
-                                    gamma2(k)=-(1._sp-omg_s(k)*(4._sp-3._sp*ga))/4._sp
-                                    gamma3(k)=(2._sp-3._sp*ga*cos_theta_s)/4._sp				
-                                enddo
-                            case default
-                                print *,'not coded'
-                                stop
-                        end select
-                        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-                
-                
+                        endif            
             
                         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-                        ! set up tridiagonal problem:									 !
+                        ! diffuse phase function scaling on p-points:   			     !
                         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-                        ! dtau(0,kp+1) needs to be set
-                        ! tau(0,kp+1) needs to be set				
                         do k=1,kp
-                            ! define coefficients for FDE:
-                            Ac=1._sp+0.5_sp*dz(k-1)*gamma1(k)*sigma_tot(k)
-                            Bc=-1._sp+0.5_sp*dz(k-1)*gamma1(k)*sigma_tot(k)
-                            Cc=-0.5_sp*dz(k-1)*gamma2(k)*sigma_tot(k)
-                            Dc=Cc
+                            factor=0.75_sp*ga(k)
+                            gamma1_sw(k)=2._sp-omg_s(k)*(1.25_sp+factor)
+                            gamma2_sw(k)=omg_s(k)*(0.75_sp-factor)
+                            gamma3_sw(k)=0.5_sp-cos_theta_s*factor
+                            gamma4_sw(k)=1._sp-gamma3_sw(k)
+                        enddo
+                        do k=1,kp
+                            factor=1.66_sp*0.5_sp*omg_s(k)
+                            gamma1_lw(k)=1.66_sp-factor*(1._sp+ga(k))
+                            gamma2_lw(k)=factor*(1._sp-ga(k))
+                        enddo
+                        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
                     
-                            alp=-Cc
-                            bet=alp
-                            gam=-Ac
-                            del=-Bc
-                
-                            ! matrix coefficients:
-                            Ak=(Bc-bet*Cc/del)
-                            Bk=(Dc-gam*Cc/del)
-                            Ck=(Ac-alp*Cc/del)
-                            Skp=0._sp
-                            Skm=0._sp
-                            if(cos_theta_s > 0._sp) then
-                                ! short-wave (see equations 9.121 Jacobson):
-                                Skp=dz(k-1)*sigma_tot(k)*gamma3(k)*omg_s(k)*sflux_l(m)* &
-                                    exp(-0.5_sp*(tau(k+1)+tau(k))/cos_theta_s)
-                                Skm=-dz(k-1)*sigma_tot(k)*(1._sp-gamma3(k))* &
-                                        omg_s(k)*sflux_l(m)*&
-                                        exp(-0.5_sp*(tau(k+1)+tau(k))/cos_theta_s)
-                            endif
-                            ! long wave (see equations 9.122 Jacobson):
-                            Skp=Skp+&
-                                dz(k-1)*sigma_tot(k)*2._sp*pi*(1._sp-omg_s(k))*blt(k,m)
-                            Skm=Skm-& 
-                                dz(k-1)*sigma_tot(k)*2._sp*pi*(1._sp-omg_s(k))*blt(k,m)
-
-                            Dk=Skp-Cc/del*Skm
-                            Ek=(gam-Dc*bet/Bc)
-                            Fk=(alp-Ac*bet/Bc)
-                            Gk=(del-Cc*bet/Bc)
-                            Hk=Skm-bet*Skp/Bc
-                        
-                        
-                        
-                            ! lower diag:
-                            ! a(1) needs to be set when not bottom
-                            if(coords(3)==0) then
-                                a(2*k)     = Ak !2,4,6,8
-                                a(2*k+1)   = Ek !3,5,7,9
+                        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+                        ! Meador and Weaver (1980) reflectance, transmittance and sources!
+                        ! for longwave     			                                     !
+                        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+                        do k=1,kp
+                            if(tau(k)>1.e-3_sp) then
+                                k_exponent=sqrt(max((gamma1_lw(k)-gamma2_lw(k))* &
+                                    (gamma1_lw(k)+gamma2_lw(k)),1.e-12_sp ))
+                                exponential=exp(-k_exponent*tau(k))
+                                exponential2=exponential*exponential
+                                reftrans_factor=1._sp / &
+                                    (k_exponent+gamma1_lw(k)+ &
+                                    (k_exponent-gamma1_lw(k))*exponential2)
+                                ! M+W (1980), eq. 25
+                                reflectance(k) = gamma2_lw(k)*(1._sp-exponential2)* &
+                                    reftrans_factor
+                                ! M+W(1980), eq. 26
+                                transmittance(k)=2._sp*k_exponent*exponential* &
+                                    reftrans_factor
+                                    
+                                ! upward and downward emission assuming Planck function
+                                ! varies linearly with OD within the layer 
+                                ! (Wiscombe, JQSRT 1976)
+                                ! From Stackhouse and Stephens (JAS 1991) eq. 5 and 12?
+                                coeff = pi*(blt_bot(k,m)-blt_top(k,m)) / &
+                                    (tau(k)*(gamma1_lw(k)+gamma2_lw(k)))
+                                coeff_up_top =  coeff + pi*blt_top(k,m)
+                                coeff_up_bot =  coeff + pi*blt_bot(k,m)
+                                coeff_dn_top = -coeff + pi*blt_top(k,m)
+                                coeff_dn_bot = -coeff + pi*blt_bot(k,m)
+                                source_up(k) = coeff_up_top - &
+                                    reflectance(k)*coeff_dn_top - &
+                                    transmittance(k)*coeff_up_bot
+                                source_dn(k) = coeff_dn_bot - &
+                                    reflectance(k)*coeff_up_bot - &
+                                    transmittance(k)*coeff_dn_top
                             else
-                                a(2*k-1) = Ak !1,3,5,7
-                                a(2*k)   = Ek !2,4,6,8
-                            endif				
-
-
-                            ! upper diag:
-                            ! c(kpp) gets set to zero on top PE
-                            if(coords(3)==0) then
-                                c(2*k) = Ck !2,4,6
-                                c(2*k+1)   = Gk !3,5,7
-                            else
-                                c(2*k-1) = Ck !1,3,5
-                                c(2*k)   = Gk !2,4,6                    
-                            endif				
-                
-                
-                
-                
-                            ! diagonal:
-                            if(coords(3)==0) then
-                                b(2*k) = Bk !2,4,6
-                                b(2*k+1)   = Fk !3,5,7
-                            else
-                                b(2*k-1) = Bk !1,3,5
-                                b(2*k)   = Fk !2,4,6
-                            endif                
-
-                            ! rhs:
-                            if(coords(3)==0) then
-                                r(2*k) = Dk !2,4,6
-                                r(2*k+1)   = Hk !3,5,7
-                            else
-                                r(2*k-1) = Dk !1,3,5
-                                r(2*k)   = Hk !2,4,6
+                                ! eq. 18 of M+W (1980)
+                                k_exponent = sqrt(max((gamma1_lw(k)- &
+                                    gamma2_lw(k))*(gamma1_lw(k)+gamma2_lw(k)), 1.e-12_sp))
+                                reflectance(k)=gamma2_lw(k)*tau(k)
+                                transmittance(k)=(1._sp-k_exponent*tau(k)) / &
+                                    (1._sp+tau(k)*(gamma1_lw(k)-k_exponent))
+                                source_up(k)=(1._sp-reflectance(k)-transmittance(k)) * &
+                                    0.5_sp*(blt_top(k,m)+pi*blt_bot(k,m))
+                                source_dn(k)=source_up(k)
+                            
                             endif
                         enddo
-                        
-                
-                        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-                        ! boundary conditions
-                        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-                        if(coords(3)==0) then
-                            a(1)=0._sp ! this is specific to parallel
-                            b(1)=-1._sp ! diagonal, so fine
-                            c(1)=albedo ! ! c(1) has to be set in both serial and parallel
-                            r(1)=0._sp
-                            if(cos_theta_s > 0._sp) then
-                                r(1)=-albedo*cos_theta_s*sflux_l(m)* &
-                                    exp(-tau(0)/cos_theta_s)
-                            endif
-                            r(1)=r(1)-emiss*pi*blt_surf(m) 
-                                                ! this needs to be for the surface, i.e. 
-                                                ! blt at tref(0)
-                        endif
-                
-                
-                        if(coords(3)==(dims(3)-1)) then
-                            a(tdend)=1._sp ! no contribution from upward flux in last equation
-                            b(tdend)=-1._sp ! was 1
-                            r(tdend)=0._sp ! toa downward flux at night
-                            c(tdend)=0._sp ! this is specific to parallel
-                            if(cos_theta_s > 0._sp) then
-                                r(tdend)=-cos_theta_s*sflux_l(m) 
-                                                        ! toa downward flux - day
-                                                        ! should be multiplied by tau(kp) 
-                                                        ! for atmosphere above
-                            endif
-                        endif                
-                        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-
-                        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-                        ! solve tridiagonal matrix:										 !
-                        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-                        call parallel_tridag(a,b,c,r,u,tdend,coords,dims, id, comm3d)
                         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
                         
-
+                        
                         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-                        ! assumes temperature is given by reference state:				 !
-                        ! message passing done out of this routine                       !
+                        ! Solution using the adding method:                              !
+                        ! can't parallelize in vertical                                  !
+                        ! 1. Longwave radiation                                          !
                         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-                        kstart=1
-                        if(coords(3)==0) then ! bottom
-                            ! flux_d(kp) recv
-                            do k=1,kp
-                                ! sets the surface fluxes too
-                                flux_u(k-kstart,j,i,m)=u(2*(k)-1)
-                                flux_d(k-kstart,j,i,m)=u(2*k)
-                            enddo
-                            flux_u(kp+1-kstart,j,i,m)=u(2*(kp+1)-1)
-                        else if (coords(3)==(dims(3)-1)) then
-                            flux_d(0,j,i,m)=u(1) ! needs to be passed to below
-                            do k=1,kp
-                                flux_u(k,j,i,m)=u(2*(k)) ! 2,4,6
-                                flux_d(k,j,i,m)=u(2*k+1) ! 3,5,7
-                            enddo
-                        else
-                            flux_d(0,j,i,m)=u(1) ! needs to be passed to below
-                            ! mpi_issend to one below
-                            ! mpi_irecv from above flux_d(kp,j,i,m)=
-                            do k=1,kp-1
-                                flux_u(k,j,i,m)=u(2*(k))
-                                flux_d(k,j,i,m)=u(2*k+1)
-                            enddo
-                            flux_u(kp,j,i,m)=u(2*kp)
-                        endif
-                        ! bottom and top
-                        if((coords(3)==0).and.(coords(3)==(dims(3)-1))) then
-                            flux_d(kp+1-kstart,j,i,m)=u(2*(kp))                            
-                        endif
+                        albedo_atmos(0)=albedo
+                        ! at the surface, the source is thermal emission
+                        source(0)=emiss*pi*blt_surf(m)
+                        
+                        ! work up through the atmosphere and compute the albedo of the 
+                        ! entire earth / atmosphere system below that half-level and also
+                        ! the source, which is the upwelling flux due to emission below
+                        ! that level
+                        do k=1,kp
+                            ! lacis and hansen (1974) eq. 33, Shonk and Hogan (2008) eq 10
+                            inv_denominator(k)=1._sp/(1._sp-albedo_atmos(k-1)* &
+                                reflectance(k))
+                            ! shonk and hogan (2008), eq. 9; Petty (2006) eq 13.81
+                            albedo_atmos(k)=reflectance(k)+ &
+                                transmittance(k)*transmittance(k)*albedo_atmos(k-1)* &
+                                inv_denominator(k)
+                            ! shonk and hogan (2008), eq. 11
+                            source(k)=source_up(k)+transmittance(k)* &
+                                (source(k-1)+albedo_atmos(k-1)*source_dn(k))* &
+                                inv_denominator(k)
+                        enddo
+                        ! toa, no diffuse downwelling
+                        flux_d(kp,j,i,m)=0._sp
+                        
+                        ! toa, all upwelling is due to emission below that level
+                        flux_u(kp,j,i,m)=source(kp)
+                        
+                        ! work down through the atmosphere computing the fluxes at each 
+                        ! half-level
+                        do k=kp,1,-1
+                            ! shonk and hogan (2008) eq. 14 after simplification
+                            flux_d(k-1,j,i,m)=(transmittance(k)*flux_d(k,j,i,m)+ &
+                                reflectance(k) * &
+                                source(k-1)+source_dn(k))*inv_denominator(k)
+                            ! shonk and hogan (2008) eq. 12
+                            flux_u(k-1,j,i,m)=albedo_atmos(k-1)* &
+                                flux_d(k-1,j,i,m)+source(k-1)
+                        enddo
+                        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!                         flux_u(:,j,i,m)=0._sp
+!                         flux_d(:,j,i,m)=0._sp
+                        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+                        ! Meador and Weaver (1980) reflectance and transmittance         !
+                        ! for shortwave   			                                     !
+                        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+                        do k=1,kp
+                            ! eq. 16 M+W (1980)
+                            alpha1=gamma1_sw(k)*gamma4_sw(k) + gamma2_sw(k)*gamma3_sw(k)
+                            ! eq. 17 M+W (1980)
+                            alpha1=gamma1_sw(k)*gamma3_sw(k) + gamma2_sw(k)*gamma4_sw(k)
+                            ! eq. 18 M+W (1980)
+                            k_exponent = sqrt(max((gamma1_sw(k)-gamma2_sw(k))* &
+                                (gamma1_sw(k)+gamma2_sw(k)), 1.e-12_sp ))
+                            
+                            mu0_local = cos_theta_s
+                            ! if k*cos_theta_s is very close to 1 then ref_dif and 
+                            ! trans_dif_diff can be outside 0-1
+                            if(abs(1._sp-k_exponent*cos_theta_s) < 1000._sp*eps1) &
+                                mu0_local = cos_theta_s*(1._sp-10._sp*eps1)
+                                
+                            od_over_mu0 = max(tau(k)/mu0_local, 0._sp)
+                            k_mu0 = k_exponent*mu0_local
+                            k_gamma3 = k_exponent*gamma3_sw(k)
+                            k_gamma4 = k_exponent*gamma4_sw(k)
+                            
+                            exponential0=exp(-od_over_mu0)
+                            ! transmission of direct radiation to direct radiation
+                            trans_dir_dir(k)=exponential0
+                            exponential=exp(-k_exponent*tau(k))
+                            
+                            exponential2=exponential*exponential
+                            k_2_exponential = 2._sp*k_exponent*exponential
+                            reftrans_factor = 1.0_sp/(k_exponent+gamma1_sw(k)+ &
+                                (k_exponent-gamma1_sw(k))*exponential2)      
+                                
+                            ! M+W (1980) eq. 25
+                            ref_diff(k)=gamma2_sw(k)*(1._sp-exponential2)*reftrans_factor                      
+                            ! M+W (1980) eq. 26
+                            trans_diff(k)=k_2_exponential*reftrans_factor  
+                            
+                            ! because we assume the incoming "direct" flux comes into a 
+                            ! plane perp. to the sun, we need to multiply by mu0 as 
+                            ! diffuse fluxes are always perp. to the ground - Robin Hogan
+                            ! (Personal Communication)
+                            reftrans_factor = mu0_local*omg_s(k)*reftrans_factor / &
+                                (1._sp-k_mu0*k_mu0)
+                                
+                            ! M+W (1980) eq. 14. multiplying top and bottom by 
+                            ! exp(-k_exponent*tau(i)) in case of very high optical depths
+                            ! Reflectance to direct radiation
+                            ref_dir(k)=reftrans_factor*((1._sp-k_mu0)*(alpha2+k_gamma3)- &
+                                (1._sp+k_mu0)*(alpha2-k_gamma3)*exponential2 - &
+                                k_2_exponential*(gamma3_sw(k)-alpha2*mu0_local)* &
+                                exponential0)
+                            
+                            ! M+W (1980) eq. 15. multiplying top and bottom by 
+                            ! exp(-k_exponent*tau(k)), minus the exp(-tau(k)/mu0) term
+                            ! representing direct unscattered transmittance.
+                            trans_dir_diff(k)=reftrans_factor*(k_2_exponential* &
+                                (gamma4_sw(k)+alpha1*mu0_local)- &
+                                    exponential0*((1._sp+k_mu0)*(alpha1+k_gamma4)- &
+                                    (1._sp-k_mu0)*(alpha1-k_gamma4)*exponential2) )
+                            ! final check that ref_dir + trans_dir_diff <=1.
+                            ref_dir(k)=max(0._sp,min(trans_dir_diff(k), 1._sp-ref_dir(k)))
+                            trans_dir_diff(k)=&
+                                max(0._sp,min(trans_dir_diff(k),1._sp-ref_dir(k)))
+                        enddo                        
+                        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+                        
+                        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+                        ! Solution using the adding method:                              !
+                        ! can't parallelize in vertical                                  !
+                        ! 2. Shortwave radiation                                         !
+                        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+                        if ((cos_theta_s <= 0._sp)) cycle
+                        ! direct beam 
+                        flux_dn_direct(kp)=sflux_l(m)*exp(-tau(kp+1)/mu0_local)
+                        do k=kp,1,-1
+                            flux_dn_direct(k-1)=flux_dn_direct(k)*trans_dir_dir(k)
+                        enddo
+                        
+                        ! Diffuse source at the surface - direct beam reflected back into 
+                        ! the diffuse stream
+                        source(0)=albedo*flux_dn_direct(0)*cos_theta_s
+                        
+                        ! work up through the atmosphere and compute the albedo of the
+                        ! earth / atmosphere system below that half-level and also the 
+                        ! source, which is the upwelling flux due to the direct radiation
+                        ! that is scattered below that level.
+                        albedo_atmos(0)=albedo
+                        do k=1,kp
+                            ! lacis and hansen, eq 33; shonk and hogan (2008) eq 10
+                            inv_denominator(k)=1._sp/(1._sp-albedo_atmos(k-1)* &
+                                ref_diff(k))
+                            ! shonk and hogan (2008), eq 9, petty (2006) eq 13.81
+                            albedo_atmos(k)=ref_diff(k)+ &
+                                trans_diff(k)*trans_diff(k)*albedo_atmos(k-1)* &
+                                inv_denominator(k)
+                            source(k)=ref_dir(k)*flux_dn_direct(k)+trans_diff(k)* &
+                                (source(k-1)+albedo_atmos(k-1)*trans_dir_diff(k)* &
+                                flux_dn_direct(k))*inv_denominator(k)
+                        enddo
+                        ! at the toa there is no diffuse downwelling radiation
+                        flux_dn_diffuse(kp)=0._sp
+                        
+                        ! at the toa, all upwelling radiation is due to scattering by the
+                        ! direct beam below that level
+                        flux_up(kp)=source(kp)
+                        
+                        ! work down through the atmosphere computing the fluxes at each
+                        ! half-level
+                        do k=kp,1,-1
+                            ! shonk and hogan (2008) eq. 14 (after simplication)
+                            flux_dn_diffuse(k-1)=(trans_diff(k)*flux_dn_diffuse(k)+ &
+                                ref_diff(k)*source(k-1)+&
+                                trans_dir_diff(k)*flux_dn_direct(k))*inv_denominator(k)
+                            ! shonk and hogan (2008) eq 12
+                            flux_up(k-1)=albedo_atmos(k-1)*flux_dn_diffuse(k-1)+ &
+                                source(k-1)
+                            flux_dn_direct(k)=flux_dn_direct(k)*cos_theta_s
+                        enddo
+                        flux_dn_direct(0)=flux_dn_direct(0)*cos_theta_s
+                        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+                        
+                        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+                        ! Finally, add shortwave fluxes to lw                            !
+                        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+                        do k=0,kp
+                            flux_d(k,j,i,m)=flux_d(k,j,i,m)+&
+                                flux_dn_direct(k)+flux_dn_diffuse(k)
+                            flux_u(k,j,i,m)=flux_u(k,j,i,m)+flux_up(k)
+                        enddo                        
                         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
                     enddo
                 enddo
-			enddo
-			
-									
+            enddo
 		end subroutine solve_fluxes
 		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
