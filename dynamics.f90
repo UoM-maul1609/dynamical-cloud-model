@@ -565,16 +565,30 @@
         do i=1,ip
             do j=1,jp
                 do k=1,kp
-                    th(k,j,i)=th(k,j,i)-1._sp/(cp*rhoan(k)*dz(k-1))* &
-                        sum((flux_d(k-1,j,i,:)-flux_u(k-1,j,i,:)) - &
-                         (flux_d(k,j,i,:)-flux_u(k,j,i,:)))*dt
+                    th(k,j,i)=th(k,j,i)+1._sp/(cp*rhoan(k)*dz(k-1))* &
+                        sum((flux_d(k,j,i,:)-flux_u(k,j,i,:)) - &
+                         (flux_d(k-1,j,i,:)-flux_u(k-1,j,i,:)))*dt
                         
                 enddo
             enddo
         enddo
-        
+!         i=1
+!         j=1
+!         print *,'heating rate'
+!         do k=1,kp
+!             print *,-1._sp/(cp*rhoan(k)*dz(k-1))* &
+!                             sum((flux_u(k,j,i,1:20)-flux_d(k,j,i,1:20)) - &
+!                              (flux_u(k-1,j,i,1:20)-flux_d(k-1,j,i,1:20)))*86400._sp
+!         enddo        
+!         
+!         print *,'fluxes'
+!         do k=1,kp
+!             print *,sum(flux_u(k,j,i,1:20)), &
+!                              sum(flux_d(k,j,i,1:20))
+!         enddo        
         
 
+        
         call exchange_full(comm3d, id, kp, jp, ip, r_h,r_h,r_h,r_h,l_h,r_h,th,&
             0._sp,0._sp,dims,coords)	
 	end subroutine radiative_transfer
