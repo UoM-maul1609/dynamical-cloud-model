@@ -11,7 +11,7 @@
 doxygen
 papers
 tests
-matlab-dev
+test
 *.dSYM
 __pycache__
 correlated_k_distribution_single.py

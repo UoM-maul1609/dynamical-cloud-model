@@ -114,10 +114,14 @@
         ! Set-up the Cartesian topology									             	 !
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 		! note the min is so that there is not more than 1 proc per grid point
-		mp1%dx=min( floor( (real(mp1%rank,sp))**(1._sp/3._sp) ) , ip)
-		mp1%dy=min( floor( &
-					(real(mp1%rank,sp)/real(mp1%dx,sp))**(1._sp/2._sp) ) , jp)
-		mp1%dz=min( floor( real(mp1%rank,sp) / real(mp1%dx*mp1%dy,sp) ), kp )
+! 		mp1%dx=min( floor( (real(mp1%rank,sp))**(1._sp/3._sp) ) , ip)
+! 		mp1%dy=min( floor( &
+! 					(real(mp1%rank,sp)/real(mp1%dx,sp))**(1._sp/2._sp) ) , jp)
+! 		mp1%dz=min( floor( real(mp1%rank,sp) / real(mp1%dx*mp1%dy,sp) ), kp )
+
+		mp1%dz=1
+		mp1%dx=min( floor( (real(mp1%rank,sp))**(1._sp/2._sp) ) , ip)
+		mp1%dy=min( floor( real(mp1%rank,sp) / real(mp1%dx*mp1%dz,sp) ), jp )
 
 		if(mp1%id == world_process) then
 			print *,'Cartesian topology: ',mp1%dx, mp1%dy, mp1%dz		
