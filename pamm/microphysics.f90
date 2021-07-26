@@ -1209,15 +1209,17 @@
         enddo
     enddo
     ! cloud moments
+    ! see https://journals.ametsoc.org/view/journals/atsc/68/7/2011jas3645.1.xml
+    ! equation 17 - modified gamma distribution
     moms=0._sp
     do i=1-l_h,ip+r_h
         do j=1-l_h,jp+r_h
             do k=1-l_h,kp+r_h
-                ! zeroth  
+                ! zeroth - number
                 if (q(k,j,i,inc).lt.1._sp) cycle
                 if (q(k,j,i,iqc).lt.1.e-20_sp) cycle
                 moms(k,j,i,1)=rhoan(k)*q(k,j,i,inc)
-                ! first  
+                ! first 
                 moms(k,j,i,2)=ngs(k,j,i,1)*gam1cr / &
                     (cc**(1._sp/dc)*lamgs(k,j,i,1)**(alpha_c+1._sp+1._sp/dc))
                 ! second  
@@ -1235,11 +1237,12 @@
                 ! calculate the ratio p M1/M0*M2/M3
                 p=moms(k,j,i,2)/moms(k,j,i,1)* &
                     moms(k,j,i,3)/moms(k,j,i,4)
+                ! p=(alpha + 1) / (alpha+3)
                 ! mu    
                 mugs(k,j,i,1)=(1._sp-3._sp*p) / (p-1._sp)
-                ! now calculate ratio of m1 : m0
+                ! now calculate ratio of m0 : m1
                 p=moms(k,j,i,1) / moms(k,j,i,2)
-                ! lambda
+                ! lambda from this ratio
                 lamgs(k,j,i,1)=p*(mugs(k,j,i,1)+1._sp)
                 ! n0
                 ngs(k,j,i,1)=lamgs(k,j,i,1)**(mugs(k,j,i,1)+1._sp)*moms(k,j,i,1) / &
