@@ -71,7 +71,8 @@
             			damping_layer,forcing, aero_prof_flag,drop_num_init, theta_flag, &
             			hm_flag=.false.,wr_flag=.false., ice_flag=.false., &
             			adiabatic_prof=.false.,divergence, &
-            			param_wind=.false., heyms_west=.false.
+            			param_wind=.false., heyms_west=.false., lawson=.false., &
+            			recycle=.true.
             integer(i4b) :: nq,ip, jp, kp, subgrid_model, advection_scheme, kord, &
                         microphysics_flag,nprec, ice_nuc_flag=1, mode2_ice_flag=0, &
                         coll_breakup_flag1=0
