@@ -2372,7 +2372,8 @@
                     n0i=n_i(k)
 
                     if(heyms_west) then
-                        ci_new=pi/6._sp*910._sp
+                        ci_new=pi/6._sp*min(910._sp, &
+                            q(k,iqi)/(q(k,iqi+2)+q(k,iqi+4)/920._sp))
                         a_hw_new=a_hw1(k)
                         pre_hw_new=pre_hw(k)
                         call quad2d_qgaus(dintegral_mode2_hw, &
@@ -2812,7 +2813,8 @@
                     n0i=n_i(k)
                     
                     if(heyms_west) then
-                        ci_new=pi/6._sp*910._sp
+                        ci_new=pi/6._sp*min(910._sp, &
+                            q(k,iqi)/(q(k,iqi+2)+q(k,iqi+4)/920._sp))
                         a_hw_new=a_hw1(k)
                         pre_hw_new=pre_hw(k)
                         call quad2d_qgaus(dintegral_collisional_breakup_hw, &
