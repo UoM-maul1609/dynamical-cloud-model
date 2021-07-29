@@ -68,6 +68,8 @@
  	nm1%th_jump=0.,
  	nm1%th_grad=0.005,
     nm1%n_levels = 7,
+    nm1%bubble=.false., ! for initialisation with warm bubble
+    nm1%param_theta=.true., ! add some noise to layer defined by param_z, below
     nm1%param_wind=.true., ! these variables define the wind if param_wind set to true
     nm1%param_vmax=15.,
     nm1%param_z=2500.,
@@ -76,5 +78,7 @@
 &sounding_vars
 	q_read(1,1:7)   = 0.0099, 0.0099, 0.0099, 1.4e-4, 1.4e-4, 1.4e-11, 1.4e-11,
 	theta_read(1:7) = 290.9, 290.9, 290.9,290.9,290.9, 300.9, 400., !312.95,
+	u_read(1:7)     = 0.,0.,0.,0.,0.,0.,0., 
+	v_read(1:7)     = 0.,0.,0.,0.,0.,0.,0., 
 	z_read(1:7)     = 0.,740,1600,1601,6260, 6261, 12000./ ! 3260
 	

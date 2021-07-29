@@ -572,20 +572,6 @@
                 enddo
             enddo
         enddo
-!         i=1
-!         j=1
-!         print *,'heating rate'
-!         do k=1,kp
-!             print *,-1._sp/(cp*rhoan(k)*dz(k-1))* &
-!                             sum((flux_u(k,j,i,1:20)-flux_d(k,j,i,1:20)) - &
-!                              (flux_u(k-1,j,i,1:20)-flux_d(k-1,j,i,1:20)))*86400._sp
-!         enddo        
-!         
-!         print *,'fluxes'
-!         do k=1,kp
-!             print *,sum(flux_u(k,j,i,1:20)), &
-!                              sum(flux_d(k,j,i,1:20))
-!         enddo        
         
 
         

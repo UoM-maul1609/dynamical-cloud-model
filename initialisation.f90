@@ -30,14 +30,16 @@
 	!>@param[inout] q_read: real array
 	!>@param[inout] z_read: real array
 	!>@param[inout] th_read: real array
+	!>@param[inout] u_read: real array
+	!>@param[inout] v_read: real array
     subroutine allocate_nml_qs(nq,n_levels,q_type,q_init,q_read, &
-                z_read,th_read)
+                z_read,th_read, u_read, v_read)
     use nrtype
     implicit none
     integer(i4b), intent(in) :: nq, n_levels
     integer(i4b), dimension(:), allocatable, intent(inout) :: q_type
     logical, dimension(:), allocatable, intent(inout) :: q_init
-    real(sp), dimension(:), allocatable, intent(inout) :: z_read,th_read
+    real(sp), dimension(:), allocatable, intent(inout) :: z_read,th_read, u_read, v_read
     real(sp), dimension(:,:), allocatable, intent(inout) :: q_read
     ! local variables:
     integer(i4b) :: AllocateStatus
@@ -52,6 +54,10 @@
     allocate( z_read(1:n_levels), STAT = AllocateStatus)
     if (AllocateStatus /= 0) STOP "*** Not enough memory ***"
     allocate( th_read(1:n_levels), STAT = AllocateStatus)
+    if (AllocateStatus /= 0) STOP "*** Not enough memory ***"
+    allocate( u_read(1:n_levels), STAT = AllocateStatus)
+    if (AllocateStatus /= 0) STOP "*** Not enough memory ***"
+    allocate( v_read(1:n_levels), STAT = AllocateStatus)
     if (AllocateStatus /= 0) STOP "*** Not enough memory ***"
     
     
@@ -96,9 +102,10 @@
 	!>@param[in] nqg,nprecg - number of precipitation categories
 	!>@param[in] iqv,iqc,inc,drop_num_init, num_drop: moisture variables
 	!>@param[in] n_levels
-	!>@params[inout] q_read,z_read,theta_read, psurf,tsurf - sounding variables
+	!>@params[inout] q_read,z_read,theta_read, 
+	!>@params[inout] u_read,v_read,psurf,tsurf - sounding variables
 	!>@params[in] adiabatic_prof,adiabatic_frac,t_cbase,t_ctop, rh_above, th_jump,th_grad
-	!>@param[in] param_wind, param_vmax,param_z,param_sigz,param_delz
+	!>@param[in] bubble, param_theta, param_wind, param_vmax,param_z,param_sigz,param_delz
 	!>@param[in] radiation,nrad
 	!>@param[inout] ngs,lamgs,mugs
 	!>@param[in] l_h,r_h - halo for arrays
@@ -138,9 +145,9 @@
 			iqv,iqc,inc,drop_num_init, num_drop, &
 			n_levels, &
 			q_read, &
-			z_read, theta_read,psurf,tsurf, &
+			z_read, theta_read,u_read,v_read,psurf,tsurf, &
 			adiabatic_prof,adiabatic_frac,t_cbase,t_ctop, rh_above, th_jump, th_grad,&
-			param_wind, param_vmax,param_z,param_sigz,param_delz, &
+			bubble, param_theta,param_wind, param_vmax,param_z,param_sigz,param_delz, &
 			radiation,nrad,ngs,lamgs,mugs, &
 			l_h,r_h, &
 			thbase,thtop, &
@@ -180,9 +187,10 @@
 		integer(i4b), intent(in) :: ip, jp, kp, l_h, r_h, nq,nprec,iqv,iqc,inc, nrad
 		integer(i4b), intent(inout) :: nqg,nprecg
 		logical, intent(in) :: moisture,theta_flag,damping_layer, forcing, drop_num_init, &
-		    adiabatic_prof,divergence, param_wind, radiation
+		    adiabatic_prof,divergence, bubble, param_theta, param_wind, radiation
 		integer(i4b), intent(in) :: n_levels
-		real(sp), dimension(n_levels), target, intent(inout) :: z_read,theta_read
+		real(sp), dimension(n_levels), target, intent(inout) :: z_read,theta_read, &
+		    u_read, v_read
 		real(sp), dimension(nq,n_levels), target, intent(inout) :: q_read
 		real(sp), intent(in) :: psurf, tsurf,damping_thickness,damping_tau, &
 		    adiabatic_frac,t_cbase,t_ctop,rh_above,th_jump,th_grad, &
@@ -708,7 +716,7 @@
 ! 			enddo
 ! 		enddo
 
-        if(param_wind) then
+        if(param_theta) then
             do i=0,ip+1
                 do j=0,jp+1
                     do k=0,kp+1
@@ -762,9 +770,43 @@
                     enddo
                 enddo
             enddo
+        else
+            do i=1-r_h,ipp+r_h
+                do j=1-r_h,jpp+r_h
+                    do k=0,kpp+1
+                        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+                        ! locate and interpolate to find u,v on p-points:	             !
+                        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+                        iloc=locate(z_read(1:n_levels),zn(k))
+                        iloc=min(n_levels-1,iloc)
+                        iloc=max(1,iloc)
+                        ! linear interp u
+                        call polint(z_read(iloc:iloc+1), u_read(iloc:iloc+1), &
+                                    min(zn(k),z_read(n_levels)), var,dummy)
+                        u(k,j,i)=var
+                        ! linear interp u
+                        call polint(z_read(iloc:iloc+1), v_read(iloc:iloc+1), &
+                                    min(zn(k),z_read(n_levels)), var,dummy)
+                        v(k,j,i)=var
+                        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+                        if((coords(3)==(dims(3)-1)).and.(k==kpp)) then
+                            u(k,j,i)=0._sp
+                            v(k,j,i)=0._sp
+                        endif
+                        if((coords(3)==0).and.(k<=1)) then
+                            u(k,j,i)=0._sp
+                            v(k,j,i)=0._sp
+                        endif
+                        zu(k,j,i)=u(k,j,i)
+                        tu(k,j,i)=u(k,j,i)
+                        zv(k,j,i)=v(k,j,i)
+                        tv(k,j,i)=v(k,j,i)
+                    enddo
+                enddo
+            enddo            
         endif
         
-        if (.not.param_wind) then
+        if (bubble) then
             th=0._sp
             do i=1-r_h,ipp+r_h
                 do j=1-r_h,jpp+r_h

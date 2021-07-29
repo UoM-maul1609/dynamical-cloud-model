@@ -72,7 +72,7 @@
             			hm_flag=.false.,wr_flag=.false., ice_flag=.false., &
             			adiabatic_prof=.false.,divergence, &
             			param_wind=.false., heyms_west=.false., lawson=.false., &
-            			recycle=.true.
+            			recycle=.true., param_theta=.true., bubble=.false.
             integer(i4b) :: nq,ip, jp, kp, subgrid_model, advection_scheme, kord, &
                         microphysics_flag,nprec, ice_nuc_flag=1, mode2_ice_flag=0, &
                         coll_breakup_flag1=0
@@ -92,7 +92,7 @@
         end type namelist_input
 
 
-        real(sp), allocatable, dimension(:) :: theta_read, z_read
+        real(sp), allocatable, dimension(:) :: theta_read, z_read, u_read, v_read
         real(sp), allocatable, dimension(:,:) :: q_read
         integer(i4b), dimension(:), allocatable :: q_type
         logical, dimension(:), allocatable :: q_init

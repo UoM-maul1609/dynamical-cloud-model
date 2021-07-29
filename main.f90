@@ -52,7 +52,7 @@
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         namelist /run_vars/ nm1
         namelist /rad_vars/ nm2
-        namelist /sounding_vars/ nm1,q_read,theta_read,z_read
+        namelist /sounding_vars/ nm1,q_read,theta_read,u_read,v_read,z_read
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 
@@ -126,7 +126,7 @@
         ! allocate arrays for namelist q-variables							   !
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         call allocate_nml_qs(nm1%nq,nm1%n_levels,q_type,q_init,&
-            q_read, z_read,theta_read) 
+            q_read, z_read,theta_read, u_read, v_read) 
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 
@@ -198,9 +198,12 @@
 			q_read(1:nm1%nq,1:nm1%n_levels), &
 			z_read(1:nm1%n_levels), &
 			theta_read(1:nm1%n_levels), &
+			u_read(1:nm1%n_levels), &
+			v_read(1:nm1%n_levels), &
 			nm1%psurf,nm1%tsurf, &
 			nm1%adiabatic_prof, nm1%adiabatic_frac,nm1%t_cbase,nm1%t_ctop, &
 			nm1%rh_above, nm1%th_jump, nm1%th_grad, &
+			nm1%bubble, nm1%param_theta, &
 			nm1%param_wind,nm1%param_vmax,nm1%param_z,nm1%param_sigz,nm1%param_delz, &
 			nm1%radiation, & ! needed to store 
             grid1%nrad, &

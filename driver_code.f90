@@ -457,12 +457,14 @@
                 select case (advection_scheme)
                     case (0:2)
                         do nqc=1,ncat
-                            call mpdata_vec_3d(dt,dx,dy,dz,dxn,dyn,dzn,rhoa,rhoan, &
-                                ipp,jpp,kpp,c_e(nqc)-c_s(nqc)+1, &
-                                l_h,r_h,u,v,w,q(:,:,:,c_s(nqc):c_e(nqc)), &
-                                q1(c_s(nqc):c_e(nqc)),q2(c_s(nqc):c_e(nqc)), &
-                                kord,monotone,0,ring_comm,id, &
-                                dims,coords)						
+                            !if((nqc<2).or.(nqc>(n_mode+1))) then
+                                call mpdata_vec_3d(dt,dx,dy,dz,dxn,dyn,dzn,rhoa,rhoan, &
+                                    ipp,jpp,kpp,c_e(nqc)-c_s(nqc)+1, &
+                                    l_h,r_h,u,v,w,q(:,:,:,c_s(nqc):c_e(nqc)), &
+                                    q1(c_s(nqc):c_e(nqc)),q2(c_s(nqc):c_e(nqc)), &
+                                    kord,monotone,0,ring_comm,id, &
+                                    dims,coords)						
+                            !endif
                         enddo
                     case default
                         print *,'not coded'
