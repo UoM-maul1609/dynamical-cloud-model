@@ -3,7 +3,7 @@
 	nm1%subgrid_model=2, ! 1 = constant viscosity, 2=smagorinsky
 	nm1%viscous_dissipation=.true.,
 	nm1%damping_layer=.true.,
-	nm1%forcing=.true.,
+	nm1%forcing=.false.,
 	nm1%divergence=.true., ! flag for large-scale subsidence - sets the vertical wind
 	                        ! so that divergence of horizontal winds should equal 
 	                        ! that specified
