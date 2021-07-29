@@ -2,8 +2,8 @@
 	n_modes_prof = 3,
     n_levels_s = 4/
 &aerosol_profile_data
-	n_read(1,1:4)     = 250e6, 250e6, 250e6,0.1e6,
-	n_read(2,1:4)     = 250e6, 250e6, 250e6,0.1e6,
+	n_read(1,1:4)     = 250e6, 250e6, 250e6,250e6,
+	n_read(2,1:4)     = 250e6, 250e6, 250e6,250e6,
 	n_read(3,1:4)     = 1e6, 1e6, 1e6,1e6,
 	sig_read(1,1:4)   = 0.2, 0.2, 0.2,0.2,
 	sig_read(2,1:4)   = 0.2, 0.2, 0.2,0.2,
