@@ -1417,7 +1417,7 @@
     integer(i4b), dimension(3), intent(in) :: coords, dims
     real(sp), dimension(nq) :: lbc,ubc
     logical, dimension(3) :: adv_lg, adv_l=[.false.,.false.,.false.], &
-                    adv_l_o=[.false.,.false.,.false.]
+                    adv_l_o=[.false.,.false.,.false.], adv_lgg
 
     n_step=1
     n_step_o=1
@@ -1458,15 +1458,17 @@
     	enddo
 	enddo
 	
-	! collective communication
+	! collective communication - no longer really need this because
+	! vertical levels are not parallelised
+	! (but you may want to keep the option of parallelising over the vertical)
+	! normally the communicator should be comm_vert
+	! but there is problem in the code  when exchange_full is called
+	! because not all processors might be there (due to if statements)
 #if MPI_PAMM == 1
 	call mpi_allreduce(adv_l_o(1:3),adv_lg(1:3),3,MPI_LOGICAL,MPI_LOR, comm_vert,error)
 	call mpi_allreduce(n_step_o(1:3),n_step_g(1:3),3,MPI_INTEGER,MPI_MAX, comm_vert,error)
+	call mpi_allreduce(adv_l_o(1:3),adv_lgg(1:3),3,MPI_LOGICAL,MPI_LOR, comm,error)
 #endif
-    
-    
-    
-    
     
 
 
@@ -1487,7 +1489,7 @@
     enddo
     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-
+    ! Vert communications
     if(adv_lg(1)) then
         call exchange_along_z(comm_vert, id, kp, jp, ip, r_h,r_h,r_h,r_h,r_h,r_h, &
                                 vqc(:,:,:),0._sp,0._sp,dims,coords)
@@ -1500,14 +1502,6 @@
                     1,.false., 2,comm_vert, id, &
                     dims,coords)
         enddo
-        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-        ! full exchange needed                                                           !
-        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-        do n1=cst(cat_c),cen(cat_c)
-            call exchange_full(comm, id, kp, jp, ip, r_h,r_h,r_h,r_h,r_h,r_h, &
-                                    q(:,:,:,n1),lbc(n1),ubc(n1),dims,coords)
-        enddo
-        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     endif       
     if(adv_lg(2)) then
         call exchange_along_z(comm_vert, id, kp, jp, ip, r_h,r_h,r_h,r_h,r_h,r_h, &
@@ -1523,14 +1517,6 @@
                     dims,coords) 
 
         enddo
-        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-        ! full exchange needed                                                           !
-        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-        do n1=cst(cat_r),cen(cat_r)
-            call exchange_full(comm, id, kp, jp, ip, r_h,r_h,r_h,r_h,r_h,r_h, &
-                                    q(:,:,:,n1),lbc(n1),ubc(n1),dims,coords)
-        enddo
-        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     endif       
     if(adv_lg(3)) then
         call exchange_along_z(comm_vert, id, kp, jp, ip, r_h,r_h,r_h,r_h,r_h,r_h, &
@@ -1546,6 +1532,33 @@
                     dims,coords) 
 
         enddo
+    endif
+    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    
+    ! comm - communications
+    if(adv_lgg(1)) then
+        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        ! full exchange needed                                                           !
+        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        do n1=cst(cat_c),cen(cat_c)
+            call exchange_full(comm, id, kp, jp, ip, r_h,r_h,r_h,r_h,r_h,r_h, &
+                                    q(:,:,:,n1),lbc(n1),ubc(n1),dims,coords)
+        enddo
+        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!    
+    endif
+           
+    if(adv_lgg(2)) then
+        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        ! full exchange needed                                                           !
+        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        do n1=cst(cat_r),cen(cat_r)
+            call exchange_full(comm, id, kp, jp, ip, r_h,r_h,r_h,r_h,r_h,r_h, &
+                                    q(:,:,:,n1),lbc(n1),ubc(n1),dims,coords)
+        enddo
+        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    endif
+           
+    if(adv_lgg(3)) then
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         ! full exchange needed                                                           !
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -1554,7 +1567,8 @@
                                     q(:,:,:,n1),lbc(n1),ubc(n1),dims,coords)
         enddo
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    endif       
+    endif
+           
 #endif
 
     if (calc_params) then
@@ -1877,7 +1891,7 @@
 	real(sp) :: qold,des_dt,dqs_dt,err,cond,temp1, dummy1,dummy2, dummy3,&
 	            n_mix,s_mix,m_mix, nin_c, din_c,nin_r,din_r, n_tot, s_tot, m_tot
 	
-	real(sp), dimension(1-o_halo:kp+o_halo) :: gamma_t,dep_density
+	real(sp), dimension(1-o_halo:kp+o_halo) :: gamma_t,dep_density, qold1
 	real(sp) :: phi,vol, nfrag=0._sp, lam_freeze, n0_freeze
 	
     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -1958,7 +1972,7 @@
     ! rain n0, lambda
     lam_r=(max(q(:,cst(cat_r)),1._sp)*cr*gam2r / &
             (max(q(:,cst(cat_r)+1),1.e-10_sp)*gam1r))**(1._sp/dr)
-    n_r=rho(:)*max(q(:,cst(cat_r)),0._sp)*lam_r**(1._sp+alpha_r) / gam1r
+    n_r=rho(:)*max(q(:,cst(cat_r)),1._sp)*lam_r**(1._sp+alpha_r) / gam1r
     ! cloud n0, lambda    
     lam_c=(max(q(:,inc),1._sp)*gam2c / (max(q(:,iqc),1.e-10_sp)*gam1c))**(1._sp/1._sp)
     n_c=rho(:)*max(q(:,inc),0._sp)*lam_c**(1._sp+alpha_c) / gam1c
@@ -2078,6 +2092,7 @@
     	
     	cond=(q(k,iqc)-qold)
     	q(k,1)=q(k,1)-cond
+    	qold1(k)=qold
 		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     enddo
     
@@ -2119,7 +2134,7 @@
 #else
         k1=max(k-1,1)
 #endif
-	    if((q(k,iqc) .gt. qsmall) .and. (q(k1,iqc) .le. qsmall)) then
+	    if((q(k1,iqc) .lt. qsmall) .and. (q(k,iqc) .gt. qsmall).and.(u(k)>0._sp)) then
 	    
             !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
             ! Calculate the lognormal parameters                                         !
@@ -2761,6 +2776,7 @@
             rrsel(k)=sb_rsel
             rcwsel(k)=sb_cwsel
         endif
+        
 		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         ! end rain auto-conversion                                                       !		
 		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -2991,21 +3007,33 @@
         
         
     rho=1._sp ! fudge for advection conservation
-    do k=-o_halo+1,kp+o_halo
-        if(q(k,iqc) .lt. qsmall) then ! if evaporated
-            do i=1,n_mode-1
-                ! add aerosol in cloud water back to aerosol
-                q(k,cst(i+1))      =q(k,cst(i+1))   +q(k,cst(cat_c)+(i-1)*3+2)
-                q(k,cst(i+1)+1)    =q(k,cst(i+1)+1) +q(k,cst(cat_c)+(i-1)*3+3)
-                q(k,cst(i+1)+2)    =q(k,cst(i+1)+2) +q(k,cst(cat_c)+(i-1)*3+4)
-                q(k,cst(cat_c)+(i-1)*3+2)=0._sp
-                q(k,cst(cat_c)+(i-1)*3+3)=0._sp
-                q(k,cst(cat_c)+(i-1)*3+4)=0._sp
-            enddo
-            q(k,inc) = 0.0_sp
-        endif
-    enddo
-
+    if(recycle) then
+        do k=-o_halo+1,kp+o_halo
+            if(q(k,iqc) .lt. qsmall) then ! if evaporated
+                do i=1,n_mode-1
+                    ! add aerosol in cloud water back to aerosol
+                    q(k,cst(i+1))      =q(k,cst(i+1))   +q(k,cst(cat_c)+(i-1)*3+2)
+                    q(k,cst(i+1)+1)    =q(k,cst(i+1)+1) +q(k,cst(cat_c)+(i-1)*3+3)
+                    q(k,cst(i+1)+2)    =q(k,cst(i+1)+2) +q(k,cst(cat_c)+(i-1)*3+4)
+                    q(k,cst(cat_c)+(i-1)*3+2)=0._sp
+                    q(k,cst(cat_c)+(i-1)*3+3)=0._sp
+                    q(k,cst(cat_c)+(i-1)*3+4)=0._sp
+                enddo
+                q(k,inc) = 0.0_sp
+            endif
+        enddo
+    else
+        do k=-o_halo+1,kp+o_halo
+            if(q(k,iqc) .lt. qsmall) then ! if evaporated
+                do i=1,n_mode-1
+                    q(k,cst(cat_c)+(i-1)*3+2)=0._sp
+                    q(k,cst(cat_c)+(i-1)*3+3)=0._sp
+                    q(k,cst(cat_c)+(i-1)*3+4)=0._sp
+                enddo
+                q(k,inc) = 0.0_sp
+            endif
+        enddo    
+    endif
 
 
 
@@ -3269,6 +3297,7 @@
 #endif	
 	endif
     ! rain 
+    vqr=0._sp
     if(sum(q(1:kp,cst(cat_r)+1)).gt.qsmall) then
         adv_l(2)=.true.
 		where(isnan(vqr))
