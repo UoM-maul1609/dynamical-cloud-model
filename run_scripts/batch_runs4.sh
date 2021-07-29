@@ -157,7 +157,7 @@ sed -e "s/!if((nqc<2).or.(nqc>(n_mode+1))) then/if((nqc<2).or.(nqc>(n_mode+1))) 
 sed -e "s/!endif/endif/" /tmp/temp.f90 > /tmp/temp2.f90
 cp /tmp/temp2.f90 driver_code.f90
 
-!make
+make NETCDFLIB=-L/usr/lib/x86_64-linux-gnu/ NETCDFMOD=/usr/include/ FFLAGS='-O3 -w -o' FFLAGS2='-w -O3 -o'
 
 
 mpiexec -n 24 ./main.exe run_scripts/westbrook_illingworth_nml.in 
@@ -167,7 +167,8 @@ mv /tmp/output_pc01.nc /tmp/output0010.nc
 
 git checkout run_scripts/westbrook_illingworth_nml.in
 git checkout run_scripts/westbrook_illingworth_pamm_nml.in 
-
+git checkout sgm/subgrid_3d.f90
+git checkout driver_code.f90
 
 
 
