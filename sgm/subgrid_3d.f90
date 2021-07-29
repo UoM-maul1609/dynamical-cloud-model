@@ -609,13 +609,15 @@
     enddo
     if(moisture) then
         do n=1,nq
-            do i=1-l_h,ip+r_h
-                do j=1-l_h,jp+r_h
-                    do k=1-l_h,kp+r_h
-                        q(k,j,i,n)=q(k,j,i,n)+sq(k,j,i,n)*dt
+!             if((n<2).or.(n>14)) then
+                do i=1-l_h,ip+r_h
+                    do j=1-l_h,jp+r_h
+                        do k=1-l_h,kp+r_h
+                            q(k,j,i,n)=q(k,j,i,n)+sq(k,j,i,n)*dt
+                        enddo
                     enddo
                 enddo
-            enddo
+!             endif
         enddo    
     endif    
     end subroutine advance_scalar_fields_3d
