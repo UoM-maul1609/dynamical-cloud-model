@@ -32,8 +32,8 @@ sed -e "s/n_read(1,1:4)     = 250e6, 250e6, 250e6,250e6,/n_read(1,1:4)     = 250
 sed -e "s/n_read(2,1:4)     = 250e6, 250e6, 250e6,250e6,/n_read(2,1:4)     = 250e6, 250e6, 250e6,0.1e6,/" /tmp/namelist.tmp > /tmp/namelist.tmp2
 sed -e "s/z_read(1:4)       = 0.,740,3260,4000/z_read(1:4)       = 0.,740,3700,3701/" /tmp/namelist.tmp2 > run_scripts/westbrook_illingworth_pamm_nml.in 
 
-sed -e "s/nm1%mode2_ice_flag=0,/nm1%mode2_ice_flag=1,/" run_scripts/westbrook_illingworth_pamm_nml.in > /tmp/namelist.tmp
-cp /tmp/namelist.tmp run_scripts/westbrook_illingworth_pamm_nml.in
+sed -e "s/nm1%mode2_ice_flag=0,/nm1%mode2_ice_flag=1,/" run_scripts/westbrook_illingworth_nml.in > /tmp/namelist.tmp
+cp /tmp/namelist.tmp run_scripts/westbrook_illingworth_nml.in
 
 mpiexec -n 24 ./main.exe run_scripts/westbrook_illingworth_nml.in 
 
@@ -48,8 +48,8 @@ sed -e "s/n_read(1,1:4)     = 250e6, 250e6, 250e6,250e6,/n_read(1,1:4)     = 250
 sed -e "s/n_read(2,1:4)     = 250e6, 250e6, 250e6,250e6,/n_read(2,1:4)     = 250e6, 250e6, 250e6,0.1e6,/" /tmp/namelist.tmp > /tmp/namelist.tmp2
 sed -e "s/z_read(1:4)       = 0.,740,3260,4000/z_read(1:4)       = 0.,740,3700,3701/" /tmp/namelist.tmp2 > run_scripts/westbrook_illingworth_pamm_nml.in 
 
-sed -e "s/nm1%coll_breakup_flag1=0,/nm1%coll_breakup_flag1=1,/" run_scripts/westbrook_illingworth_pamm_nml.in > /tmp/namelist.tmp
-cp /tmp/namelist.tmp run_scripts/westbrook_illingworth_pamm_nml.in
+sed -e "s/nm1%coll_breakup_flag1=0,/nm1%coll_breakup_flag1=1,/" run_scripts/westbrook_illingworth_nml.in > /tmp/namelist.tmp
+cp /tmp/namelist.tmp run_scripts/westbrook_illingworth_nml.in
 
 mpiexec -n 24 ./main.exe run_scripts/westbrook_illingworth_nml.in 
 
@@ -63,8 +63,8 @@ sed -e "s/n_read(1,1:4)     = 250e6, 250e6, 250e6,250e6,/n_read(1,1:4)     = 250
 sed -e "s/n_read(2,1:4)     = 250e6, 250e6, 250e6,250e6,/n_read(2,1:4)     = 250e6, 250e6, 250e6,0.1e6,/" /tmp/namelist.tmp > /tmp/namelist.tmp2
 sed -e "s/z_read(1:4)       = 0.,740,3260,4000/z_read(1:4)       = 0.,740,3700,3701/" /tmp/namelist.tmp2 > run_scripts/westbrook_illingworth_pamm_nml.in 
 
-sed -e "s/nm1%lawson=.false./nm1%lawson=.true./" run_scripts/westbrook_illingworth_pamm_nml.in > /tmp/namelist.tmp
-cp /tmp/namelist.tmp run_scripts/westbrook_illingworth_pamm_nml.in
+sed -e "s/nm1%lawson=.false./nm1%lawson=.true./" run_scripts/westbrook_illingworth_nml.in > /tmp/namelist.tmp
+cp /tmp/namelist.tmp run_scripts/westbrook_illingworth_nml.in
 
 mpiexec -n 24 ./main.exe run_scripts/westbrook_illingworth_nml.in 
 
@@ -79,8 +79,8 @@ sed -e "s/n_read(1,1:4)     = 250e6, 250e6, 250e6,250e6,/n_read(1,1:4)     = 250
 sed -e "s/n_read(2,1:4)     = 250e6, 250e6, 250e6,250e6,/n_read(2,1:4)     = 250e6, 250e6, 250e6,0.1e6,/" /tmp/namelist.tmp > /tmp/namelist.tmp2
 sed -e "s/z_read(1:4)       = 0.,740,3260,4000/z_read(1:4)       = 0.,740,3700,3701/" /tmp/namelist.tmp2 > run_scripts/westbrook_illingworth_pamm_nml.in 
 
-sed -e "s/nm1%recycle=.true./nm1%recycle=.false./" run_scripts/westbrook_illingworth_pamm_nml.in > /tmp/namelist.tmp
-cp /tmp/namelist.tmp run_scripts/westbrook_illingworth_pamm_nml.in
+sed -e "s/nm1%recycle=.true./nm1%recycle=.false./" run_scripts/westbrook_illingworth_nml.in > /tmp/namelist.tmp
+cp /tmp/namelist.tmp run_scripts/westbrook_illingworth_nml.in
 
 mpiexec -n 24 ./main.exe run_scripts/westbrook_illingworth_nml.in 
 
@@ -97,9 +97,9 @@ sed -e "s/n_read(1,1:4)     = 250e6, 250e6, 250e6,250e6,/n_read(1,1:4)     = 250
 sed -e "s/n_read(2,1:4)     = 250e6, 250e6, 250e6,250e6,/n_read(2,1:4)     = 250e6, 250e6, 250e6,0.1e6,/" /tmp/namelist.tmp > /tmp/namelist.tmp2
 sed -e "s/z_read(1:4)       = 0.,740,3260,4000/z_read(1:4)       = 0.,740,3700,3701/" /tmp/namelist.tmp2 > run_scripts/westbrook_illingworth_pamm_nml.in 
 
-sed -e "s/nm1%ice_nuc_flag=1,/nm1%ice_nuc_flag=2,/" run_scripts/westbrook_illingworth_pamm_nml.in > /tmp/namelist.tmp
+sed -e "s/nm1%ice_nuc_flag=1,/nm1%ice_nuc_flag=2,/" run_scripts/westbrook_illingworth_nml.in > /tmp/namelist.tmp
 sed -e "s/nm1%j_stochastic=0.5e-9,/nm1%j_stochastic=1e-8,/" /tmp/namelist.tmp > /tmp/namelist.tmp2
-cp /tmp/namelist.tmp2 run_scripts/westbrook_illingworth_pamm_nml.in
+cp /tmp/namelist.tmp2 run_scripts/westbrook_illingworth_nml.in
 
 mpiexec -n 24 ./main.exe run_scripts/westbrook_illingworth_nml.in 
 
@@ -115,9 +115,9 @@ sed -e "s/n_read(1,1:4)     = 250e6, 250e6, 250e6,250e6,/n_read(1,1:4)     = 250
 sed -e "s/n_read(2,1:4)     = 250e6, 250e6, 250e6,250e6,/n_read(2,1:4)     = 250e6, 250e6, 250e6,0.1e6,/" /tmp/namelist.tmp > /tmp/namelist.tmp2
 sed -e "s/z_read(1:4)       = 0.,740,3260,4000/z_read(1:4)       = 0.,740,3700,3701/" /tmp/namelist.tmp2 > run_scripts/westbrook_illingworth_pamm_nml.in 
 
-sed -e "s/nm1%ice_nuc_flag=1,/nm1%ice_nuc_flag=2,/" run_scripts/westbrook_illingworth_pamm_nml.in > /tmp/namelist.tmp
+sed -e "s/nm1%ice_nuc_flag=1,/nm1%ice_nuc_flag=2,/" run_scripts/westbrook_illingworth_nml.in > /tmp/namelist.tmp
 sed -e "s/nm1%j_stochastic=0.5e-9,/nm1%j_stochastic=5e-8,/" /tmp/namelist.tmp > /tmp/namelist.tmp2
-cp /tmp/namelist.tmp2 run_scripts/westbrook_illingworth_pamm_nml.in
+cp /tmp/namelist.tmp2 run_scripts/westbrook_illingworth_nml.in
 
 mpiexec -n 24 ./main.exe run_scripts/westbrook_illingworth_nml.in 
 
@@ -132,9 +132,9 @@ sed -e "s/n_read(1,1:4)     = 250e6, 250e6, 250e6,250e6,/n_read(1,1:4)     = 250
 sed -e "s/n_read(2,1:4)     = 250e6, 250e6, 250e6,250e6,/n_read(2,1:4)     = 250e6, 250e6, 250e6,0.1e6,/" /tmp/namelist.tmp > /tmp/namelist.tmp2
 sed -e "s/z_read(1:4)       = 0.,740,3260,4000/z_read(1:4)       = 0.,740,3700,3701/" /tmp/namelist.tmp2 > run_scripts/westbrook_illingworth_pamm_nml.in 
 
-sed -e "s/nm1%ice_nuc_flag=1,/nm1%ice_nuc_flag=2,/" run_scripts/westbrook_illingworth_pamm_nml.in > /tmp/namelist.tmp
+sed -e "s/nm1%ice_nuc_flag=1,/nm1%ice_nuc_flag=2,/" run_scripts/westbrook_illingworth_nml.in > /tmp/namelist.tmp
 sed -e "s/nm1%j_stochastic=0.5e-9,/nm1%j_stochastic=1e-7,/" /tmp/namelist.tmp > /tmp/namelist.tmp2
-cp /tmp/namelist.tmp2 run_scripts/westbrook_illingworth_pamm_nml.in
+cp /tmp/namelist.tmp2 run_scripts/westbrook_illingworth_nml.in
 
 mpiexec -n 24 ./main.exe run_scripts/westbrook_illingworth_nml.in 
 
@@ -185,8 +185,8 @@ sed -e "s/n_read(2,1:4)     = 250e6, 250e6, 250e6,250e6,/n_read(2,1:4)     = 250
 sed -e "s/z_read(1:4)       = 0.,740,3260,4000/z_read(1:4)       = 0.,740,3700,3701/" /tmp/namelist.tmp2 > run_scripts/westbrook_illingworth_pamm_nml.in
 
 
-sed -e "s/nm1%radiation=.true./nm1%radiation=.false./" run_scripts/westbrook_illingworth_pamm_nml.in > /tmp/namelist.tmp
-cp /tmp/namelist.tmp run_scripts/westbrook_illingworth_pamm_nml.in
+sed -e "s/nm1%radiation=.true./nm1%radiation=.false./" run_scripts/westbrook_illingworth_nml.in > /tmp/namelist.tmp
+cp /tmp/namelist.tmp run_scripts/westbrook_illingworth_nml.in
 
 mpiexec -n 24 ./main.exe run_scripts/westbrook_illingworth_nml.in
 
@@ -202,10 +202,10 @@ sed -e "s/n_read(2,1:4)     = 250e6, 250e6, 250e6,250e6,/n_read(2,1:4)     = 250
 sed -e "s/z_read(1:4)       = 0.,740,3260,4000/z_read(1:4)       = 0.,740,3700,3701/" /tmp/namelist.tmp2 > run_scripts/westbrook_illingworth_pamm_nml.in
 
 
-sed -e "s/nm1%radiation=.true./nm1%radiation=.false./" run_scripts/westbrook_illingworth_pamm_nml.in > /tmp/namelist.tmp
-sed -e "s/nm1%ice_flag=.true./nm1%ice_flag=.false./" /tmp/namelist.tmp /tmp/namelist.tmp2
+sed -e "s/nm1%radiation=.true./nm1%radiation=.false./" run_scripts/westbrook_illingworth_nml.in > /tmp/namelist.tmp
+sed -e "s/nm1%ice_flag=.true./nm1%ice_flag=.false./" /tmp/namelist.tmp > /tmp/namelist.tmp2
 
-cp /tmp/namelist.tmp2 run_scripts/westbrook_illingworth_pamm_nml.in
+cp /tmp/namelist.tmp2 run_scripts/westbrook_illingworth_nml.in
 
 
 mpiexec -n 24 ./main.exe run_scripts/westbrook_illingworth_nml.in
