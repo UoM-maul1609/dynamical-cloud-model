@@ -3924,7 +3924,7 @@
         ! calculate the change in momentum - equation 7
         ! assume a coefficient of restitution of 0.5?
         ! units are g cm s-1
-        delm = 1.25_sp*pi*mr*mi/(mr+mi)*(1._sp+0.5_sp)*abs(vr-vi)*1.e5_sp 
+        delm = 0.25_sp*pi*mr*mi/(mr+mi)*(1._sp+0.5_sp)*abs(vr-vi)*1.e5_sp 
         nfrag = vard02(1)*(log(delm)**2)+vard02(2)*log(delm)+vard02(3)
         
         dintegral_collisional_breakup = dintegral_collisional_breakup * nfrag
