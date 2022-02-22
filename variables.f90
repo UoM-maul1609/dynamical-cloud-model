@@ -74,8 +74,8 @@
             			param_wind=.false., heyms_west=.false., lawson=.false., &
             			recycle=.true., param_theta=.true., bubble=.false.
             integer(i4b) :: nq,ip, jp, kp, subgrid_model, advection_scheme, kord, &
-                        microphysics_flag,nprec, ice_nuc_flag=1, mode2_ice_flag=0, &
-                        coll_breakup_flag1=0
+                        microphysics_flag,nprec, ice_nuc_flag=1, mode1_ice_flag=0, &
+                        mode2_ice_flag=0, coll_breakup_flag1=0
             real(sp) :: vis, &
             			runtime, dt, output_interval, &
             			rotation_period_hours, &
