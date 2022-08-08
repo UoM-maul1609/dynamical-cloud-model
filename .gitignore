@@ -16,3 +16,5 @@ test
 __pycache__
 correlated_k_distribution_single.py
 correlated_k_distribution.py
+test.f90
+

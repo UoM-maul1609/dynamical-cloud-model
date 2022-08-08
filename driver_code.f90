@@ -44,12 +44,17 @@
 				theta,thetan, &
 				tref,trefn, &
 				rhoa,rhoan, &
+				q, &
 				lambda,lambda_low,lambda_high, delta_lambda,&
 				nrwbin,niwbin, &
 				sflux_l, b_s_g, &
 				start_year,start_mon, start_day,start_hour,start_min,start_sec, &
 				lat, lon, albedo, emiss,quad_flag, &
-				asymmetry_water, &
+				gas_absorption, asymmetry_water, &
+		        probs_read, h2o_read, press_read, temp_read, bli_read, &
+		        nh2o, npress, ntemp, nweights, nmolecule, &
+		        moleculeID, moleculePPM, molecularWeights,  &
+		        itemp, ipress, &
 				nprocv,mvrecv, &
 				coords, &
 				new_file,outputfile, output_interval, &
@@ -63,6 +68,7 @@
 	
 		implicit none
 		logical, intent(inout) :: new_file
+		logical, intent(in) :: gas_absorption
 		real(sp), dimension(nbands) :: lambda, b_s_g, lambda_low,&
 						lambda_high, delta_lambda, nrwbin, niwbin, sflux_l
 		real(sp), intent(in), dimension(nprocv) :: mvrecv
@@ -74,6 +80,8 @@
 		character (len=*), intent(in) :: outputfile
 		real(sp), intent(inout), dimension(1:tdend) :: a,b,c,r,usol
 		real(sp), intent(in) :: output_interval, dt
+		real(sp), dimension(1-r_h:kpp+r_h,1-r_h:jpp+r_h,1-r_h:ipp+r_h,1) :: q
+		
 		real(sp), dimension(1-r_h:kpp+r_h,1-r_h:jpp+r_h,1-r_h:ipp+r_h,1:nbands) :: &
 						flux_d,flux_u
 		real(sp), dimension(1-r_h:kpp+r_h,1-r_h:jpp+r_h,1-r_h:ipp+r_h) :: &
@@ -85,6 +93,18 @@
 		real(sp), intent(in) :: lat, lon, albedo, emiss, asymmetry_water
 		integer(i4b), intent(in) :: quad_flag, start_year, start_mon, start_day, &
 									start_hour, start_min, start_sec
+
+        integer(i4b), intent(in) :: nh2o, npress, ntemp, nweights, nmolecule
+        integer(i4b), intent(in), dimension(1-l_h:kpp+r_h) :: itemp, ipress
+        real(sp), intent(in), dimension(1:nbands,1:nmolecule,1:nweights, &
+			        1:ntemp,1:npress, 1:nh2o) :: bli_read
+		real(sp), intent(in), dimension(1:nweights) :: probs_read
+		real(sp), intent(in), dimension(1:npress) :: press_read
+		real(sp), intent(in), dimension(1:ntemp) :: temp_read
+		real(sp), intent(in), dimension(1:nh2o) :: h2o_read
+		integer(i4b), intent(in), dimension(1:nmolecule) :: moleculeID
+		real(sp), intent(in), dimension(1:nmolecule) :: moleculePPM, molecularWeights
+
 		! locals:		
 		integer(i4b) :: n,n2, cur=1, i,j,k, error, rank2
 		real(sp) :: time, time_last_output, output_time
@@ -119,8 +139,13 @@
 								tdstart,tdend,a,b,c,r,usol, &
 								lambda_low, lambda_high, lambda,nrwbin, niwbin, &
 								b_s_g,sflux_l, &
+						        1,q, &
 								rhoan, tref, trefn, dz,dzn, albedo, emiss, &
-								quad_flag, th, flux_u, flux_d, &
+								quad_flag, gas_absorption, &
+								nmolecule, nweights, npress, ntemp, nh2o, &
+								itemp,ipress,bli_read, probs_read, h2o_read, &
+								moleculeID, moleculePPM, molecularWeights, &
+								th, flux_u, flux_d, &
 								asymmetry_water, 0, ngs,lamgs,mugs, &
 								.false., &
 								nprocv,mvrecv, &

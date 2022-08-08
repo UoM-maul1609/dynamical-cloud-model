@@ -19,21 +19,27 @@
             real(sp), dimension(:), allocatable ::	b_s_g, & ! cross section for Rayleigh
             	lambda, lambda_low, lambda_high, delta_lambda, & 
             	nrwbin,niwbin ! bin averaged refractive indices
+            real(sp), dimension(:,:,:,:,:,:), allocatable :: bli_read ! absorption by gases
+            real(sp), dimension(:), allocatable :: probs_read, lambda_low_read, lambda_high_read, &
+                                    h2o_read, press_read, temp_read, molecularWeights_read
             real(sp), dimension(:), allocatable ::	ext_s_g ! extinction for Rayleigh
             real(sp), dimension(:,:,:,:), allocatable :: flux_u, flux_d
             real(sp), dimension(:,:,:), allocatable :: rad_power
             real(sp), dimension(:), allocatable :: sflux_l	
             real(sp), dimension(:), allocatable :: mvrecv	
             real(sp), dimension(:), allocatable :: a,b,c,r,u
-            integer(i4b) :: tdstart,tdend
+            integer(i4b), dimension(:), allocatable :: ipress, itemp
+            integer(i4b) :: tdstart,tdend, nh2o, npress, &
+                    ntemp, nweights, nmolecule, nbands
             							 
         end type radg
 
         logical, parameter :: deltaScaling=.true.
 
-		real(sp), parameter :: r_gas=8.314_sp, ma=29e-3_sp, ra=r_gas / ma, &
+		real(sp), parameter :: r_gas=8.314_sp, ma=29.e-3_sp, ra=r_gas / ma, &
+		                        mv=18.e-3_sp, &
 								t_stp=288._sp, p_stp=101300._sp, navog=6.022e23_sp, &
-								sflux=1370._sp
+								sflux=1370._sp, rv=r_gas/mv
 		!>@brief
 		!>variables for namelist radiation input
         type namelist_rad
@@ -42,12 +48,17 @@
         	real(sp) :: lat_ref,lon_ref
         	real(sp) :: asymmetry_water
         	integer(i4b) :: quad_flag
+        	character (len=200) :: gases_file='data/bli_data.nc'
         	character (len=200) :: albedo='Urban'
         	character (len=200) :: emissivity='Urban'
             integer(i4b) :: ns,nl
+            integer(i4b) :: nmolecule = 8
+            integer(i4b), dimension(20) :: moleculeID
+            real(sp), dimension(20) :: moleculePPM
             real(sp), dimension(20) :: lambda_read_s
             real(sp), dimension(20) :: lambda_read_l
             real(sp) :: lambda_s_low, lambda_s_high, lambda_l_low, lambda_l_high
+            logical :: gas_absorption=.false.
         end type namelist_rad
 
 		integer(i4b), parameter :: nemiss=12, nalb=14
@@ -597,10 +608,17 @@
 		!>@param[inout] b_s_g_lambda: the scattering cross section
 		subroutine allocate_and_set_radiation(start_year, start_mon, &
 		  				 				start_day, start_hour,start_min, start_sec, &
+		  				 				gases_file, &
+		  				 				probs_read, lambda_low_read, lambda_high_read, &
+		  				 				h2o_read, press_read, temp_read, bli_read, &
+		  				 				molecularWeights_read, &
+		  				 				nh2o, npress, ntemp, nweights, nmolecule, nbands, &
+		  				 				itemp, ipress, &
 		  									ip,jp,kp,ns,nl,ns_r,nl_r, &
 											ntot, &
 		  									albedo_r,emiss_r, alb, emiss, &
 		  									lat_ref,lon_ref, lat, lon, &
+		  									nmolecule_nm, moleculeID_nm, &
 											lambda_read_s,lambda_read_l, &
 											lambda_s_low, lambda_s_high, &
 											lambda_l_low, lambda_l_high, &
@@ -608,16 +626,27 @@
 											nrwbin,niwbin, &
 											sflux_l, b_s_g, &
 											ext_s_g, flux_u, flux_d, rad_power, &
-											l_h, r_h, rhoan, thetan, &
+											l_h, r_h, rhoan, thetan, trefn, &
 											nprocv,mvrecv, &
 											tdstart,tdend,a,b,c,r,u, &
 											coords,dims, id, comm3d)
 			use mpi
+			use netcdf
 			implicit none
 			character (len=200), intent(in) :: albedo_r, emiss_r
+			character (len=200), intent(in) :: gases_file
+			real(sp), intent(inout), dimension(:), allocatable :: probs_read, &
+			            lambda_low_read, lambda_high_read, h2o_read, press_read, &
+			            temp_read, molecularWeights_read
+			integer(i4b), intent(inout) :: nh2o, npress, ntemp, nweights, &
+			                                nmolecule, nbands
+			integer(i4b), intent(inout), dimension(:), allocatable :: itemp, ipress
+			real(sp), intent(inout), dimension(:,:,:,:,:,:), allocatable :: bli_read
 			real(sp), intent(inout) :: alb, emiss
 			real(sp), intent(in) :: lat_ref, lon_ref
 			real(sp), intent(inout) :: lat, lon
+			integer(i4b), intent(in) :: nmolecule_nm
+			integer(i4b), intent(in), dimension(nmolecule_nm) :: moleculeID_nm
 			integer(i4b), intent(in) :: start_year, start_mon, start_day, start_hour, &
 									start_min, start_sec
 			integer(i4b), intent(in) :: ns_r,nl_r, l_h, r_h
@@ -628,7 +657,7 @@
 			real(sp), intent(inout), dimension(:), allocatable :: lambda, &
 						lambda_low, lambda_high, delta_lambda, b_s_g, ext_s_g, sflux_l, &
 						nrwbin,niwbin
-			real(sp), intent(in), dimension(1-l_h:kp+r_h) :: rhoan, thetan
+			real(sp), intent(in), dimension(1-l_h:kp+r_h) :: rhoan, thetan, trefn
 			real(sp), dimension(:,:,:,:), allocatable, intent(inout) :: flux_d,flux_u
 			real(sp), dimension(:,:,:), allocatable, intent(inout) :: rad_power
 			integer(i4b), intent(inout) :: nprocv,tdstart,tdend
@@ -637,9 +666,11 @@
 			integer(i4b), dimension(3), intent(in) :: dims
 			integer(i4b), intent(in) :: id, comm3d
 			
-		
+			integer(i4b), dimension(:), allocatable :: moleculeID_read
 			real(sp) :: sum_upper, sum_lower, x_upper, x_lower, fac
-			integer(i4b) :: AllocateStatus, i, j,doy, error
+		    character(len = 100) :: str 
+			integer(i4b) :: AllocateStatus, i, j,doy, error, &
+			                ncid, varid, dimid
 			logical :: leap
 			
 ! if the pe is not being used in the cartesian topology, do not use here
@@ -741,7 +772,79 @@
 			allocate( rad_power(1-r_h:kp+r_h,1-r_h:jp+r_h,1-r_h:ip+r_h), &
 									STAT = AllocateStatus)
 			if (AllocateStatus /= 0) STOP "*** Not enough memory ***"
+			
+			
+			! for the netCDF variables
+            call check(nf90_open(gases_file, NF90_NOWRITE, ncid))	
+            call check( nf90_inq_dimid(ncid, "nh2o", dimid))
+            call check( nf90_inquire_dimension(ncid, dimid, str,nh2o))
+            call check( nf90_inq_dimid(ncid, "npress", dimid))
+            call check( nf90_inquire_dimension(ncid, dimid, str,npress))
+            call check( nf90_inq_dimid(ncid, "ntemp", dimid))
+            call check( nf90_inquire_dimension(ncid, dimid, str,ntemp))
+            call check( nf90_inq_dimid(ncid, "weights", dimid))
+            call check( nf90_inquire_dimension(ncid, dimid, str,nweights))
+            call check( nf90_inq_dimid(ncid, "molecule", dimid))
+            call check( nf90_inquire_dimension(ncid, dimid, str,nmolecule))
+            call check( nf90_inq_dimid(ncid, "nbands", dimid))
+            call check( nf90_inquire_dimension(ncid, dimid, str,nbands))
+            ! allocation
+			allocate( h2o_read(1:nh2o),STAT = AllocateStatus)
+			if (AllocateStatus /= 0) STOP "*** Not enough memory ***"
+			allocate( press_read(1:npress),STAT = AllocateStatus)
+			if (AllocateStatus /= 0) STOP "*** Not enough memory ***"
+			allocate( temp_read(1:ntemp),STAT = AllocateStatus)
+			if (AllocateStatus /= 0) STOP "*** Not enough memory ***"
+			allocate( probs_read(1:nweights),STAT = AllocateStatus)
+			if (AllocateStatus /= 0) STOP "*** Not enough memory ***"
+			allocate( lambda_low_read(1:nbands),STAT = AllocateStatus)
+			if (AllocateStatus /= 0) STOP "*** Not enough memory ***"
+			allocate( lambda_high_read(1:nbands),STAT = AllocateStatus)
+			if (AllocateStatus /= 0) STOP "*** Not enough memory ***"
+			allocate( bli_read(1:nbands,1:nmolecule,1:nweights, &
+			        1:ntemp,1:npress, 1:nh2o),STAT = AllocateStatus)
+			allocate( moleculeID_read(1:nmolecule),STAT = AllocateStatus)
+			if (AllocateStatus /= 0) STOP "*** Not enough memory ***"
+			allocate( molecularWeights_read(1:nmolecule),STAT = AllocateStatus)
+			if (AllocateStatus /= 0) STOP "*** Not enough memory ***"
+			if (AllocateStatus /= 0) STOP "*** Not enough memory ***"
+			allocate( itemp(1-r_h:kp+r_h),STAT = AllocateStatus)
+			if (AllocateStatus /= 0) STOP "*** Not enough memory ***"
+			allocate( ipress(1-r_h:kp+r_h),STAT = AllocateStatus)
+			if (AllocateStatus /= 0) STOP "*** Not enough memory ***"
+			
+            
+            ! read variables
+            call check( nf90_inq_varid(ncid, "bli", varid))
+            call check( nf90_get_var(ncid, varid, bli_read))
+        
+            call check( nf90_inq_varid(ncid, "probs", varid))
+            call check( nf90_get_var(ncid, varid, probs_read))
+        
+            call check( nf90_inq_varid(ncid, "lambda_low", varid))
+            call check( nf90_get_var(ncid, varid, lambda_low_read))
+
+            call check( nf90_inq_varid(ncid, "lambda_high", varid))
+            call check( nf90_get_var(ncid, varid, lambda_high_read))
+        
+            call check( nf90_inq_varid(ncid, "h2o", varid))
+            call check( nf90_get_var(ncid, varid, h2o_read))
+
+            call check( nf90_inq_varid(ncid, "press", varid))
+            call check( nf90_get_var(ncid, varid, press_read))
+
+            call check( nf90_inq_varid(ncid, "temp", varid))
+            call check( nf90_get_var(ncid, varid, temp_read))
+
+            call check( nf90_inq_varid(ncid, "moleculeID", varid))
+            call check( nf90_get_var(ncid, varid, moleculeID_read))
+
+            call check( nf90_inq_varid(ncid, "molecularWeights", varid))
+            call check( nf90_get_var(ncid, varid, molecularWeights_read))
+
+            call check( nf90_close(ncid) )		
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+			
 			
 			
 
@@ -768,7 +871,52 @@
 			endif
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         
+			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+			! perform check on band definitions:						                 !
+			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+            do i=1,nbands
+                if((abs(lambda_low_read(i)-lambda_low(i))/lambda_low(i) > 1.e-3 ).or. &
+                    (abs(lambda_high_read(i)-lambda_high(i))/lambda_high(i) > 1.e-3 )) then
+                    print *,"recalculate absorption coefficients", &
+                        lambda_high_read(i), lambda_high(i), i
+                    stop
+                endif
+            enddo
+			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
+			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+			! perform check on moleculeIDs      						                 !
+			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+            if(nmolecule_nm.ne.nmolecule) then
+                print *,'moleculeID not correct'
+                stop
+            endif
+            do i=1,nmolecule_nm
+                if(moleculeID_read(i).ne.moleculeID_nm(i)) then
+                    print *,'moleculeID not correct', moleculeID_read(i), moleculeID_nm(i)
+                    stop
+                endif
+            enddo
+            deallocate(moleculeID_read)
+			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+
+
+
+			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+			! define pointer for temperature and pressure:						         !
+			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+            do i=1-r_h,kp+r_h
+                itemp(i)=locate(temp_read(1:ntemp),trefn(i))
+                itemp(i)=min(ntemp,itemp(i))
+                itemp(i)=max(1,itemp(i))
+            enddo
+            do i=1-r_h,kp+r_h
+                ipress(i)=locate(press_read(1:npress),rhoan(i)*ra*trefn(i))
+                ipress(i)=min(npress,ipress(i))
+                ipress(i)=max(1,ipress(i))
+            enddo
+			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 			
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -826,6 +974,15 @@
 
 			! 6. Optical depth
 
+        contains
+          subroutine check(status)
+            integer, intent ( in) :: status
+    
+            if(status /= nf90_noerr) then 
+              print *, trim(nf90_strerror(status))
+              stop "Stopped"
+            end if
+          end subroutine check     
 		end subroutine allocate_and_set_radiation
 		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
@@ -1550,8 +1707,13 @@
 								tdstart,tdend,a,b,c,r,u, &
 								lambda_low, lambda_high, lambda,nrwbin, niwbin, &
 								b_s_g, sflux_l,&
+								nq,q, &
 								rhoan, tref, trefn, dz,dzn, albedo, emiss, &
-								quad_flag, th, flux_u, flux_d, &
+								quad_flag, gas_absorption, &
+								nmolecule, nweights, npress, ntemp, nh2o, &
+								itemp,ipress,bli_read, probs_read, h2o_read, &	
+								moleculeID, moleculePPM, molecularWeights, &							
+								th, flux_u, flux_d, &
 								asymmetry_water, nrad, ngs,lamgs,mugs, &
 								cloud_flag, &
 								nprocv,mvrecv, &
@@ -1560,10 +1722,20 @@
 			use mpi
 			use pts
 			implicit none
+			logical, intent(in) :: gas_absorption
 			integer(i4b), intent(in) :: start_year, start_mon, start_day, start_hour, &
 							start_min, start_sec
 			real(sp), intent(in) :: time
-			integer(i4b), intent(in) :: nbands, ns, nl, ip, jp, kp, r_h, nprocv
+			integer(i4b), intent(in) :: nbands, ns, nl, ip, jp, kp, r_h, nprocv, &
+			        nmolecule, nweights, npress, ntemp, nh2o			
+            integer(i4b), intent(in), dimension(1-r_h:kp+r_h) :: itemp, ipress
+            real(sp), intent(in), dimension(1:nbands,1:nmolecule,1:nweights, &
+                        1:ntemp,1:npress, 1:nh2o) :: bli_read
+            real(sp), intent(in), dimension(1:nweights) :: probs_read
+            real(sp), intent(in), dimension(1:nh2o) :: h2o_read
+            integer(i4b), intent(in), dimension(1:nmolecule) :: moleculeID
+            real(sp), intent(in), dimension(1:nmolecule) :: moleculePPM, molecularWeights
+
 			real(sp), intent(in), dimension(nprocv) :: mvrecv
 			real(sp), dimension(nbands), intent(in) :: &
 					lambda_low, lambda_high, lambda, nrwbin, niwbin, b_s_g, sflux_l
@@ -1573,6 +1745,9 @@
 			real(sp), intent(inout), &
 					dimension(1-r_h:kp+r_h, 1-r_h:jp+r_h, 1-r_h:ip+r_h,1:nbands) :: &
 					flux_u, flux_d
+		    integer(i4b), intent(in) :: nq
+			real(sp), intent(in), &
+					dimension(1-r_h:kp+r_h, 1-r_h:jp+r_h, 1-r_h:ip+r_h,1:nq) :: q
 			real(sp), intent(in), &
 					dimension(1-r_h:kp+r_h, 1-r_h:jp+r_h, 1-r_h:ip+r_h,1:nrad) :: &
 					    ngs,lamgs, mugs
@@ -1594,8 +1769,10 @@
 			    k_exponent, mu0_local, od_over_mu0, k_mu0, k_gamma3, k_gamma4, &
 			    exponential0, exponential, exponential2, k_2_exponential, &
 			    reftrans_factor, coeff, coeff_up_top, coeff_dn_top, coeff_up_bot, &
-			    coeff_dn_bot
-			real(sp), dimension(1:kp+1) :: sigma_ray, sigma_tot,taun,dtau,dtaun
+			    coeff_dn_bot, &
+			    tau_store1, a_abs, uq, ev
+			real(sp), dimension(1:kp+1) :: sigma_ray, sigma_tot,taun,dtau,dtaun, &
+			                                sigma_abs_gas, tau_store
 			real(sp), dimension(1:kp+1) :: tau, ref_diff, trans_dir_dir, trans_diff, &
 			    ref_dir, trans_dir_diff, inv_denominator
 			real(sp), dimension(kp+1,nbands) :: blt, blt_top, blt_bot
@@ -1608,7 +1785,7 @@
 			    flux_dn_direct, flux_dn_diffuse, flux_up
 			logical :: leap
 			
-			integer(i4b) :: it, itermax=1, k, m,j,i,kend,kstart, shortWave
+			integer(i4b) :: it, itermax=1, k, m,j,i,qgas,kend,kstart, shortWave, ih2o
 			
 			
 			
@@ -1638,7 +1815,7 @@
             endif
             !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-            do m=1,nbands
+            do m=1,nbands            
                 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
                 ! extinction:							    					         !
                 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -1647,10 +1824,70 @@
                     ! collision cross-section:
                     sigma_ray(k)=rhoan(k)*navog/ma*b_s_g(m)
                 enddo
+                !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+                !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+                ! absorption by gases (everything except water vapour):					 !
+                !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+                do k=1,kp
+                    tau_store(k)=1._sp
+                    do qgas=2,nmolecule
+                        ! calculate the pathlength
+                        uq=rhoan(k)*molecularWeights(qgas)/(ma*1000._sp)* &
+                            moleculePPM(qgas)*dz(k)*1.e-8_sp
+                        
+                        a_abs = sum(probs_read*(1._sp-exp( &
+                            -uq*bli_read(m,qgas,:,itemp(k),ipress(k),1) ))) / &
+                            sum(probs_read)
+                        tau_store(k) = tau_store(k)*(1._sp-a_abs)
+                    enddo
+                enddo
+                !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
                 do i=1,ip
                     do j=1,jp
+                    
                         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-                        ! calculate planck function at all levels bottom-points:			     !
+                        ! absorption by gases (everything except water vapour):			 !
+                        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+                        if(moleculePPM(1).gt.0._sp) then
+                            do k=1,kp
+                                ! calculate the partial pressure
+                                ev = rhoan(k)*ra*trefn(k)*moleculePPM(1)/1.e6_sp
+                                ih2o=1
+                                if(ev.gt.h2o_read(1)) ih2o=2
+                                ! calculate the pathlength
+                                uq=rhoan(k)*molecularWeights(1)/(ma*1000._sp)* &
+                                    moleculePPM(1)*dz(k)*1.e-8_sp
+
+                                a_abs = sum(probs_read*(1._sp-exp( &
+                                    -uq*bli_read(m,1,:,itemp(k),ipress(k),ih2o) ))) / &
+                                    sum(probs_read)
+                                tau_store1 = tau_store(k)*(1._sp-a_abs)
+                                tau_store1=-log(tau_store1)
+                                sigma_abs_gas(k)=tau_store1/dz(k)
+                            enddo
+                        else
+                            do k=1,kp
+                                ! calculate the partial pressure
+                                ev = q(k,j,i,1)*rhoan(k)*rv*trefn(k)
+                                ih2o=1
+                                if(ev.gt.h2o_read(1)) ih2o=2
+                                ! calculate the pathlength
+                                uq=q(k,j,i,1)*rhoan(k)*dz(k)*1.e-2_sp
+
+                                a_abs = sum(probs_read*(1._sp-exp( &
+                                    -uq*bli_read(m,1,:,itemp(k),ipress(k),ih2o) ))) / &
+                                    sum(probs_read)
+                                tau_store1 = tau_store(k)*(1._sp-a_abs)
+                                tau_store1=-log(tau_store1)
+                                sigma_abs_gas(k)=tau_store1/dz(k)
+                            enddo                        
+                        endif
+                        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+                        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+                        ! calculate planck function at all levels bottom-points:	     !
                         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
                         do k=1,kp
                             call inband_planck(1,lambda_low(m),lambda_high(m), &
@@ -1675,7 +1912,7 @@
 
 
                         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-                        ! extinction:							    				     !
+                        ! extinction and absorption:							    	 !
                         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
                         do k=1,kp
                             sigma_tot(k)=sigma_ray(k)
@@ -1683,6 +1920,7 @@
                                 sigma_tot(k)=sigma_tot(k)+(sigma_s_clouds(k,j,i,m) + &
                                     sigma_a_clouds(k,j,i,m))
                             endif
+                            if(gas_absorption) sigma_tot(k)=sigma_tot(k)+sigma_abs_gas(k)
                         enddo
                         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
@@ -1695,7 +1933,7 @@
                             omg_s(k)=min((sigma_ray(k)+sigma_s_clouds(k,j,i,m)) / &
                                 (sigma_tot(k)),1._sp-1.e-10_sp)
 
-                            ! equation 9.115, Jacobson - effective asymmetry param
+                            ! equation 9.117, Jacobson - effective asymmetry param
                             ga(k)=(sigma_s_clouds(k,j,i,m)*asymmetry_water) / &
                                 (sigma_ray(k)+sigma_s_clouds(k,j,i,m)) 
 

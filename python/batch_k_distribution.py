@@ -4,6 +4,12 @@
 Created on Mon Jul 27 21:35:27 2020
 
 @author: mccikpc2
+
+run by importing
+
+import batch_k_distribution
+batch_k_distribution.driver()
+
 """
 import numpy as np
 import matplotlib.pyplot as plt
@@ -16,6 +22,7 @@ import subprocess
 import itertools
 import sys
 import os
+import scipy.interpolate as scint
 
 import calculation
 
@@ -25,6 +32,7 @@ import calculation
 for all run variables                                                        =
 ==============================================================================
 """
+
 h=6.62607015e-34
 c=2.99792458e10 # cm/s
 k=1.380649e-23
@@ -42,25 +50,25 @@ weights=[0.227979164257, 0.227979164257, 0.227979164257, 0.227979164257, \
 
 
 
-# table 3 of Jaconson, 2005, page 511 - surely this is g/cm-2!
+# table 3 of Jacobson, 2005, page 511 - surely this is g/cm-2!
 mlpath=[0.21274, 0.026143, 2.9051e-5, 2.0783e-5,3.83e-6, 4.1468e-5,10.76,4.4894e-8] 
 #,3.8387e-8,6.27e-8,2.1148e-8]
 
 
-lineByLineFile='/Volumes/Macintosh HD/Users/mccikpc2/' + \
-    'Dropbox (The University of Manchester)/absorption_data/' + \
+lineByLineFile='/models/mccikpc2/absorption_data/' + \
     '5f13dd32.par.txt'
     
-lineByLinePartitionFiles='/Volumes/Macintosh HD/Users/mccikpc2/' + \
-    'Dropbox (The University of Manchester)/absorption_data/' + \
+lineByLinePartitionFiles='/models/mccikpc2/absorption_data/' + \
     'partitiondata/'
 
-
-# lineByLineFile='/tmp/absorption_data/' + \
+# lineByLineFile='/Volumes/Macintosh HD/Users/mccikpc2/' + \
+#     'Dropbox (The University of Manchester)/absorption_data/' + \
 #     '5f13dd32.par.txt'
 #     
-# lineByLinePartitionFiles='/tmp/absorption_data/' + \
+# lineByLinePartitionFiles='/Volumes/Macintosh HD/Users/mccikpc2/' + \
+#     'Dropbox (The University of Manchester)/absorption_data/' + \
 #     'partitiondata/'
+
 
 
 """
@@ -68,7 +76,7 @@ lineByLinePartitionFiles='/Volumes/Macintosh HD/Users/mccikpc2/' + \
 define run variables                                                         =
 ==============================================================================
 """
-nc=4
+nc=32
 Pref=101325.
 """
 page 511, Jacobson, 2005:
@@ -78,39 +86,56 @@ page 511, Jacobson, 2005:
     1 partial pressure - for a given total pressure
 
 """
-ntemp =4
-npress=1
-nh2o  =1
-mtemp=0 # remember n-1 indexing
-mpress=0
-mh2o=0
+ntemp =11    # 11 page 511, Jacobson et al 2005
+npress=31    # 31 page 511, Jacobson et al 2005
+nh2o  =2    # 2 page 511, Jacobson et al 2005
 tlow=150.
 thigh=350.
 plow=0.2e2
 phigh=1050.e2
-tlow=270.
-plow=338e2
-h2olow=0.0*Pref
-h2ohigh=0.03*Pref
+# tlow=270.
+# plow=338e2
+h2olow=0.0
+h2ohigh=0.03
+
+# tlow=270
+#plow=1000.e2
+
 
 Pcalc=np.linspace(plow,phigh,npress)
 Tcalc=np.linspace(tlow,thigh,ntemp)
 h2ocalc=np.linspace(h2olow,h2ohigh,nh2o)
-
 lambdas=np.array([100.e-9,200.e-9,300.e-9,350.e-9,400.e-9,450.e-9,\
          500.e-9,550.e-9,600.e-9,700.e-9,800.e-9,900.e-9,\
          1000.e-9,1100.e-9,1200.e-9,1300.e-9,1400.e-9,10500.e-9,\
         16000.e-9,120000.e-9])
+# lambdas=np.logspace(-7,-3,50)
 lambdalow=10.e-9
-lambdahigh=1000000e-9
+lambdahigh=150000.e-9
+# lambdahigh=1.5e-3
 lambda_low=np.zeros((len(lambdas),))
 lambda_high=np.zeros((len(lambdas),))
 lambda_low[0]=lambdalow
 lambda_low[1:]=[(lambdas[i+1]+lambdas[i])/2. for i in range(len(lambdas)-1)]
 lambda_high[-1]=lambdahigh
 lambda_high[0:-1]=[(lambdas[i+1]+lambdas[i])/2. for i in range(len(lambdas)-1)]
+lambda_low[10]=705e-9
+lambda_high[9]=705e-9
+
 nbands=len(lambda_low)
 
+
+# to work out main absorber, specify pressure and temp and wv
+mtemp=0 # remember n-1 indexing
+mpress=0
+mh2o=0
+# pint=scint.interp1d(Pcalc,np.mgrid[0:npress],kind='nearest')
+# mpress=pint(1e5).astype('int') 
+# tint=scint.interp1d(Tcalc,np.mgrid[0:ntemp],kind='nearest')
+# mtemp=pint(290).astype('int') 
+
+# These are the isotopologue files. 
+# see here for details https://hitran.org/docs/iso-meta/
 moleculeKey={'H2O':[1,[1,2,3,4,5,6,7],\
                     ['q1.txt','q2.txt','q3.txt','q4.txt',\
                      'q5.txt','q6.txt','q129.txt']],\
@@ -132,6 +157,9 @@ moleculeKey={'H2O':[1,[1,2,3,4,5,6,7],\
               'O2':[7,[1,2,3],\
                     ['q36.txt','q37.txt','q38.txt']],\
               'CH3Cl':[24,[1,2],['q73.txt','q74.txt']]}
+# moleculeKey={'H2O':[1,[1,2,3,4,5,6,7],\
+#                     ['q1.txt','q2.txt','q3.txt','q4.txt',\
+#                      'q5.txt','q6.txt','q129.txt']]}              
 molecularWeights=[18.01528,44.01,48.,44.013,28.01,16.04,32.,50.49]
 
 moleculeID=[moleculeKey[i][0] for i in moleculeKey]
@@ -158,8 +186,7 @@ def driver():
     Start loop                                                               =
     ==========================================================================
     """
-    
-    
+    # up this calls "doRun", creating temporary files for all kabs, and lambdas in bands
     start=time.time()
     
     myelements=[]
@@ -186,10 +213,17 @@ def driver():
                     str(ih2o).zfill(2) + ' ' + \
                     str(ipress).zfill(2) + ' ' + str(itemp).zfill(2) + ' 1'
                 # note last 1 is for the flag
+                submission[j]=runs
                 print(runs)
                 p[j]=subprocess.Popen(runs, shell=True)
                 i += 1
             
+            # resubmit if it didn't work
+            if (p[j].poll() != 0) and (p[j].poll() != None):
+                print('resubmitting')
+                p[j].terminate()
+                p[j]=subprocess.Popen(submission[j], shell=True)
+
             # check if runs are still going
             runsProcessing = runsProcessing or (p[j].poll() != 0)
         
@@ -212,6 +246,8 @@ def driver():
     find main absorber at specific P and T (and h2o setting?)
     ==========================================================================
     """
+    # just reads the temporary files and finds the main absorber for a typical 
+    # mlpath 
     import netCDF4 as nc4
     nus=[None]*nbands
     kabs=[[None for x in range(len(moleculeKey))] for y in range(nbands)]
@@ -257,6 +293,7 @@ def driver():
     and output
     ==========================================================================
     """
+    # calls "procRun" to calculate absorption coefficient for each band, molecule and weight
     p=[None]*nc
     log=[None]*nc
     submission=[None]*nc
@@ -278,10 +315,16 @@ def driver():
                     str(ih2o).zfill(2) + ' ' + \
                     str(ipress).zfill(2) + ' ' + str(itemp).zfill(2) + ' 2'
                 # note last 2 is for the flag
+                submission[j]=runs
                 print(runs)
                 p[j]=subprocess.Popen(runs, shell=True)
                 i += 1
             
+            # resubmit if it didn't work
+            if (p[j].poll() != 0) and (p[j].poll() != None):
+                print('resubmitting')
+                p[j].terminate()
+                p[j]=subprocess.Popen(submission[j], shell=True)
             # check if runs are still going
             runsProcessing = runsProcessing or (p[j].poll() != 0)
         
@@ -307,14 +350,20 @@ def driver():
     bliout=f1.createVariable('bli','f4', \
             ('nh2o','npress','ntemp','weights','molecule' ,'nbands'))
     cumout=f1.createVariable('cumulat','f4', ('weights'))
+    weightout=f1.createVariable('probs','f4', ('weights'))
     lam_lowout=f1.createVariable('lambda_low','f4', ('nbands'))
     lam_highout=f1.createVariable('lambda_high','f4', ('nbands'))
     h2oout=f1.createVariable('h2o','f4', 'nh2o')
     pressout=f1.createVariable('press','f4', 'npress')
     tempout=f1.createVariable('temp','f4', 'ntemp')
+    moleculeIDnc=f1.createVariable('moleculeID','i4', 'molecule')
+    molecularWeightsnc=f1.createVariable('molecularWeights','f4', 'molecule')
+    
     h2oout[:]=h2ocalc[:]
     pressout[:]=Pcalc[:]
     tempout[:]=Tcalc[:]
+    moleculeIDnc[:]=moleculeID[:]
+    molecularWeightsnc[:]=molecularWeights[:]
     for i in range(nh2o):
         for j in range(npress):
             for k in range(ntemp):
@@ -335,6 +384,7 @@ def driver():
                 lam_lowout[:]=lambda_low
                 lam_highout[:]=lambda_high
                 cumout[:] = cumulat
+                weightout[:] = weights
                 bliout[i,j,k,:,:,:]=bli
                 
                 f2.close()
@@ -431,7 +481,7 @@ def main_loop(MN,MR,ipress,itemp,ih2o,nbands,moleculeID,moleculeKey, \
     kabs=[[None for x in range(len(moleculeKey))] for y in range(nbands)]
 
     ind,=np.where(MN[:,0]==1) # find the water molecule
-    MR[ind,0]=h2ocalc[ih2o]/Pcalc[ipress]
+    MR[ind,0]=h2ocalc[ih2o] #/Pcalc[ipress]
     Patm1=Pcalc[ipress]/Pref
     for ilam in range(len(lambda_high)):
         print("*********" + str(ilam) + ' ' + str(lambda_low[ilam]) + ' to ' +\
@@ -711,6 +761,7 @@ def procRun(ih2o,ipress,itemp,fileName):
     print("Creating bli file done: " + fileName1)    
 
 
+# create temporary absorption dataset
 def doRun(ih2o,ipress,itemp,fileName):
     
     import netCDF4 as nc4
@@ -736,18 +787,18 @@ def doRun(ih2o,ipress,itemp,fileName):
 
     print("Declaring arrays for: " + fileName)
     len1=len(str1)
-    MN =np.zeros((len1,1),dtype=int)
-    IN =np.zeros((len1,1),dtype=int)
-    TF =np.zeros((len1,1),dtype=float)
-    LI =np.zeros((len1,1),dtype=float)
-    EAC=np.zeros((len1,1),dtype=float)
-    ABW=np.zeros((len1,1),dtype=float)
-    SBW=np.zeros((len1,1),dtype=float)
-    LSE=np.zeros((len1,1),dtype=float)
-    TD =np.zeros((len1,1),dtype=float)
-    PS =np.zeros((len1,1),dtype=float)
-    MOLW =np.zeros((len1,1),dtype=float)
-    MR =np.zeros((len1,1),dtype=float)
+    MN =np.zeros((len1,1),dtype=int) # molecule number
+    IN =np.zeros((len1,1),dtype=int) # isotope number
+    TF =np.zeros((len1,1),dtype=float) # transition freq
+    LI =np.zeros((len1,1),dtype=float) # line intensity
+    EAC=np.zeros((len1,1),dtype=float) # einstein a coefficient
+    ABW=np.zeros((len1,1),dtype=float) # air broadened width
+    SBW=np.zeros((len1,1),dtype=float) # self "
+    LSE=np.zeros((len1,1),dtype=float) # lower state energy
+    TD =np.zeros((len1,1),dtype=float) # temperature dependence (of air width)
+    PS =np.zeros((len1,1),dtype=float) # pressure shift 
+    MOLW =np.zeros((len1,1),dtype=float) # molecular weight
+    MR =np.zeros((len1,1),dtype=float) # mixing ratio - to determine main absorber
     # UVQ=np.zeros((len1,1),dtype=float)
     # LVQ=np.zeros((len1,1),dtype=float)
     # ULQ=np.zeros((len1,1),dtype=float)
@@ -871,7 +922,9 @@ def doRun(ih2o,ipress,itemp,fileName):
 
 if __name__ == "__main__":
     """
-        Call the mult_job function using commandline arguemnts
+        Call the mult_job function using commandline arguemnts for testing
+        e.g. 
+        python3 batch_k_distribution.py 4 10 10 1
     """
     import sys
     ih2o=sys.argv[1]
@@ -882,6 +935,7 @@ if __name__ == "__main__":
     fileName='/tmp/output_' + ih2o + '_' + ipress + '_' + itemp + '.nc'
 
     if flag==1:
+        # creates a temporary absorption dataset, with all the kabs and nus for each line
         doRun(int(ih2o),int(ipress),int(itemp),fileName)
     elif flag==2:
         procRun(int(ih2o),int(ipress),int(itemp),fileName)

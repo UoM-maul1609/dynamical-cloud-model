@@ -21,7 +21,7 @@
 	!>@brief
 	!>allocate arrays on each PE, and initialise them
 	!>@param[inout] dt,runtime,ntim - time variables
-	!>@param[inout] x,y,z,xn,yn,zn,u,v,w,p,th,rho - grid positions and prognostics
+	!>@param[inout] x,y,z,xn,yn,zn,u,v,w,p,th,rho, q - grid positions and prognostics
 	!>@param[inout] zu,zv,zw,tu,tv,tw - previous time-step and temporary storage
 	!>@param[inout] su,sv,sw,psrc - grid positions and prognostics
 	!>@param[inout] theta,thetan - reference potential temperatures
@@ -44,7 +44,7 @@
 			u,v,w,&
 			zu,zv,zw,&
 			tu,tv,tw,&
-			p,th,rho, &
+			p,th,rho, q, &
 			su,sv,sw,psrc, &
 			theta,thetan, &
 			tref,trefn, &
@@ -57,7 +57,7 @@
 			ipstart, jpstart, kpstart, &
 			dx_nm, dy_nm, dz_nm, &
 			ip, jp, kp, &
-			n_levels,z_read, theta_read,psurf,tsurf, &
+			n_levels,z_read, theta_read,q_read, psurf,tsurf, &
 			l_h,r_h, &
 			coords,dims, id, comm3d)
 				
@@ -73,6 +73,7 @@
 														u,v,w,zu,zv,zw,tu,tv,tw,&
 														p,th,rho, &
 														su,sv,sw,psrc
+		real(sp), dimension(:,:,:,:), allocatable, intent(inout) :: q
 		real(sp), dimension(:), allocatable, intent(inout) :: x,y,z,xn,yn,zn,dx,dy,dz, &
 															dxn,dyn,dzn, theta,thetan, &
 															rhoa, rhoan, tref, trefn, &
@@ -85,6 +86,7 @@
 		integer(i4b), intent(in) :: ip, jp, kp, l_h, r_h
 		integer(i4b), intent(in) :: n_levels
 		real(sp), dimension(n_levels), target, intent(in) :: z_read,theta_read
+		real(sp), dimension(1,n_levels), intent(in) :: q_read
 		real(sp), intent(in) :: psurf, tsurf
 		integer(i4b), dimension(3), intent(inout) :: coords
 		integer(i4b), dimension(3), intent(in) :: dims
@@ -174,6 +176,8 @@
 		allocate( th(1-r_h:kpp+r_h,1-r_h:jpp+r_h,1-r_h:ipp+r_h), STAT = AllocateStatus)
 		if (AllocateStatus /= 0) STOP "*** Not enough memory ***"
 		allocate( rho(1-r_h:kpp+r_h,1-r_h:jpp+r_h,1-r_h:ipp+r_h), STAT = AllocateStatus)
+		if (AllocateStatus /= 0) STOP "*** Not enough memory ***"
+		allocate( q(1-r_h:kpp+r_h,1-r_h:jpp+r_h,1-r_h:ipp+r_h,1), STAT = AllocateStatus)
 		if (AllocateStatus /= 0) STOP "*** Not enough memory ***"
 		
 		allocate( su(1-r_h:kpp+r_h,1-r_h:jpp+r_h,1-r_h:ipp+r_h), STAT = AllocateStatus)
@@ -302,7 +306,12 @@
 			theta(i)=var
 			rhoa(i)=psolve(1)/(ra*theta(i)*(psolve(1)/psurf)**(ra/cp))
 			tref(i)=theta(i)*(psolve(1)/psurf)**(ra/cp)
+
+			call polint(z_read(iloc:iloc+1), q_read(1,iloc:iloc+1), &
+						min(z(i),z_read(n_levels)), var,dummy)
+			q(i,:,:,1)=var
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
 
 
 
