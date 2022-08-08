@@ -91,8 +91,9 @@ mpi_module.$(OBJ) : mpi_module.f90
 	$(FOR) mpi_module.f90 $(FFLAGS)mpi_module.$(OBJ)
 radiation.$(OBJ) : radiation.f90 nrtype.$(OBJ) nr.$(OBJ) mpi_module.$(OBJ) \
 					initialisation.$(OBJ) locate.$(OBJ) polint.$(OBJ) \
-					trapzd.$(OBJ) qromb.$(OBJ) pts_code
-	$(FOR) radiation.f90 $(FFLAGSOMP)radiation.$(OBJ) -I$(PTS_DIR)
+					trapzd.$(OBJ) qromb.$(OBJ) pts_code 
+	$(FOR) radiation.f90 $(FFLAGSOMP)radiation.$(OBJ) -I$(PTS_DIR) \
+	    ${NETCDFLIB} -I ${NETCDFMOD} ${NETCDF_LIB} 
 main.$(OBJ)   : main.f90 variables.$(OBJ) nrtype.$(OBJ)  mpi_module.$(OBJ) \
 			initialisation.$(OBJ) radiation.$(OBJ) driver_code.$(OBJ) pts_code
 	$(FOR)  main.f90 -I ${NETCDFMOD} $(FFLAGS)main.$(OBJ) -I$(PTS_DIR)
