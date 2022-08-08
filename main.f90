@@ -220,16 +220,28 @@
             open(8,file=nm1%rad_nmlfile,status='old', recl=80, delim='apostrophe')
             read(8,nml=rad_vars)
             close(8)
+            ! adjust gases file location
+            nm2%gases_file= &
+                nm1%rad_nmlfile(1:index(nm1%rad_nmlfile,"/"))//nm2%gases_file
+
             !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
             ! Allocate and initialise radiation arrays                         !
             !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
             call allocate_and_set_radiation(nm2%start_year, nm2%start_mon, &
               nm2%start_day, nm2%start_hour,nm2%start_min, nm2%start_sec, &
+              nm2%gases_file, &
+              radg1%probs_read, radg1%lambda_low_read, radg1%lambda_high_read, &
+              radg1%h2o_read, radg1%press_read, radg1%temp_read, radg1%bli_read, &
+              radg1%molecularWeights_read, &
+              radg1%nh2o, radg1%npress, radg1%ntemp, radg1%nweights, &
+              radg1%nmolecule, radg1%nbands, &
+              radg1%itemp, radg1%ipress, &
               grid1%ip,grid1%jp,grid1%kp,&
               radg1%ns,radg1%nl,nm2%ns,nm2%nl, &
               radg1%ntot, &
               nm2%albedo,nm2%emissivity, radg1%albedo, radg1%emiss, &
               nm2%lat_ref,nm2%lon_ref, radg1%lat, radg1%lon, &
+              nm2%nmolecule, nm2%moleculeID(1:nm2%nmolecule), &
               nm2%lambda_read_s,nm2%lambda_read_l, &
               nm2%lambda_s_low, nm2%lambda_s_high, &
               nm2%lambda_l_low, nm2%lambda_l_high, &
@@ -237,7 +249,7 @@
     		  radg1%nrwbin,radg1%niwbin, &
               radg1%sflux_l, radg1%b_s_g, &
               radg1%ext_s_g, radg1%flux_u, radg1%flux_d, radg1%rad_power,  &
-              grid1%l_halo, grid1%r_halo, grid1%rhoan, grid1%thetan, &
+              grid1%l_halo, grid1%r_halo, grid1%rhoan, grid1%thetan, grid1%trefn, &
               radg1%nprocv,radg1%mvrecv, &
               radg1%tdstart,radg1%tdend,radg1%a,radg1%b,radg1%c,radg1%r,radg1%u, &
               grid1%coords,mp1%dims, mp1%id, mp1%sub_comm)
@@ -356,6 +368,12 @@
                     nm2%start_year, nm2%start_mon, nm2%start_day,&
                     nm2%start_hour, nm2%start_min,nm2%start_sec, &
                     radg1%lat, radg1%lon, radg1%albedo, radg1%emiss,nm2%quad_flag, &
+                    nm2%gas_absorption, &
+                    radg1%nmolecule, radg1%nweights, radg1%npress, radg1%ntemp,radg1%nh2o,  &
+                    radg1%itemp, radg1%ipress, radg1%bli_read, radg1%probs_read, &
+                    radg1%h2o_read,&
+                    radg1%molecularWeights_read, &
+                    nm2%moleculeID(1:nm2%nmolecule), nm2%moleculePPM(1:nm2%nmolecule), &
                     nm2%asymmetry_water, &
                     grid1%nrad, grid1%ngs,grid1%lamgs,grid1%mugs, &
                     radg1%nprocv,radg1%mvrecv, &

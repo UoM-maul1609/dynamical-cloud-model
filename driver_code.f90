@@ -117,7 +117,13 @@
                     nrwbin,niwbin, &
                     sflux_l, b_s_g, &
                     start_year,start_mon, start_day,start_hour,start_min,start_sec, &
-                    lat, lon, albedo, emiss,quad_flag, asymmetry_water, &
+                    lat, lon, albedo, emiss,quad_flag, &
+                    gas_absorption, &
+                    nmolecule, nweights, npress, ntemp, nh2o, &
+                    itemp,ipress,bli_read, probs_read, h2o_read, &	
+                    molecularWeights, &
+                    moleculeID, moleculePPM, &	                    
+                    asymmetry_water, &
                     nrad,ngs,lamgs,mugs, &
                     nprocv,mvrecv, &
 				coords, &
@@ -138,13 +144,23 @@
 		logical, intent(inout) :: new_file
 		logical, intent(in) :: viscous, monotone, moisture, &
 		                    damping_layer, forcing, theta_flag, ice_flag, hm_flag, &
-		                    wr_flag, divergence, radiation, heyms_west, lawson, recycle
+		                    wr_flag, divergence, radiation, heyms_west, lawson, recycle, &
+		                    gas_absorption
 		integer(i4b), intent(in) :: ice_nuc_flag, nrad, mode1_ice_flag, mode2_ice_flag, &
 		                        coll_breakup_flag1
 		logical, intent(inout) :: micro_init
 		integer(i4b), intent(in) :: ntim,ip,jp,kp, ipp,jpp,kpp, &
 						l_h,r_h, ipstart, jpstart, kpstart, &
-						advection_scheme, kord, nq,nprec,ncat, microphysics_flag
+						advection_scheme, kord, nq,nprec,ncat, microphysics_flag, &
+						nmolecule, nweights, npress, ntemp, nh2o
+        integer(i4b), intent(in), dimension(1-r_h:kp+r_h) :: itemp, ipress
+        real(sp), intent(in), dimension(1:nbands,1:nmolecule,1:nweights, &
+                    1:ntemp,1:npress, 1:nh2o) :: bli_read
+        real(sp), intent(in), dimension(1:nweights) :: probs_read
+        real(sp), intent(in), dimension(1:nh2o) :: h2o_read
+        integer(i4b), intent(in), dimension(1:nmolecule) :: moleculeID
+        real(sp), intent(in), dimension(1:nmolecule) :: moleculePPM, molecularWeights
+
 		integer(i4b), intent(in) :: id, world_process, ring_comm, sub_horiz_comm, &
 		    sub_vert_comm,rank
 		integer(i4b), dimension(3), intent(in) :: coords, dims
@@ -198,7 +214,7 @@
         character(len=20), intent(in), dimension(nq) :: q_name
 
         ! radiation variables		
-		real(sp), dimension(nbands) :: lambda, b_s_g, lambda_low,&
+		real(sp), dimension(nbands), intent(in) :: lambda, b_s_g, lambda_low,&
 							lambda_high, delta_lambda, nrwbin,niwbin, sflux_l
 		real(sp), intent(in), dimension(nprocv) :: mvrecv
 		integer(i4b), intent(in) :: nbands, ns, nl, tdstart,tdend
@@ -305,8 +321,13 @@
                     nbands, ns,nl, flux_u, flux_d, &
                     lambda,lambda_low,lambda_high, delta_lambda,nrwbin, niwbin, &
                     sflux_l, b_s_g, &
+                    nq, q, &
                     start_year,start_mon, start_day,start_hour,start_min,start_sec, &
                     lat, lon, albedo, emiss,quad_flag, &
+                    gas_absorption, &
+                    nmolecule, nweights, npress, ntemp, nh2o, &
+                    itemp,ipress,bli_read, probs_read, h2o_read, &	
+                    moleculeID, moleculePPM, molecularWeights, &	
                     asymmetry_water, &
                     nrad,ngs,lamgs,mugs, &
                     nprocv,mvrecv)	

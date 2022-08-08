@@ -490,10 +490,14 @@
             a,b,c,r,usol, &
             nbands, ns,nl, flux_u, flux_d, &
             lambda,lambda_low,lambda_high, delta_lambda,nrwbin, niwbin, &
-            sflux_l, b_s_g, &
+            sflux_l, b_s_g, nq,q, &
             start_year,start_mon, start_day,start_hour,start_min,start_sec, &
             lat, lon, albedo, emiss,quad_flag, &
-            asymmetry_water, &
+            gas_absorption, &
+            nmolecule, nweights, npress, ntemp, nh2o, &
+			itemp,ipress,bli_read, probs_read, h2o_read, &	
+			moleculeID, moleculePPM, molecularWeights,  &	
+			asymmetry_water, &
             nrad,ngs,lamgs,mugs, &
             nprocv,mvrecv)
 		use nrtype
@@ -507,10 +511,21 @@
 
 		
 		real(sp), intent(in) :: dt
-		integer(i4b), intent(in) :: ip, jp, kp, l_h, r_h
+		logical, intent(in) :: gas_absorption
+		integer(i4b), intent(in) :: ip, jp, kp, l_h, r_h, nq, &
+		                    nmolecule, nweights, npress, ntemp, nh2o
+        integer(i4b), intent(in), dimension(1-r_h:kp+r_h) :: itemp, ipress
+        real(sp), intent(in), dimension(1:nbands,1:nmolecule,1:nweights, &
+                    1:ntemp,1:npress, 1:nh2o) :: bli_read
+        real(sp), intent(in), dimension(1:nweights) :: probs_read
+        real(sp), intent(in), dimension(1:nh2o) :: h2o_read
+        integer(i4b), intent(in), dimension(1:nmolecule) :: moleculeID
+        real(sp), intent(in), dimension(1:nmolecule) :: moleculePPM, molecularWeights
 		real(sp), dimension(-l_h+1:kp+r_h), intent(in) :: dz, dzn
 		real(sp), dimension(-r_h+1:kp+r_h,-r_h+1:jp+r_h,-r_h+1:ip+r_h), &
 			intent(inout) :: th, sth
+		real(sp), dimension(-r_h+1:kp+r_h,-r_h+1:jp+r_h,-r_h+1:ip+r_h,nq), &
+			intent(in) :: q
 	    real(sp), dimension(-l_h+1:kp+r_h), intent(in) :: tref,trefn, rhoa, rhoan
 	    
         ! radiation variables	
@@ -545,9 +560,13 @@
                             time, nbands,ns,nl,ip,jp,kp,r_h, &
                             tdstart,tdend,a,b,c,r,usol, &
                             lambda_low, lambda_high, lambda,nrwbin, niwbin, &
-                            b_s_g,sflux_l, &
+                            b_s_g,sflux_l,nq,q, &
                             rhoan, tref, trefn, dz,dzn, albedo, emiss, &
-                            quad_flag, th,flux_u, flux_d, &
+                            quad_flag,  gas_absorption, &
+                            nmolecule, nweights, npress, ntemp, nh2o, &
+							itemp,ipress,bli_read, probs_read, h2o_read, &	
+							moleculeID, moleculePPM, molecularWeights, &	
+							th,flux_u, flux_d, &
                             asymmetry_water, nrad, ngs,lamgs,mugs, &
                             .true., &
                             nprocv,mvrecv, &
