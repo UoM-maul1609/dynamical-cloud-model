@@ -560,8 +560,8 @@
                 lef(j,i) = -lv*rhoan(1)*ustar(j,i)*qstar
                 
                 ! add flux to first layer
-                sth(1,j,i) = sth(1,j,i) - ustar(j,i)*thstar(j,i)/dz(0)*dt
-                sq(1,j,i,1) = sq(1,j,i,1) - ustar(j,i)*qstar/dz(0)*dt
+                sth(1,j,i) = sth(1,j,i) - ustar(j,i)*thstar(j,i)/dz(0)
+                sq(1,j,i,1) = sq(1,j,i,1) - ustar(j,i)*qstar/dz(0)
             enddo
         enddo
         !print *,maxval(abs(lef(1:jp,1:ip))),maxval(abs(hf(1:jp,1:ip)))
