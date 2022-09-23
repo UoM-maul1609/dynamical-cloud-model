@@ -316,7 +316,7 @@
         
         
     if(moisture) then
-        sq=0._sp
+        !sq=0._sp
         ! q-fields
         do n=1,nq
             ! calculate q sources due to viscosity
