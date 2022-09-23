@@ -46,7 +46,8 @@
             			viscous_dissipation, &
             			dissipate_h, nudge, restart, &
             			monotone
-            integer(i4b) :: ip, jp, kp, subgrid_model, advection_scheme, kord
+            integer(i4b) :: ip, jp, kp, subgrid_model, advection_scheme, kord, &
+                            land_surface_init
             real(sp) :: vis, &
             			runtime, dt, output_interval, &
             			rotation_period_hours, &

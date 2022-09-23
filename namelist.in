@@ -7,6 +7,8 @@
 	nm1%cvis=0.1, ! usually between 0.1 and 0.2 - think LEM has factor of 2 higher because
 	              ! of definition of Sij
 	nm1%runtime= 7200.,
+	nm1%land_surface_init=2,    ! 0=initialise t from lsm namelist, 1=initialise t from this namelist, 
+	                            ! 2=initialise surface from this namelist and subsurface from lsm namelist
 	nm1%dt=5.,
 	nm1%advection_scheme=1, ! 0=upstream, 1=mpdata (for scalars)
 	nm1%monotone=.true.,    ! monotone advection   (for scalars)
@@ -27,6 +29,8 @@
 	nm1%z_read(1:4)     = 0.,740,6260, 6261/ ! 3260
 	
  &lsm_vars
+    nm3%tinit=283.15,   ! temperature of ground
+    nm3%wg_pc_init=10., ! percent saturation initialisation
  	nm3%nsoil_lay=10,
  	!nm3%soil_thickness(1:10)=0.01, 0.01, 0.01,0.01,0.01,0.01,0.01,0.01,0.01,0.01,
  	!nm3%soil_thickness(1:10)=0.005, 0.01, 0.01,0.01,0.015,0.025,0.05,0.075,0.1,0.2,

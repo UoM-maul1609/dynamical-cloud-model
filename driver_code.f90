@@ -19,7 +19,7 @@
 	!>@param[in] l_h,r_h, ipstart,jpstart,skpstart, nbands: halo and dims, number of bands
 	!>@param[in] x,y,sz, dx, dy, dsz, dxn, dyn, dszn: grids
 	!>@param[in] skp,sz,szn, dsz, dszn, 
-	!>@param[inout] tdend,t,wg,tsurf, a,b,c,r,u, pscs, b1,wgs,phi_ps,kgs
+	!>@param[inout] tdend,t,wg,tsurf, a,b,c,r,u, pscs, b1,wgs,wfc,phi_ps,kgs
 	!>@param[in] coords: for Cartesian topology
 	!>@param[inout] new_file: flag for if this is a new file
 	!>@param[in] outputfile: netcdf output
@@ -34,7 +34,7 @@
 				dxn,dyn,dzn, &
 				skp,sz,szn,dsz,dszn,  &
 				tdend,t,wg,tsurf, a,b,c,r,u, pscs, &
-				b1,wgs,phi_ps,kgs, &
+				b1,wgs,wfc,phi_ps,kgs, &
 				coords, &
 				new_file,outputfile, output_interval, &
 				dims,id, world_process, rank, ring_comm,sub_comm)
@@ -57,7 +57,7 @@
 		real(sp), dimension(1-l_h:jpp+r_h), intent(in) :: y,dy,dyn
 		real(sp), dimension(1-l_h:kpp+r_h), intent(in) :: z,dz,dzn
 		real(sp), dimension(1-l_h:skp+r_h), intent(in) :: sz,szn, dsz, dszn, pscs, &
-		                                                b1,wgs,phi_ps,kgs
+		                                                b1,wgs,wfc,phi_ps,kgs
 
         real(sp), dimension(1-l_h:skp+r_h,1-l_h:jpp+r_h,1-l_h:ipp+r_h), & 
             intent(inout) :: t,wg
@@ -70,7 +70,7 @@
 		! locals:		
 		integer(i4b) :: n,n2, cur=1, i,j,k, error, rank2
 		real(sp) :: time, time_last_output, output_time
-
+        real(sp), dimension(1-l_h:jpp+r_h,1-l_h:ipp+r_h) :: flux2d_1, flux2d_2
 		
         if(id>=dims(1)*dims(2)*dims(3)) return 
         
@@ -80,6 +80,8 @@
 		output_time=output_interval
 		rank2=dims(1)*dims(2)*dims(3)
 		
+		flux2d_1=0._sp
+		flux2d_2=0._sp
 		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 		! time-loop                                                                      !
 		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -94,7 +96,7 @@
 								tdend,a,b,c,r,u, pscs, &
 								b1,wgs,phi_ps,kgs, &
                                 dt,t,wg,tsurf,  &
-								sz,szn,dsz,dszn, &
+								sz,szn,dsz,dszn, flux2d_1, flux2d_2, &
 								coords,dims, id, sub_comm)
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 

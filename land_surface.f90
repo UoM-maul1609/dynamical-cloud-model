@@ -25,7 +25,8 @@
             real(sp), dimension(:,:), allocatable :: tsurf
             real(sp), dimension(:), allocatable :: sflux_l	
             real(sp), dimension(:), allocatable :: sz,szn	, dsz, dszn
-            real(sp), dimension(:), allocatable :: a,b,c,r,u, pscs, b1, wgs, phi_ps, kgs
+            real(sp), dimension(:), allocatable :: a,b,c,r,u, pscs, b1, wgs, wfc, &
+                                                 phi_ps, kgs
             integer(i4b) :: tdstart,tdend
             							 
         end type lsmg
@@ -41,7 +42,7 @@
         type namelist_lsm
         	integer(i4b) :: start_year, start_mon,start_day, &
         					start_hour, start_min, start_sec
-        	real(sp) :: lat_ref,lon_ref
+        	real(sp) :: lat_ref,lon_ref, tinit, wg_pc_init
         	real(sp) :: asymmetry_water
         	integer(i4b) :: quad_flag
         	character (len=200) :: albedo='Urban'
@@ -99,18 +100,21 @@
 		! declare a radiation grid type
 		type(lsmg) :: lsmg1
 
-		real(sp), parameter :: h_planck=6.6256e-34_sp, &
-							c_light=2.9979e8_sp, &	
-							k_boltz=1.38e-23_sp, temp_sun=5778._sp, &
-						sigma_sb=2._sp*pi**5*k_boltz**4/(15._sp*h_planck**3*c_light**2), &
-						fac_planck=2._sp*k_boltz**4/(h_planck**3*c_light**2)*pi, &
-			N_a_0 = (p_stp / (t_stp*ra)) / ma * navog ! number of air molecules per m^3 at stp
+        ! variables / parameters used in subgrid model
+        ! note when kvon=0.4, prn should be 0.95 - see Jacobson (page 242 - from Hogstrom)
+        real(sp), parameter :: &!prn=0.7_sp, &
+                            prn=0.95_sp, suba=1._sp/prn, subb=40._sp, subc=16._sp, &
+                            subf=suba, subg=1.2_sp, subh=0._sp, subr=4._sp, ric=0.25_sp, &
+                            grav=9.81_sp, small=1.e-10_sp, kvon=0.4_sp
 
+        real(sp), parameter :: rv=461.5_sp,eps1=ra/rv,&
+                        cp=1005._sp, cw=4190._sp, ttr=273.15_sp, lv=2.5e6_sp, &
+                            ra_on_cp=ra/cp
 
 	
 		                    
 		private
-		public :: nm3, lsmg1,allocate_and_set_lsm, soil_solver
+		public :: nm3, lsmg1,allocate_and_set_lsm, soil_solver, calculate_h_and_le,lv
 
 		contains
 		
@@ -128,18 +132,22 @@
 											skp_nm, soil_thickness, soil_types, &
 											skp, sz, szn, dsz,dszn, t, wg, tsurf, &
 											tdend,a,b,c,r,u,pscs, &
-											b1, wgs, phi_ps, kgs, &
+											b1, wgs, wfc,phi_ps, kgs, &
+											tinit, wg_pc_init, tsurf1, &
+											land_surface_init, &
 											coords,dims, id, comm3d)
 			use mpi
 			implicit none
 			integer(i4b), intent(in) :: l_h, r_h, skp_nm
 			integer(i4b), intent(inout) :: ip, jp, kp, skp, tdend
 			real(sp), dimension(:), allocatable, intent(inout) :: a,b,c,r,u,  sz, szn, &
-			        dsz, dszn, pscs, b1, wgs, phi_ps, kgs
+			        dsz, dszn, pscs, b1, wgs, wfc,phi_ps, kgs
 			real(sp), dimension(:,:,:), allocatable, intent(inout) :: t,wg
 			real(sp), dimension(:,:), allocatable, intent(inout) :: tsurf
 			real(sp), dimension(skp_nm), intent(in) :: soil_thickness
 			character (len=charlen), dimension(stl), intent(in) :: soil_types
+			real(sp), intent(in) :: tinit, wg_pc_init, tsurf1
+			integer(i4b), intent(in) :: land_surface_init
 			
 			integer(i4b), dimension(3), intent(inout) :: coords
 			integer(i4b), dimension(3), intent(in) :: dims
@@ -184,6 +192,8 @@
 			if (AllocateStatus /= 0) STOP "*** Not enough memory ***"
 			allocate( wgs(1-l_h:skp+r_h), STAT = AllocateStatus)
 			if (AllocateStatus /= 0) STOP "*** Not enough memory ***"
+			allocate( wfc(1-l_h:skp+r_h), STAT = AllocateStatus)
+			if (AllocateStatus /= 0) STOP "*** Not enough memory ***"
 			allocate( phi_ps(1-l_h:skp+r_h), STAT = AllocateStatus)
 			if (AllocateStatus /= 0) STOP "*** Not enough memory ***"
 			allocate( kgs(1-l_h:skp+r_h), STAT = AllocateStatus)
@@ -214,6 +224,7 @@
 			    wgs(i)   =rsv%wgs(soil_index(i))
 			    phi_ps(i)=rsv%phips(soil_index(i))
 			    kgs(i)   =rsv%kgs(soil_index(i))
+			    wfc(i)   =rsv%wfc(soil_index(i))
 			enddo
 			pscs(0)=pscs(1)
 			pscs(skp+1)=pscs(skp)
@@ -229,8 +240,8 @@
 			
 			! position of grid edges
             sz=0.0_sp
-            do i=skp,1,-1
-                sz(i-1)=sz(i)-soil_thickness(skp-i+1)
+            do i=1,skp
+                sz(i)=sz(i-1)+soil_thickness(i)
             enddo
             sz(skp+1)=sz(skp)+(sz(skp)-sz(skp-1))
             !---checked
@@ -254,8 +265,28 @@
             enddo
             dszn(skp+1)=dszn(skp)
             
-            t=283.15_sp
-            wg=1.e-8_sp
+
+            select case (land_surface_init)
+                case (0)
+                    tsurf=tsurf1
+                    t=tsurf1
+                case (1)
+                    tsurf=tinit
+                    t=tinit
+                case (2)
+                    tsurf=tsurf1
+                    t=tinit
+                case default
+                    print *,'error land-surface init'
+                    stop
+            end select
+            do i=0,skp+1
+                wg(i,:,:)=0.01_sp*wg_pc_init*wgs(i)
+            enddo
+            
+            !tsurf=283.15_sp
+            !t=283.15_sp
+            !wg=0.2_sp !1.e-8_sp
 		end subroutine allocate_and_set_lsm
 		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
@@ -269,7 +300,7 @@
 		!>@param[inout] 
 		subroutine soil_solver(ip,jp,skp,l_h, r_h, tdend,a,b,c,r,u, pscs,b1,wgs,phi_ps, &
 		                        kgs, &
-		                        dt,t,wg,tsurf,sz,szn,dsz,dszn, &
+		                        dt,t,wg,tsurf,sz,szn,dsz,dszn, flux2d_1, flux2d_2, &
                                 coords,dims, id, comm3d)
 			use mpi
 			use nr, only : tridag
@@ -285,6 +316,8 @@
 			    intent(inout) :: t,wg
 			real(sp), dimension(1-l_h:jp+r_h,1-l_h:ip+r_h), &
 			    intent(inout) :: tsurf
+			real(sp), dimension(1-l_h:jp+r_h,1-l_h:ip+r_h), &
+			    intent(in) :: flux2d_1, flux2d_2
 			
 			integer(i4b), dimension(3), intent(in) :: coords
 			integer(i4b), dimension(3), intent(in) :: dims
@@ -297,14 +330,19 @@
 			
 
 ! 			kval=100._sp
-			flux1=10._sp
-			flux2=2.78e-6_sp
+			
+			
 ! if the pe is not being used in the cartesian topology, do not use here
 			if(id>=dims(1)*dims(2)*dims(3)) return 
 
 
+            ! so, solve ti, but for first layer the energy going in is =flux
+            ! tsurf is then diagnosed assuming that the heat added is conducted downwards
+            ! quasi steady state - i.e. it is in equilibrium in this layer
             do i=1,ip
                 do j=1,jp
+                    flux1=flux2d_1(j,i)
+                    flux2=min(flux2d_2(j,i),wg(1,j,i)/dt*dsz(0))
                     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
                     ! Temperature solver - equation 8.91 in Jacobson                     !                    
                     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -317,61 +355,52 @@
                         !  are neglected in the first term
                         pgcg(k)=(1._sp-wgs(k))*pscs(k)+wg(k,j,i)*4.2e6_sp
                     enddo   
-                    
-                    ! a is the sub diagonal, b is diagonal, c is super diagonal
-                    do k = 1,tdend-1
-                        kp05=(ks(k+1)+ks(k))*0.5_sp
-                        km05=(ks(k)+ks(k-1))*0.5_sp
-                        alpha_i= dt*kp05/(2._sp*pgcg(k)*dsz(k-1)*dszn(k))
-                        beta_i = dt*km05/(2._sp*pgcg(k)*dsz(k-1)*dszn(k-1))
-                        beta_ip1 = dt*kp05/(2._sp*pscs(i+1)*dsz(k)*dszn(k))
-                        ! super-diagonal
-                        c(k)   = -alpha_i
-                        ! diagonal
-                        b(k)   = 1._sp+alpha_i+beta_i
-                        ! sub-diagonal
-                        a(k)   = -beta_ip1
-                    enddo
-            
-            
-                    k=tdend
-                    kp05=(ks(k+1)+ks(k))*0.5_sp
-                    km05=(ks(k)+ks(k-1))*0.5_sp
-                    alpha_i= dt*kp05/(2._sp*pgcg(k)*dsz(k-1)*dszn(k))
-                    beta_i = dt*km05/(2._sp*pgcg(k+1)*dsz(k)*dszn(k))
+                            
+                    ! first layer, k=1
+                    kp05=(ks(2)+ks(1))*0.5_sp
+                    km05=(ks(1)+ks(0))*0.5_sp
+                    alpha_i=dt*kp05/(2._sp*pgcg(1)*dsz(0)*dszn(1))
+                    beta_i=dt/(pgcg(1)*dsz(0))
                     ! diagonal
-                    b(k)   = 1._sp+alpha_i+beta_i
-            
-                    ! now set the RHS
-                    do k=1,tdend
+                    b(1)=1._sp+alpha_i
+                    ! super-diagonal
+                    c(1)=-alpha_i
+                    ! result
+                    r(1)=(1._sp-alpha_i)*t(1,j,i)+ &
+                                alpha_i*t(2,j,i)+beta_i*flux1
+                            
+                    
+                    ! internal elements from 1 to tdend-1
+                    do k=2,tdend-1
                         kp05=(ks(k+1)+ks(k))*0.5_sp
                         km05=(ks(k)+ks(k-1))*0.5_sp
-                        alpha_i= dt*kp05/(2._sp*pgcg(k)*dsz(k-1)*dszn(k))
-                        beta_i = dt*km05/(2._sp*pgcg(k)*dsz(k-1)*dszn(k-1))
-                        beta_ip1 = dt*kp05/(2._sp*pgcg(k+1)*dsz(k)*dszn(k))
-                        r(k)   = alpha_i*t(k+1,j,i)+(1._sp-alpha_i-beta_i)*t(k,j,i)+ &
-                                 beta_i*t(k-1,j,i)    
-                        ! uncomment for backward euler
-                        ! r(k)=t(k,j,i)        
+                        alpha_i=dt*kp05/(2._sp*pgcg(k)*dsz(k-1)*dszn(k))
+                        beta_i=dt*km05/(2._sp*pgcg(k)*dsz(k-1)*dszn(k-1))
+                        ! diagonal
+                        b(k)=1._sp+alpha_i+beta_i
+                        ! super-diagonal
+                        c(k)=-alpha_i
+                        ! sub-diagonal
+                        a(k-1)=-beta_i
+                        ! result
+                        r(k)=(1._sp-alpha_i-beta_i)*t(k,j,i)+ &
+                                    alpha_i*t(k+1,j,i)+beta_i*t(k-1,j,i)
                     enddo
-                    ! top BC - i.e. governed by radiation and heat fluxes
-                    b(tdend)=1._sp
-                    a(tdend-1)=0._sp
-                    r(tdend)=t(tdend,1,1)+dt/(pgcg(tdend)*dsz(tdend-1))*(flux1)
-            
-            
-                    ! bottom BC  - no flux
-                    b(1)=1._sp
-                    c(1)=0._sp
-                    r(1)=t(1, j,i) ! should mean rate of change is zero
-            
+                    
+                    ! last layer
+                    ! diagonal
+                    b(tdend) = 1._sp
+                    ! sub-diagonal
+                    a(tdend-1) = 0._sp
+                    r(tdend) = t(tdend,j,i) 
+                    
+                    
+                               
                     ! now solve
                     call tridag(a,b,c,r,u)
                     t(1:tdend,j,i)=u
-                    t(0,j,i)=t(1,j,i)
-                    ! surface temperature
-                    kval=ks(tdend)
-                    tsurf(j,i) = t(tdend,j,i)-flux1 * ((sz(tdend)-szn(tdend))/kval)
+                    ! surface temperature - 
+                    tsurf(j,i)=flux1/ks(0)*dsz(0)+t(1,j,i)
                     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
                     
                     
@@ -387,73 +416,160 @@
                         kg(k)=kgs(k)*(wg(k,j,i)/wgs(k))**(2._sp*b1(k)+3._sp)
                     enddo   
                     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!   
-
-                    ! a is the sub diagonal, b is diagonal, c is super diagonal
-                    do k = 1,tdend-1
-                        dp05=(dg(k+1)+dg(k))*0.5_sp
-                        dm05=(dg(k)+dg(k-1))*0.5_sp
-                        alpha_i= dt*dp05/(2._sp*dsz(k-1)*dszn(k))
-                        beta_i = dt*dm05/(2._sp*dsz(k-1)*dszn(k-1))
-                        beta_ip1 = dt*dp05/(2._sp*dsz(k)*dszn(k))
-                        ! super-diagonal
-                        c(k)   = -alpha_i
-                        ! diagonal
-                        b(k)   = 1._sp+alpha_i+beta_i
-                        ! sub-diagonal
-                        a(k)   = -beta_ip1
-                    enddo
-                    k=tdend
-                    dp05=(dg(k+1)+dg(k))*0.5_sp
-                    dm05=(dg(k)+dg(k-1))*0.5_sp
-                    alpha_i= dt*dp05/(2._sp*dsz(k-1)*dszn(k))
-                    beta_i = dt*dm05/(2._sp*dsz(k)*dszn(k))
-                    ! diagonal
-                    b(k)   = 1._sp+alpha_i+beta_i
             
+                    ! first layer, k=1
+                    dp05=(dg(2)+dg(1))*0.5_sp
+                    dm05=(dg(1)+dg(0))*0.5_sp
+                    alpha_i=dt*dp05/(2._sp*dsz(0)*dszn(1))
+                    beta_i=dt/dsz(0)
+                    gamma_i=dt*(kg(2)-kg(0))/(dszn(0)+dszn(1))
+                    ! diagonal
+                    b(1)=1._sp+alpha_i
+                    ! super-diagonal
+                    c(1)=-alpha_i
+                    ! result
+                    r(1)=(1._sp-alpha_i)*wg(1,j,i)+ &
+                                alpha_i*wg(2,j,i)-beta_i*flux2+gamma_i
+
                     ! now set the RHS
-                    do k=1,tdend
+                    do k=2,tdend-1
                         dp05=(dg(k+1)+dg(k))*0.5_sp
                         dm05=(dg(k)+dg(k-1))*0.5_sp
                         alpha_i= dt*dp05/(2._sp*dsz(k-1)*dszn(k))
                         beta_i = dt*dm05/(2._sp*dsz(k-1)*dszn(k-1))
-                        beta_ip1 = dt*dp05/(2._sp*dsz(k)*dszn(k))
                         gamma_i=dt*(kg(k+1)-kg(k-1))/(dszn(k-1)+dszn(k))
+                        ! diagonal
+                        b(k)=1._sp+alpha_i+beta_i
+                        ! super-diagonal
+                        c(k)=-alpha_i
+                        ! sub-diagonal
+                        a(k-1)=-beta_i
+                        ! result
                         r(k)   = alpha_i*wg(k+1,j,i)+(1._sp-alpha_i-beta_i)*wg(k,j,i)+ &
                                  beta_i*wg(k-1,j,i) + gamma_i
-                        ! uncomment for backward euler
-                        ! r(k)=wg(k,j,i) + gamma_i      
+                        
                     enddo
-                    ! top BC - i.e. governed by radiation and heat fluxes
+                    ! bottom BC - i.e. no flux
                     b(tdend)=1._sp
                     a(tdend-1)=0._sp
-                    r(tdend)=wg(tdend,1,1)+dt/(dsz(tdend-1))*(flux2)
+                    ! 8.99 I think, flux2=(Pg-Ef)/rhow
+                    r(tdend)=wg(tdend,j,i) !+dt/(dsz(tdend-1))*(flux2)
             
-            
-                    ! bottom BC  - no flux
-                    b(1)=1._sp
-                    c(1)=0._sp
-                    r(1)=wg(1, j,i) ! should mean rate of change is zero
-            
+                        
                     ! now solve
                     call tridag(a,b,c,r,u)
-                    wg(1:tdend,j,i)=min(u,wgs(1:tdend))
-                    wg(0,j,i)=wg(1,j,i)
+                    wg(1:tdend,j,i)=min(u,wgs(1:tdend)) ! can't be more than the 
+                                                        ! saturated value
                     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
+                    ! note, vegetated soil - 8.6.3, page 259, Jacobson.
+                    ! this just alters the flux at surface
        
                 enddo
             enddo
             
             
-!            print *,wg(1:tdend,1,1)
-            !print *,tsurf(1,1),t(tdend,1,1), wg(tdend,1,1)
+            !print *,wg(1:tdend,1,1)
+!            print *,tsurf(1,1),t(1,1,1), wg(1,1,1)
             !stop
             
 		end subroutine soil_solver
 		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 
+		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        ! calculate the sensible and latent heat flux from the surface                   !
+		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        !>@author
+        !>Paul J. Connolly, The University of Manchester
+        !>@brief
+        !>calculate the momentum and potential temperature scales
+        !> see page 243, Jacobson 
+        !> "Noniterative parameterisation for momentum and potential temperature scales"
+        !>@param[in] z0,z0th,theta,thetan,z,zn,th,u,v,ip,jp,kp,l_h,r_h
+        !>@param[inout] vism,vist
+		subroutine calculate_h_and_le(ip,jp,kp,l_h, r_h, nq, dt,z0, z0th, &
+		        wfc, rhoan, thetan, &
+		        z,zn,dz,u,v, psurf, tsurf,th,w1,q, sth, sq, hf, lef )
+		        
+        implicit none
+        integer(i4b), intent(in) :: ip, jp, kp, l_h, r_h, nq
+        real(sp), dimension(1-l_h:jp+r_h, 1-l_h:ip+r_h), intent(in) :: &
+            tsurf, w1
+        real(sp), intent(in), dimension(-r_h+1:kp+r_h,-r_h+1:jp+r_h,-l_h+1:ip+r_h) :: &
+            th, q, u,v
+            
+        real(sp), intent(inout), dimension(-r_h+1:kp+r_h,-r_h+1:jp+r_h,-l_h+1:ip+r_h) :: &
+            sth
+            
+        real(sp), intent(inout), &
+            dimension(-r_h+1:kp+r_h,-r_h+1:jp+r_h,-l_h+1:ip+r_h,nq) :: sq
+            
+        real(sp), dimension(1-l_h:jp+r_h, 1-l_h:ip+r_h), intent(inout) :: hf, lef
+        real(sp), intent(in), dimension(-r_h+1:kp+r_h) :: rhoan, thetan, zn,z,dz
+        real(sp), intent(in) :: z0, z0th, psurf, dt, wfc
 
+        ! locals
+        integer(i4b) :: i,j
+        real(sp), dimension(-r_h+1:jp+r_h,-l_h+1:ip+r_h) :: vmag,rib,gm,gh, &
+                                                                ustar,thstar
+        real(sp) :: thcalc, qstar, qv0
+            
+        do i=1,ip
+            do j=1,jp
+                thcalc = tsurf(j,i)*(1.e5_sp/psurf)**(ra_on_cp)
+                ! wind speed in first layer above surface 
+                vmag(j,i)=0.5_sp*sqrt((u(1,j,i)+u(1,j,i-1))**2 + &
+                                      (v(1,j,i)+v(1,j-1,i))**2  )+small
+            
+                ! bulk richardson number
+                ! equation 8.39 (Jacobson pp 243) - theta(0) is the surface there is no pertubation here
+                rib(j,i)=grav*(th(1,j,i)+thetan(1)-thcalc)*(z(1)-z0)**2 / &
+                    (tsurf(j,i)*vmag(j,i)**2*(z(1)-z0th)) 
+            
+                ! equation 8.41 (Jacobson pp 243) - need to use z(1)
+                if(rib(j,i) .le. 0._sp) then
+                    gm(j,i)=1._sp-9.4_sp*rib(j,i)/ &
+                        (1._sp+70._sp*kvon**2* &
+                        sqrt(abs(rib(j,i)*z(1)/z0))/(log(z(1)/z0))**2)
+                    gh(j,i)=1._sp-9.4_sp*rib(j,i)/ &
+                        (1._sp+50._sp*kvon**2* &
+                        sqrt(abs(rib(j,i)*z(1)/z0))/(log(z(1)/z0))**2)
+                else
+                    gm(j,i)=1._sp/(1._sp+4.7_sp*rib(j,i))**2
+                    gh(j,i)=1._sp/(1._sp+4.7_sp*rib(j,i))**2
+                endif
+            
+                ! equation 8.40 (Jacobson pp 243) - need to use z(1)
+                ustar(j,i)=kvon*vmag(j,i)/log(z(1)/z0)*sqrt(gm(j,i))
+                thstar(j,i)=kvon**2*vmag(j,i)*(th(1,j,i)+thetan(1)-thcalc) / &
+                    (ustar(j,i)*prn*log(z(1)/z0)**2)*gh(j,i)
+                
+                if(w1(j,i)<wfc) then
+                    qv0=0.25_sp*(1._sp+cos(w1(j,i)/wfc*pi))**2
+                else
+                    qv0=1.0_sp
+                endif            
+                ! note, this is from eq 8.52 and 8.37 - it aasumes the roughness length
+                ! for q is the same as for theta
+                qstar = thstar(j,i)*(q(1,j,i)-qv0)/(th(1,j,i)+thetan(1)-thcalc)
+            
+                ! sensible heat flux - Jacobson, equation 8.53, page 246
+                hf(j,i) = -rhoan(1)*cp*ustar(j,i)*thstar(j,i)
+                ! latent heat flux - Jacobson, equation 8.53, page 246 (multiply by lv)
+                lef(j,i) = -lv*rhoan(1)*ustar(j,i)*qstar
+                
+                ! add flux to first layer
+                sth(1,j,i) = sth(1,j,i) - ustar(j,i)*thstar(j,i)/dz(0)*dt
+                sq(1,j,i,1) = sq(1,j,i,1) - ustar(j,i)*qstar/dz(0)*dt
+            enddo
+        enddo
+        !print *,maxval(abs(lef(1:jp,1:ip))),maxval(abs(hf(1:jp,1:ip)))
+    
+            
+            		
+		end subroutine calculate_h_and_le
+		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 
 	end module lsm

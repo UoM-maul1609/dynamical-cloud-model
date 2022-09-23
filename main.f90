@@ -125,9 +125,8 @@
 
 
 
-
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-        ! Allocate and initialise arrays for radiative transfer model		   !
+        ! Allocate and initialise arrays for land surface model		           !
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 		call allocate_and_set_lsm(grid1%ip,grid1%jp,grid1%kp,&
 		  grid1%l_halo, grid1%r_halo,  &
@@ -135,7 +134,8 @@
 		  lsmg1%skp, lsmg1%sz,lsmg1%szn, lsmg1%dsz,lsmg1%dszn, &
 		  lsmg1%t,lsmg1%wg, lsmg1%tsurf,  &
 		  lsmg1%tdend,lsmg1%a,lsmg1%b,lsmg1%c,lsmg1%r,lsmg1%u, lsmg1%pscs,  &
-		  lsmg1%b1, lsmg1%wgs, lsmg1%phi_ps, lsmg1%kgs, &
+		  lsmg1%b1, lsmg1%wgs, lsmg1%wfc, lsmg1%phi_ps, lsmg1%kgs, &
+		  nm3%tinit, nm3%wg_pc_init, nm1%tsurf, nm1%land_surface_init, &
 		  grid1%coords,mp1%dims, mp1%id, mp1%sub_horiz_comm) ! no comms needed
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
@@ -168,7 +168,7 @@
 				lsmg1%skp, lsmg1%sz,lsmg1%szn,lsmg1%dsz,lsmg1%dszn, &
                 lsmg1%tdend,lsmg1%t,lsmg1%wg, lsmg1%tsurf, &
                 lsmg1%a,lsmg1%b,lsmg1%c,lsmg1%r,lsmg1%u, lsmg1%pscs,  &		
-                lsmg1%b1, lsmg1%wgs, lsmg1%phi_ps, lsmg1%kgs, &		
+                lsmg1%b1, lsmg1%wgs, lsmg1%wfc, lsmg1%phi_ps, lsmg1%kgs, &		
 				grid1%coords, &
 				io1%new_file, nm1%outputfile, nm1%output_interval, &
 				mp1%dims,mp1%id, world_process, mp1%rank, mp1%ring_comm, &
