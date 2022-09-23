@@ -1834,7 +1834,7 @@
                     do qgas=2,nmolecule
                         ! calculate the pathlength
                         uq=rhoan(k)*molecularWeights(qgas)/(ma*1000._sp)* &
-                            moleculePPM(qgas)*dz(k)*1.e-8_sp
+                            moleculePPM(qgas)*dz(k)*1.e-7_sp
                         
                         a_abs = sum(probs_read*(1._sp-exp( &
                             -uq*bli_read(m,qgas,:,itemp(k),ipress(k),1) ))) / &
@@ -1850,7 +1850,7 @@
                         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
                         ! absorption by gases (everything except water vapour):			 !
                         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-                        if(moleculePPM(1).gt.0._sp) then
+                        if(moleculePPM(1).ge.0._sp) then
                             do k=1,kp
                                 ! calculate the partial pressure
                                 ev = rhoan(k)*ra*trefn(k)*moleculePPM(1)/1.e6_sp
@@ -1858,7 +1858,7 @@
                                 if(ev.gt.h2o_read(1)) ih2o=2
                                 ! calculate the pathlength
                                 uq=rhoan(k)*molecularWeights(1)/(ma*1000._sp)* &
-                                    moleculePPM(1)*dz(k)*1.e-8_sp
+                                    moleculePPM(1)*dz(k)*1.e-7_sp
 
                                 a_abs = sum(probs_read*(1._sp-exp( &
                                     -uq*bli_read(m,1,:,itemp(k),ipress(k),ih2o) ))) / &
@@ -1874,7 +1874,7 @@
                                 ih2o=1
                                 if(ev.gt.h2o_read(1)) ih2o=2
                                 ! calculate the pathlength
-                                uq=q(k,j,i,1)*rhoan(k)*dz(k)*1.e-2_sp
+                                uq=q(k,j,i,1)*rhoan(k)*dz(k)*1.e-1_sp
 
                                 a_abs = sum(probs_read*(1._sp-exp( &
                                     -uq*bli_read(m,1,:,itemp(k),ipress(k),ih2o) ))) / &

@@ -38,7 +38,7 @@
  	nm2%gases_file = 'data/bli_data.nc',
  	nm2%nmolecule = 8,
  	nm2%moleculeID(1:8) = 1, 2, 3, 4, 5, 6, 7, 24, ! H2O, CO2, O3, N2O, CO, CH4, O2, CH3Cl
- 	nm2%moleculePPM(1:8) = -99, 417, 0.070, 0.330, 5., 1.900, 209460., 0.000545, 
+ 	nm2%moleculePPM(1:8) = -99., 417, 0.070, 0.330, 5., 1.900, 209460., 0.000545, 
  	                        ! H2O, CO2, O3, N2O, CO, CH4, O2, CH3Cl
  	nm2%quad_flag=0, ! 0 is quadrature, 1 is Eddington
  	nm2%gas_absorption=.true.,
