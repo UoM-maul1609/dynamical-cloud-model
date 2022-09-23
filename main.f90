@@ -41,6 +41,7 @@
         use p_micro_module, only : read_in_pamm_bam_namelist, p_initialise_aerosol, &
                 p_initialise_aerosol_3d, calculate_gamma_params
         use radiation, only : allocate_and_set_radiation, nm2, radg1
+        use lsm, only : allocate_and_set_lsm, nm3, lsmg1
         use pts
         
         implicit none
@@ -52,6 +53,7 @@
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         namelist /run_vars/ nm1
         namelist /rad_vars/ nm2
+        namelist /lsm_vars/ nm3
         namelist /sounding_vars/ nm1,q_read,theta_read,u_read,v_read,z_read
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
@@ -257,6 +259,32 @@
         endif
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
+
+
+        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        ! Allocate and initialise arrays for land surface model		           !
+        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        if(nm1%land_surface) then
+            open(8,file=nm1%lsm_nmlfile,status='old', recl=80, delim='apostrophe')
+            read(8,nml=lsm_vars)
+            close(8)
+            call allocate_and_set_lsm(grid1%ip,grid1%jp,grid1%kp,&
+              grid1%l_halo, grid1%r_halo,  &
+              nm3%nsoil_lay,nm3%soil_thickness, nm3%soil_types, &
+              lsmg1%skp, lsmg1%sz,lsmg1%szn, lsmg1%dsz,lsmg1%dszn, &
+              lsmg1%t,lsmg1%wg, lsmg1%tsurf,  &
+              lsmg1%tdend,lsmg1%a,lsmg1%b,lsmg1%c,lsmg1%r,lsmg1%u, lsmg1%pscs,  &
+              lsmg1%b1, lsmg1%wgs, lsmg1%wfc, lsmg1%phi_ps, lsmg1%kgs, &
+    		  nm3%tinit, nm3%wg_pc_init, nm1%tsurf, nm1%land_surface_init, &
+              grid1%coords,mp1%dims, mp1%id, mp1%sub_horiz_comm) 
+        endif
+        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+
+
+
+
+
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         ! set initial q-variable properties                                    !
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -355,9 +383,15 @@
 				nm1%hm_flag, nm1%wr_flag, &
 				nm1%theta_flag, &
 				nm1%damping_layer,  nm1%forcing, nm1%divergence, nm1%radiation, &
+				nm1%land_surface, &
 				nm1%j_stochastic, nm1%ice_nuc_flag,nm1%mode1_ice_flag,nm1%mode2_ice_flag, &
 				nm1%coll_breakup_flag1, nm1%heyms_west, nm1%lawson, nm1%recycle, &
 				grid1%nq, grid1%nprec, grid1%ncat, &
+				nm1%psurf, &
+				lsmg1%skp, lsmg1%sz,lsmg1%szn,lsmg1%dsz,lsmg1%dszn, &
+                lsmg1%tdend,lsmg1%t,lsmg1%wg, lsmg1%tsurf, &
+                lsmg1%a,lsmg1%b,lsmg1%c,lsmg1%r,lsmg1%u, lsmg1%pscs,  &		
+                lsmg1%b1, lsmg1%wgs, lsmg1%wfc, lsmg1%phi_ps, lsmg1%kgs, &		
                     radg1%tdstart,radg1%tdend, &
                     radg1%a,radg1%b,radg1%c,radg1%r,radg1%u, &
                     radg1%ntot, radg1%ns, radg1%nl, &

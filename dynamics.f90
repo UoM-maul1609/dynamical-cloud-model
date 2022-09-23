@@ -730,6 +730,7 @@
 			s,tau11,tau12,tau13,tau22,tau23,tau33
 		
 		sth=0._sp
+		if(moisture) sq=0._sp
 		! using current time-step
 		! sources for u:
 !$omp simd	

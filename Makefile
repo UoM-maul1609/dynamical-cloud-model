@@ -2,10 +2,11 @@ SFVT_DIR = sfvt
 SGM_DIR = sgm
 PAMM_DIR = pamm
 RTM_DIR = rtm
+LSM_DIR = lsm
 
-.PHONY: sfvt_code sgm_code pamm_code rtm_code cleanall
+.PHONY: sfvt_code sgm_code pamm_code rtm_code lsm_code cleanall
 CLEANDIRS = $(SFVT_DIR) $(SGM_DIR) $(PAMM_DIR) $(PAMM_DIR)/sfvt $(PAMM_DIR)/bam \
-    $(RTM_DIR) ./
+    $(RTM_DIR) $(LSM_DIR) ./
 
 
 DEBUG = -fbounds-check -g 
@@ -38,7 +39,7 @@ FFLAGS2 =  $(DEBUG) -w -O3 -o
 main.exe	:  main.$(OBJ) variables.$(OBJ) nrtype.$(OBJ) mpi_module.$(OBJ) \
             diagnostics.$(OBJ) \
 			 initialisation.$(OBJ) driver_code.$(OBJ) \
-			  dynamics.$(OBJ) model_lib.a sfvt_code pamm_code rtm_code
+			  dynamics.$(OBJ) model_lib.a sfvt_code pamm_code rtm_code lsm_code
 	$(FOR2) $(FFLAGSOMP)main.exe main.$(OBJ) variables.$(OBJ) mpi_module.$(OBJ) \
 	    diagnostics.$(OBJ) \
 		 initialisation.$(OBJ) driver_code.$(OBJ) \
@@ -47,6 +48,7 @@ main.exe	:  main.$(OBJ) variables.$(OBJ) nrtype.$(OBJ) mpi_module.$(OBJ) \
 		  $(SGM_DIR)/sg_model_lib.a \
 		  $(PAMM_DIR)/pmicro_lib.a \
 		  $(RTM_DIR)/rtm_lib.a \
+		  $(LSM_DIR)/lsm_lib.a \
 		  -lm model_lib.a \
 		 ${NETCDFLIB} -I ${NETCDFMOD} ${NETCDF_LIB} $(DEBUG)
 model_lib.a	:   nrtype.$(OBJ) nr.$(OBJ) nrutil.$(OBJ) locate.$(OBJ) polint.$(OBJ) \
@@ -85,17 +87,17 @@ initialisation.$(OBJ) : initialisation.f90 random.$(OBJ) nr.$(OBJ) nrtype.$(OBJ)
 	$(FOR) initialisation.f90 -I ${NETCDFMOD}  $(FFLAGS)initialisation.$(OBJ) \
 	    -I$(PAMM_DIR)
 driver_code.$(OBJ) : driver_code.f90 nrtype.$(OBJ) dynamics.$(OBJ) \
-        sfvt_code sgm_code pamm_code rtm_code diagnostics.$(OBJ)
+        sfvt_code sgm_code pamm_code rtm_code lsm_code diagnostics.$(OBJ)
 	$(FOR) driver_code.f90 -I ${NETCDFMOD}  $(FFLAGS)driver_code.$(OBJ) -I$(SFVT_DIR) \
-	    -I$(SGM_DIR) -I$(PAMM_DIR) -I$(RTM_DIR)
+	    -I$(SGM_DIR) -I$(PAMM_DIR) -I$(RTM_DIR) -I$(LSM_DIR)
 mpi_module.$(OBJ) : mpi_module.f90 
 	$(FOR) mpi_module.f90 $(FFLAGS)mpi_module.$(OBJ)
 dynamics.$(OBJ) : dynamics.f90 sgm_code rtm_code 
 	$(FOR) dynamics.f90 $(FFLAGSOMP)dynamics.$(OBJ) -I$(SGM_DIR) -I$(RTM_DIR)
 main.$(OBJ)   : main.f90 variables.$(OBJ) mpi_module.$(OBJ) initialisation.$(OBJ) \
-				 driver_code.$(OBJ) dynamics.$(OBJ) pamm_code rtm_code
+				 driver_code.$(OBJ) dynamics.$(OBJ) pamm_code rtm_code lsm_code
 	$(FOR)  main.f90 -I ${NETCDFMOD} $(FFLAGS)main.$(OBJ) -I$(PAMM_DIR) -I$(RTM_DIR) \
-	    -I$(RTM_DIR)/pts
+	    -I$(LSM_DIR) -I$(RTM_DIR)/pts
 
 sfvt_code:
 	$(MAKE) -C $(SFVT_DIR)
@@ -108,6 +110,9 @@ pamm_code:
 
 rtm_code:
 	$(MAKE) -C $(RTM_DIR)
+
+lsm_code:
+	$(MAKE) -C $(LSM_DIR)
 
 clean: 
 	rm *.exe  *.o *.mod *~ \

@@ -62,10 +62,11 @@
             character (len=200) :: bam_nmlfile='input'
             character (len=200) :: aero_nmlfile='input'
             character (len=200) :: rad_nmlfile='input'
+            character (len=200) :: lsm_nmlfile='input'
             logical :: add_random_height_noise, &
             			initially_geostrophic, &
             			viscous_dissipation, &
-            			radiation, &
+            			radiation, land_surface, &
             			dissipate_h, nudge, restart, &
             			monotone, moisture, &
             			damping_layer,forcing, aero_prof_flag,drop_num_init, theta_flag, &
@@ -75,7 +76,7 @@
             			recycle=.true., param_theta=.true., bubble=.false.
             integer(i4b) :: nq,ip, jp, kp, subgrid_model, advection_scheme, kord, &
                         microphysics_flag,nprec, ice_nuc_flag=1, mode1_ice_flag=0, &
-                        mode2_ice_flag=0, coll_breakup_flag1=0
+                        mode2_ice_flag=0, coll_breakup_flag1=0, land_surface_init=0
             real(sp) :: vis, &
             			runtime, dt, output_interval, &
             			rotation_period_hours, &

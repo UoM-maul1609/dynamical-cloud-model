@@ -60,6 +60,7 @@
 	!>@param[in] j_stochastic, ice_nuc_flag, mode1_ice_flag, mode2_ice_flag, coll_breakup_flag1,
 	!>@param[in] heyms_west, lawson, recycle
 	!>@param[in] nq,nprec,ncat: number of q-variables
+	!>@param[in] psurf
 	!>@param[in] tdstart, tdend: start and end array indices - parallel ts
 	!>@param[inout] a, b, c, r, usol: tridag
     !>@param[in] nbands, ns, nl: number of bands
@@ -105,11 +106,15 @@
 				viscous, &
 				advection_scheme, kord, monotone, &
 				moisture, microphysics_flag, ice_flag, hm_flag, wr_flag, theta_flag, &
-				damping_layer,forcing, divergence, radiation, &
+				damping_layer,forcing, divergence, radiation, land_surface, &
 				j_stochastic, ice_nuc_flag, mode1_ice_flag, &
 				mode2_ice_flag, coll_breakup_flag1, &
 				heyms_west, lawson, recycle, &
 				nq, nprec, ncat, &
+				psurf, &
+				skp,sz,szn,dsz,dszn,  &
+				tdend_lsm,t_lsm,wg_lsm,tsurf_lsm, a_lsm,b_lsm,c_lsm,r_lsm,u_lsm, pscs_lsm, &
+				b1_lsm,wgs_lsm,wfc_lsm, phi_ps_lsm,kgs_lsm, &
                     tdstart,tdend, &
                     a,b,c,r,usol, &
                     nbands, ns,nl, flux_u, flux_d, rad_power, &
@@ -137,6 +142,7 @@
 		use subgrid_3d, only : advance_scalar_fields_3d
         use diagnostics
         use p_micro_module
+		use lsm, only : soil_solver, calculate_h_and_le, lv
         
 		implicit none
 				
@@ -144,7 +150,8 @@
 		logical, intent(inout) :: new_file
 		logical, intent(in) :: viscous, monotone, moisture, &
 		                    damping_layer, forcing, theta_flag, ice_flag, hm_flag, &
-		                    wr_flag, divergence, radiation, heyms_west, lawson, recycle, &
+		                    wr_flag, divergence, radiation, land_surface, &
+		                    heyms_west, lawson, recycle, &
 		                    gas_absorption
 		integer(i4b), intent(in) :: ice_nuc_flag, nrad, mode1_ice_flag, mode2_ice_flag, &
 		                        coll_breakup_flag1
@@ -222,11 +229,28 @@
 		real(sp), intent(inout), dimension(1:tdend) :: a,b,c,r,usol
 		real(sp), dimension(1-r_h:kpp+r_h,1-r_h:jpp+r_h,1-r_h:ipp+r_h,1:nbands) :: &
 						flux_d,flux_u
+		real(sp), dimension(1-r_h:jpp+r_h,1-r_h:ipp+r_h) :: fng
 		real(sp), dimension(1-r_h:kpp+r_h,1-r_h:jpp+r_h,1-r_h:ipp+r_h) :: &
 						rad_power
 		real(sp), intent(in) :: lat, lon, albedo, emiss, asymmetry_water
 		integer(i4b), intent(in) :: quad_flag, start_year, start_mon, start_day, &
 									start_hour, start_min, start_sec
+        ! land surface model variables
+        real(sp), intent(in) :: psurf
+		integer(i4b), intent(in) :: tdend_lsm, skp
+		real(sp), dimension(1-l_h:skp+r_h), intent(in) :: sz,szn, dsz, dszn, pscs_lsm, &
+		                                                b1_lsm,wgs_lsm,wfc_lsm, &
+		                                                    phi_ps_lsm,kgs_lsm
+
+        real(sp), dimension(1-l_h:skp+r_h,1-l_h:jpp+r_h,1-l_h:ipp+r_h), & 
+            intent(inout) :: t_lsm,wg_lsm
+        real(sp), dimension(1-l_h:jpp+r_h,1-l_h:ipp+r_h), & 
+            intent(inout) :: tsurf_lsm
+        real(sp), dimension(tdend_lsm), intent(inout) :: b_lsm,r_lsm,u_lsm
+        real(sp), dimension(tdend_lsm-1), intent(inout) :: a_lsm,c_lsm
+		real(sp), dimension(1-r_h:jpp+r_h,1-r_h:ipp+r_h) :: flux2d_1, flux2d_2, &
+		    hf_lsm, lef_lsm
+        
 		!-
 		
 
@@ -249,6 +273,7 @@
 
 		q1=0._sp
 		q2=0._sp
+		fng=0._sp
 		
 		
 		! associate pointers - for efficiency, when swapping arrays in leap-frog scheme
@@ -309,9 +334,48 @@
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+			! microphysics                                                               !
+			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+            if(moisture) then
+                select case (microphysics_flag)
+                    case (0) ! null microphysics
+
+                    case (1) ! not coded yet
+                    			
+                    case (2) ! not coded yet
+
+                    case (3) ! pamm microphysics - an exchange full is done on fields
+                        call p_microphysics_3d(nq,ncat,n_mode,c_s,c_e, inc, iqc,&
+                                        inr,iqr,ini,iqi,&
+                                        iai, &
+                                        cat_am,cat_c, cat_r, cat_i,&
+                                        nprec, &
+                                        ipp,jpp,kpp,l_h,r_h,dt,dz,&
+                                        dzn,q(:,:,:,:),precip(:,:,:,:),&
+                                        nrad,ngs(:,:,:,:),lamgs(:,:,:,:),mugs(:,:,:,:), &
+                                        th(:,:,:),prefn, &
+                                        zn(:),thetan,rhoa,rhoan,w(:,:,:), &
+                                        micro_init,hm_flag,wr_flag, 1.e-14_sp, &
+                                        ice_flag, theta_flag, &
+                                        j_stochastic, ice_nuc_flag, mode1_ice_flag, &
+                                        mode2_ice_flag, &
+                                        coll_breakup_flag1, &
+                                        heyms_west, lawson, recycle, &
+                                        radiation, &
+                                        ring_comm,sub_vert_comm,id,dims,coords)		
+                    case default
+                        print *,'not coded'
+                        stop
+                end select
+            endif
+			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+
+			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 			! try doing radiation here                                                   !
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
             if(radiation) then
+                ! updates th
                 call radiative_transfer(ring_comm,id,rank2, dims, coords, &
                     dt,dz,dzn,ipp,jpp,kpp,l_h,r_h,&
                     th,sth,&
@@ -331,9 +395,33 @@
                     asymmetry_water, &
                     nrad,ngs,lamgs,mugs, &
                     nprocv,mvrecv)	
+                if(land_surface) then
+                    ! the net flux at the ground can now be calculated
+                    fng=sum(flux_d(0,:,:,:),dim=3)-sum(flux_u(0,:,:,:),dim=3)
+                endif
             endif
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 			
+			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+			! call land-surface model                                                    !
+			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+            if(land_surface) then
+                ! call the land-surface model
+                call calculate_h_and_le(ipp,jpp,kpp,l_h, r_h, nq, dt,z0, &
+                    z0th, wfc_lsm(1), rhoan, thetan, z,zn,dz,u,v, psurf, tsurf_lsm,&
+                    th,wg_lsm(1,:,:),q(:,:,:,1), sth, sq, hf_lsm, lef_lsm )
+                    
+                flux2d_1=fng+hf_lsm-lef_lsm
+                flux2d_2=precip(1,:,:,1)/3.6e6_sp-lef_lsm/lv
+		        
+                call soil_solver(ipp,jpp,skp,l_h,r_h, &
+                    tdend_lsm,a_lsm,b_lsm,c_lsm,r_lsm,u_lsm, pscs_lsm, &
+                    b1_lsm,wgs_lsm,phi_ps_lsm,kgs_lsm, &
+                    dt,t_lsm,wg_lsm,tsurf_lsm,  &
+                    sz,szn,dsz,dszn, flux2d_1, flux2d_2, &
+                    coords,dims, id, ring_comm)                    
+            endif
+			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 			
 			
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -529,42 +617,7 @@
 
 
 
-			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-			! microphysics                                                               !
-			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-            if(moisture) then
-                select case (microphysics_flag)
-                    case (0) ! null microphysics
 
-                    case (1) ! not coded yet
-                    			
-                    case (2) ! not coded yet
-
-                    case (3) ! pamm microphysics
-                        call p_microphysics_3d(nq,ncat,n_mode,c_s,c_e, inc, iqc,&
-                                        inr,iqr,ini,iqi,&
-                                        iai, &
-                                        cat_am,cat_c, cat_r, cat_i,&
-                                        nprec, &
-                                        ipp,jpp,kpp,l_h,r_h,dt,dz,&
-                                        dzn,q(:,:,:,:),precip(:,:,:,:),&
-                                        nrad,ngs(:,:,:,:),lamgs(:,:,:,:),mugs(:,:,:,:), &
-                                        th(:,:,:),prefn, &
-                                        zn(:),thetan,rhoa,rhoan,w(:,:,:), &
-                                        micro_init,hm_flag,wr_flag, 1.e-14_sp, &
-                                        ice_flag, theta_flag, &
-                                        j_stochastic, ice_nuc_flag, mode1_ice_flag, &
-                                        mode2_ice_flag, &
-                                        coll_breakup_flag1, &
-                                        heyms_west, lawson, recycle, &
-                                        radiation, &
-                                        ring_comm,sub_vert_comm,id,dims,coords)		
-                    case default
-                        print *,'not coded'
-                        stop
-                end select
-            endif
-			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 
 
@@ -622,7 +675,6 @@
                 u(kpp+1,:,:)=u(kpp,:,:)
                 v(kpp+1,:,:)=v(kpp,:,:)
             endif
-
 
 		enddo
 		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
