@@ -164,6 +164,7 @@
                     sv=0._sp
                     sw=0._sp
                     sth=0._sp
+                    sq=0._sp
                     call calculate_subgrid_3d(dt,z,zn,dx,dy,dz,rhoa,theta,&
                         dxn,dyn,dzn,rhoan,thetan,&
                         ipp,jpp,kpp,nq,l_h,r_h,u,v,w,&
