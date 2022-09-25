@@ -521,11 +521,12 @@
                 ! wind speed in first layer above surface 
                 vmag(j,i)=0.5_sp*sqrt((u(1,j,i)+u(1,j,i-1))**2 + &
                                       (v(1,j,i)+v(1,j-1,i))**2  )+small
-            
+                vmag(j,i)=5._sp
+
                 ! bulk richardson number
                 ! equation 8.39 (Jacobson pp 243) - theta(0) is the surface there is no pertubation here
                 rib(j,i)=grav*(th(1,j,i)+thetan(1)-thcalc)*(z(1)-z0)**2 / &
-                    (tsurf(j,i)*vmag(j,i)**2*(z(1)-z0th)) 
+                    (thcalc*vmag(j,i)**2*(z(1)-z0th)) 
             
                 ! equation 8.41 (Jacobson pp 243) - need to use z(1)
                 if(rib(j,i) .le. 0._sp) then
@@ -549,7 +550,8 @@
                     qv0=0.25_sp*(1._sp+cos(w1(j,i)/wfc*pi))**2
                 else
                     qv0=1.0_sp
-                endif            
+                endif  
+                qv0=qv0*eps1*svp_liq(tsurf(j,i))/psurf + (1._sp-qv0)*q(1,j,i)          
                 ! note, this is from eq 8.52 and 8.37 - it aasumes the roughness length
                 ! for q is the same as for theta
                 qstar = thstar(j,i)*(q(1,j,i)-qv0)/(th(1,j,i)+thetan(1)-thcalc)
@@ -564,13 +566,33 @@
                 sq(1,j,i,1) = sq(1,j,i,1) - ustar(j,i)*qstar/dz(0)
             enddo
         enddo
-        !print *,maxval(abs(lef(1:jp,1:ip))),maxval(abs(hf(1:jp,1:ip)))
+        !print *,sum((lef(1:jp,1:ip)))/real(ip*jp,sp),sum((hf(1:jp,1:ip)))/real(ip*jp,sp), &
+        !    thcalc, thetan(1), thstar(1,1),ustar(1,1)
     
             
             		
 		end subroutine calculate_h_and_le
 		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
+        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        ! saturation vapour pressure over liquid                                       !
+        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        !>@author
+        !>Paul J. Connolly, The University of Manchester
+        !>@brief
+        !>calculates the saturation vapour pressure over liquid water according to buck fit
+        !>@param[in] t: temperature
+        !>@return svp_liq: saturation vapour pressure over liquid water
+        function svp_liq(t)
+            use nrtype
+            implicit none
+            real(sp), intent(in) :: t
+            real(sp) :: svp_liq
+            svp_liq = 100._sp*6.1121_sp* &
+                  exp((18.678_sp - (t-ttr)/ 234.5_sp)* &
+                  (t-ttr)/(257.14_sp + (t-ttr)))
+        end function svp_liq
+        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 	end module lsm
 	
