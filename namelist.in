@@ -9,7 +9,7 @@
 	                            ! that specified
 	nm1%radiation=.false.,       ! flag for radiation calculations
 	nm1%land_surface=.false.,   ! flag for land-surface calculations
-	nm1%land_surface_init=1,    ! 0=initialise t from lsm namelist, 1=initialise t from this namelist, 
+	nm1%land_surface_init=2,    ! 0=initialise t from lsm namelist, 1=initialise t from this namelist, 
 	                            ! 2=initialise surface from this namelist and subsurface from lsm namelist
 	nm1%ptol=1.e-8,             ! tolerance for pressure solver
 	                            ! please note for mass conservation 1.e-8 required

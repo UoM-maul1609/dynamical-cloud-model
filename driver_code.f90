@@ -411,8 +411,8 @@
                     z0th, wfc_lsm(1), rhoan, thetan, z,zn,dz,u,v, psurf, tsurf_lsm,&
                     th,wg_lsm(1,:,:),q(:,:,:,1), sth, sq, hf_lsm, lef_lsm )
                     
-                flux2d_1=fng+hf_lsm-lef_lsm
-                flux2d_2=precip(1,:,:,1)/3.6e6_sp-lef_lsm/lv
+                flux2d_1=fng-hf_lsm-lef_lsm
+                flux2d_2=-(precip(1,:,:,1)/3.6e6_sp-lef_lsm/lv/1000._sp)
 		        
                 call soil_solver(ipp,jpp,skp,l_h,r_h, &
                     tdend_lsm,a_lsm,b_lsm,c_lsm,r_lsm,u_lsm, pscs_lsm, &
