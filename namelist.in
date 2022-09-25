@@ -29,7 +29,7 @@
 	nm1%z_read(1:4)     = 0.,740,6260, 6261/ ! 3260
 	
  &lsm_vars
-    nm3%tinit=283.15,   ! temperature of ground
+    nm3%tinit=290.9,   ! temperature of ground
     nm3%wg_pc_init=10., ! percent saturation initialisation
  	nm3%nsoil_lay=10,
  	!nm3%soil_thickness(1:10)=0.01, 0.01, 0.01,0.01,0.01,0.01,0.01,0.01,0.01,0.01,
