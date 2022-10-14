@@ -3356,7 +3356,7 @@
 #endif	
 	endif
     ! rain 
-    vqr=0._sp
+    !vqr=0._sp
     if(sum(q(1:kp,cst(cat_r)+1)).gt.qsmall) then
         adv_l(2)=.true.
 		where(isnan(vqr))
