@@ -6,7 +6,7 @@ LSM_DIR = lsm
 
 .PHONY: sfvt_code sgm_code pamm_code rtm_code lsm_code cleanall
 CLEANDIRS = $(SFVT_DIR) $(SGM_DIR) $(PAMM_DIR) $(PAMM_DIR)/sfvt $(PAMM_DIR)/bam \
-    $(RTM_DIR) $(RTM_DIR)/pts $(LSM_DIR) ./
+    $(PAMM_DIR)/osnf $(RTM_DIR) $(RTM_DIR)/pts $(LSM_DIR) ./
 
 
 DEBUG = -fbounds-check -g 
