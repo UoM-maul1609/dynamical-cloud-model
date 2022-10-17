@@ -73,9 +73,10 @@
     						ttr=273.15_sp, joules_in_an_erg=1.0e-7_sp, &
     						joules_in_a_cal=4.187_sp, &
     						gamma_liq=0.072_sp, DEcrit=0.2_sp, &
-    						oneoversix=1._sp/6._sp, dtt=10.e-6_sp
-    						
-    						
+    						oneoversix=1._sp/6._sp, dtt=10.e-6_sp, &
+        					oneoverthree=1._sp/3._sp, oneovernine=1._sp/9._sp, &
+        					oneoverpi=1._sp/pi, phi_phillips=3.5e-3_sp    
+
     ! mass-diameter and size spectra relations
     real(sp), parameter :: cr=523.6_sp, cc=523.6_sp, &
                         cs=52.36_sp, cg=261.8_sp, ci=104._sp, &
@@ -129,6 +130,9 @@
 				chi_rain1, chi_cloud1, chi_ice1, chi_snow1, chi_graupel1, &
 				chi_num_ice, chi_num_ice1, &
 				gam1cr,gam2cr ! for radiation
+				
+	! some work space to transfer data between functions
+	real(sp), dimension(5) :: phillips_br_workspace
 				
 	! Seifert and Beheng autoconversion
 	real(sp) :: kc, kr, xstar
@@ -2915,6 +2919,51 @@
                     ! increase ice crystal monomers
                     q(k  ,iqi+3)=q(k  ,iqi+3)+nfrag
                 endif
+            elseif(coll_breakup_flag1==2) then
+            
+                ! calculate the number of fragments
+                lambda0r=lam_i(k)
+                lambda0i=lam_i(k)
+                mrthresh=0._sp
+                mrupper=ci*(pthreshi/lambda0r)**di
+                miupper=ci*(pthreshi/lambda0i)**di
+                mrupper=min(mrupper,miupper)
+            
+                ! only call integral if mrupper gt mrthresh
+                if((mrupper.gt.mrthresh).and.(q(k,iqi).gt.qsmall)) then
+
+                    ! total volume
+                    phillips_br_workspace(1)=q(k,iqi+2)
+                    ! total mass
+                    phillips_br_workspace(2)=q(k,iqi)
+                    ! total rime mass
+                    phillips_br_workspace(3)=q(k,iqi+4)
+                    ! total phi
+                    phillips_br_workspace(4)=q(k,iqi+1)
+                    ! total number
+                    phillips_br_workspace(5)=q(k,ini)
+
+
+                    f_mode2=1._sp !eii(k) ! only need to consider collision, not sticking
+                    n0r=n_i(k)
+                    n0i=n_i(k)
+                    
+                    ci_new=pi/6._sp*min(910._sp, &
+                        q(k,iqi)/(q(k,iqi+2)+q(k,iqi+4)/920._sp))
+                    a_hw_new=a_hw1(k)
+                    pre_hw_new=pre_hw(k)
+                    call quad2d_qgaus(dintegral_collisional_breakup2_hw, &
+                        limit1_collisional,limit2_mode2,mrthresh,mrupper,dummy3)
+
+                    ! multiplication according to Phillips et al (2017)
+                    nfrag=dummy3*dt
+                    ! increase ice crystal number
+                    q(k  ,ini)=q(k  ,ini)+nfrag
+                    ! increase ice crystal shape factor
+                    q(k  ,iqi+1)=q(k  ,iqi+1)+nfrag
+                    ! increase ice crystal monomers
+                    q(k  ,iqi+3)=q(k  ,iqi+3)+nfrag
+                endif
             endif
             !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
             
@@ -4221,6 +4270,169 @@
             
              
     end function dintegral_collisional_breakup_hw
+	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+
+	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    ! This evaluates the integrand                                                       !
+    ! for collisional breakup following Phillips et al (2017)                            !
+	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    function dintegral_collisional_breakup2_hw(x,y)
+        use numerics_type, only : wp
+        implicit none
+        real(wp), intent(in) :: x
+        real(wp), dimension(:), intent(in) :: y
+
+        real(wp), dimension(size(y)) :: dintegral_collisional_breakup2_hw
+        real(wp) :: diamr, mr, vr
+        real(wp), dimension(size(y)) :: mi, diami, delv, vi, k0, nfrag, delm,vol2, &
+                    twicea2, dmax2
+        real(wp) :: dmax1, twicea1, dsmall, frimes, frimel, &
+                    rhois, phis, &
+                    alpha, a0, t0, a, c, nmax, gamma, zeta, &
+                    rhoi1,rhoi2,frime1,frime2, phi1, phi2, vol1, t=0._wp
+        integer(i4b) :: i
+
+
+        mr=x
+        mi=y
+        diamr=(mr/ci_new)**(1.0_wp/di)
+        diami=(mi/ci_new)**(1.0_wp/di)
+        ! fall-speeds
+        vr=pre_hw_new*(diamr**-1)*((1._sp+a_hw_new*diamr**(0.5_sp*di))**0.5_sp-1._sp)**2
+        vi=pre_hw_new*(diami**-1)*((1._sp+a_hw_new*diami**(0.5_sp*di))**0.5_sp-1._sp)**2
+        delv=abs(vr-vi)
+
+        ! last bit is to convert to integral over m
+        ! need to multiply by eii(k) - f_mode2
+        dintegral_collisional_breakup2_hw=f_mode2*pi/4.0_wp*(diamr+diami)**2* &
+            delv*n0i*diamr**alpha_i* &
+            exp(-lambda0i*diamr)*n0i*diami**alpha_i*exp(-lambda0i*diami)* &
+            (diamr**(1.0_wp-di)) / (ci_new*di)*(diami**(1.0_wp-di)) / (ci_new*di)
+        
+        
+        ! now Phillips et al++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+        ! calculate particle properties from moments
+        ! 1=vol, 2=mass, 3=rime mass, 4=phi, 5=number
+        frime1=phillips_br_workspace(3)/phillips_br_workspace(2)
+        frime2=frime1
+        phi1=phillips_br_workspace(4)/phillips_br_workspace(5)
+        phi2=phi1
+        rhoi1 = min(rhoi,(phillips_br_workspace(2)-phillips_br_workspace(3)) / &
+                phillips_br_workspace(1))
+        rhoi2 = rhoi1      
+        vol1=mr/rhoi1
+        vol2=mi/rhoi1
+        
+        
+        
+        ! calculate the max length of the ice crystals
+        twicea1 = (6._wp*vol1 / (pi*phi1))**oneoverthree
+        dmax1 = max(twicea1, dmax1*phi1  )
+        
+        twicea2=(6._wp*vol2 / (pi*phi2))**oneoverthree
+        dmax2 = max(twicea2, dmax2*phi2  )
+        
+        ! calculate the max dimension of the particle assuming rime fills in like a sphere
+        dmax1=max(dmax1,  &
+         (6._wp*oneoverpi*(pi*twicea1**3*phi1*oneoversix)+ &
+            mr*frime1/rhoi  )**oneoverthree)
+        dmax2=max(dmax2,  &
+         (6._wp*oneoverpi*(pi*twicea2**3*phi2*oneoversix)+&
+            mi*frime2/rhoi  )**oneoverthree)
+        
+        
+        
+        do i=1,size(y)
+            ! some swapping
+            if(dmax1<dmax2(i)) then
+                dsmall = dmax1
+                frimes = frime1
+                frimel = frime2
+                rhois = rhoi1
+                phis = phi1
+            else
+                dsmall = dmax2(i)
+                frimes = frime2
+                frimel = frime1
+                rhois = rhoi2
+                phis = phi2
+            endif
+        
+        
+            !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+            ! table 1: phillips et al. (2017)
+            !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+            ! type 1
+            alpha=pi*dsmall**2
+            if ((dsmall> 5.e-4_wp).and.(dsmall<5.e-3_wp).and.(frimes>=0.5_wp) &
+                .and.(frimes<0.9_wp).and.(frimel>=0.5_wp)) then
+            
+                ! collisions of graupel size 500 micron to 5 mm with graupel and hail
+                a0=3.78e4_wp*(1._wp+0.0079_wp/dsmall**1.5_wp)
+                t0=-15._wp
+                A=a0*oneoverthree+max(2.*a0*oneoverthree- &
+                        a0*oneovernine*abs(t-ttr-t0),0._wp)
+                c=6.30e6_wp*phi_phillips
+                nmax=100._wp
+                gamma=0.3_wp
+                zeta=0.001_wp
+        
+            ! type 1
+            elseif ((frimes>=0.9_wp).and.(frimel>=0.9_wp)) then
+            
+                ! collisions of hail and hail - no size constraint
+                a0=4.35e5_wp
+                t0=15._wp
+                A=a0*oneoverthree+max(2.*a0*oneoverthree- &
+                    a0*oneovernine*abs(t-ttr-t0),0._wp)
+                c=3.31e5_wp
+                nmax=1000._wp
+                gamma=0.54_wp
+                zeta=1.e-6_wp
+            
+            ! types 2 or 3
+            elseif ((dsmall> 5.e-4_wp).and.(dsmall<5.e-3_wp).and.(frimes<0.5_wp) &
+                .and. (phis < 1._wp)) then
+                ! collisions of ice /snow size 500 micron to 5 mm with any ice
+            
+                ! seems like columnar habits dont fragment?
+                if(rhois < 400._wp) then
+                    ! dendrites
+                    A=1.41e6_wp*(1._wp+100._wp*frimes**2)* &
+                        (1._wp+3.98e-5_wp/dsmall**1.5_wp)
+                    c=3.09e6_wp*frimes
+                    nmax=100._wp
+                    gamma=0.50_wp - 0.25_wp*frimes
+                    zeta=0.001_wp
+                
+                else
+                    ! spatial planar
+                    A=1.58e7_wp*(1._wp+100._wp*frimes**2)* &
+                        (1._wp+1.33e-4_wp/dsmall**1.5_wp)
+                    c=7.08e6_wp*frimes
+                    nmax=100._wp
+                    gamma=0.50_wp - 0.25_wp*frimes
+                    zeta=0.001_wp
+            
+                endif
+                ! CKE
+                k0(i) = 0.5_wp*(mr*mi(i)/(mr+mi(i)))*(vr-vi(i))**2
+                ! finally apply equation 13
+                nfrag(i) = min(alpha*A*(1._wp-exp(-(C*K0(i)/(alpha*A))**gamma )), nmax)
+
+            else
+                nfrag(i)= 0._wp
+            endif
+            !---------------------------------------------------------------------------------
+        enddo
+        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        
+        
+        dintegral_collisional_breakup2_hw = dintegral_collisional_breakup2_hw * nfrag
+            
+             
+    end function dintegral_collisional_breakup2_hw
 	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 
