@@ -40,7 +40,7 @@
 	nm1%wr_flag=.true.,             ! switch for warm rain process
 	nm1%mode1_ice_flag=0,           ! 0 is off; 1 is on - experimental
 	nm1%mode2_ice_flag=0,           ! 0 is off; 1 is on - experimental
-	nm1%coll_breakup_flag1=0,        ! 0 is off; 1 is on - experimental
+	nm1%coll_breakup_flag1=0,        ! 0 is off; 1 is on vardiman, 2 is phillips et al 2017 - experimental
 	nm1%heyms_west=.true.,          ! flag for new fall-speeds
 	nm1%lawson=.false.,          ! lawson rain drop fragmentation
 	nm1%recycle=.true.,          ! recycle aerosol
