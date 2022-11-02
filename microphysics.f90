@@ -2948,21 +2948,24 @@
                     n0r=n_i(k)
                     n0i=n_i(k)
                     
-                    ci_new=pi/6._sp*min(910._sp, &
-                        q(k,iqi)/(q(k,iqi+2)+q(k,iqi+4)/920._sp))
-                    a_hw_new=a_hw1(k)
-                    pre_hw_new=pre_hw(k)
-                    call quad2d_qgaus(dintegral_collisional_breakup2_hw, &
-                        limit1_collisional,limit2_mode2,mrthresh,mrupper,dummy3)
+                    if(n0i>0) then
+                    
+                        ci_new=pi/6._sp*min(910._sp, &
+                            q(k,iqi)/(q(k,iqi+2)+q(k,iqi+4)/920._sp))
+                        a_hw_new=a_hw1(k)
+                        pre_hw_new=pre_hw(k)
+                        call quad2d_qgaus(dintegral_collisional_breakup2_hw, &
+                            limit1_collisional,limit2_mode2,mrthresh,mrupper,dummy3)
 
-                    ! multiplication according to Phillips et al (2017)
-                    nfrag=dummy3*dt
-                    ! increase ice crystal number
-                    q(k  ,ini)=q(k  ,ini)+nfrag
-                    ! increase ice crystal shape factor
-                    q(k  ,iqi+1)=q(k  ,iqi+1)+nfrag
-                    ! increase ice crystal monomers
-                    q(k  ,iqi+3)=q(k  ,iqi+3)+nfrag
+                        ! multiplication according to Phillips et al (2017)
+                        nfrag=dummy3*dt
+                        ! increase ice crystal number
+                        q(k  ,ini)=q(k  ,ini)+nfrag
+                        ! increase ice crystal shape factor
+                        q(k  ,iqi+1)=q(k  ,iqi+1)+nfrag
+                        ! increase ice crystal monomers
+                        q(k  ,iqi+3)=q(k  ,iqi+3)+nfrag
+                    endif
                 endif
             endif
             !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -3023,7 +3026,9 @@
         
         ! add the aerosol in ice into the mixed-mode aerosol
         do k=1,kp
+            dummy2 = min(max((q(k,ini)-(riaci(k))*dt)/ (q(k,ini)+qsmall), 0._sp),1._sp)
             q(k,ini)=q(k,ini)-(riaci(k))*dt
+            q(k,ini+1) = q(k,ini+1)*dummy2 ! shape factor
             if(q(k,iqi)<qsmall) then
                 dummy2=q(k,ini)
                 q(k,ini)=0._sp
@@ -4428,9 +4433,9 @@
         enddo
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         
-        
-        dintegral_collisional_breakup2_hw = dintegral_collisional_breakup2_hw * nfrag
-            
+        dintegral_collisional_breakup2_hw = &
+            dintegral_collisional_breakup2_hw * nfrag
+                    
              
     end function dintegral_collisional_breakup2_hw
 	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
