@@ -729,8 +729,8 @@
 		real(sp), dimension(-r_h+1:kp+r_h,-r_h+1:jp+r_h,-r_h+1:ip+r_h) :: &
 			s,tau11,tau12,tau13,tau22,tau23,tau33
 		
-		sth=0._sp
-		if(moisture) sq=0._sp
+		!sth=0._sp
+		!if(moisture) sq=0._sp
 		! using current time-step
 		! sources for u:
 !$omp simd	
