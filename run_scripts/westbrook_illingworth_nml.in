@@ -8,6 +8,9 @@
 	                        ! so that divergence of horizontal winds should equal 
 	                        ! that specified
 	nm1%radiation=.true.,   ! flag for radiation calculations
+	nm1%land_surface=.false.,   ! flag for land-surface calculations
+	nm1%land_surface_init=2,    ! 0=initialise t from lsm namelist, 1=initialise t from this namelist, 
+	                            ! 2=initialise surface from this namelist and subsurface from lsm namelist
 	nm1%ptol=1.e-8,         ! tolerance for pressure solver
 	                        ! please note for mass conservation 1.e-8 required
 	                        ! for simulations with dy=200, dz=100, dt=5s
@@ -35,6 +38,7 @@
 	nm1%ice_nuc_flag=1,             ! 1 is for Demott, 2 is for const stochastic 
 	nm1%hm_flag=.false.,             ! hm process
 	nm1%wr_flag=.true.,             ! switch for warm rain process
+	nm1%mode1_ice_flag=0,           ! 0 is off; 1 is on - experimental
 	nm1%mode2_ice_flag=0,           ! 0 is off; 1 is on - experimental
 	nm1%coll_breakup_flag1=0,        ! 0 is off; 1 is on - experimental
 	nm1%heyms_west=.true.,          ! flag for new fall-speeds

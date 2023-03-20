@@ -35,8 +35,14 @@
  	nm2%start_sec=0,
  	nm2%lat_ref=51.159330,
  	nm2%lon_ref=-1.436290,
+ 	nm2%gases_file = 'bli_data.nc',
+ 	nm2%nmolecule = 8,
+ 	nm2%moleculeID(1:8) = 1, 2, 3, 4, 5, 6, 7, 24, ! H2O, CO2, O3, N2O, CO, CH4, O2, CH3Cl
+ 	nm2%moleculePPM(1:8) = -99., 417, 0.070, 0.330, 5., 1.900, 209460., 0.000545, 
+ 	                        ! H2O, CO2, O3, N2O, CO, CH4, O2, CH3Cl
  	nm2%quad_flag=0, ! 0 is quadrature, 1 is Eddington, 2 is modified Eddington, 3 is hybrid modified eddington-delta,
  	                    ! 4 is hemispheric constant
+ 	nm2%gas_absorption=.false.,
  	nm2%albedo="Grass",
  	nm2%emissivity="Grass",
  	nm2%asymmetry_water=0.85,
@@ -46,10 +52,5 @@
  	nm2%lambda_s_high=705.e-9,
 	nm2%lambda_read_s(1:10)=100.e-9,200.e-9,300.e-9,350.e-9,400.e-9,450.e-9,500.e-9,550.e-9,600.e-9,700.e-9,
  	nm2%lambda_l_low=705.e-9,
- 	nm2%lambda_l_high=200000.e-9,
-	nm2%lambda_read_l(1:10)=800.e-9,900.e-9,1000.e-9,1100.e-9,1200.e-9,1300.e-9,
-	    1400.e-9,10500.e-9,16000.e-9,120000.e-9/ 
-!	nm2%lambda_read_l(1:20)=800.e-9,900.e-9,1000.e-9,1100.e-9,1200.e-9,1300.e-9,
-!	    1400.e-9,2.e-6,5.e-6,8.e-6,10500.e-9,16000.e-9,20e-6,30e-6,40e-6, 70.e-6,80.e-6,
-!	    90.e-6,110.e-6,120000.e-9/ 
-	
+ 	nm2%lambda_l_high=150000.e-9,
+	nm2%lambda_read_l(1:10)=800.e-9,900.e-9,1000.e-9,1100.e-9,1200.e-9,1300.e-9,1400.e-9,10500.e-9,16000.e-9,120000.e-9/ 
