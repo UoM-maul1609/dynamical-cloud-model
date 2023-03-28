@@ -48,7 +48,7 @@ sed -e "s/n_read(1,1:4)     = 250e6, 250e6, 250e6,250e6,/n_read(1,1:4)     = 250
 sed -e "s/n_read(2,1:4)     = 250e6, 250e6, 250e6,250e6,/n_read(2,1:4)     = 250e6, 250e6, 250e6,0.1e6,/" /tmp/namelist.tmp > /tmp/namelist.tmp2
 sed -e "s/z_read(1:4)       = 0.,740,3260,4000/z_read(1:4)       = 0.,740,3700,3701/" /tmp/namelist.tmp2 > run_scripts/westbrook_illingworth_pamm_nml.in 
 
-sed -e "s/nm1%coll_breakup_flag1=0,/nm1%coll_breakup_flag1=1,/" run_scripts/westbrook_illingworth_nml.in > /tmp/namelist.tmp
+sed -e "s/nm1%coll_breakup_flag1=0,/nm1%coll_breakup_flag1=2,/" run_scripts/westbrook_illingworth_nml.in > /tmp/namelist.tmp
 cp /tmp/namelist.tmp run_scripts/westbrook_illingworth_nml.in
 
 mpiexec -n 24 ./main.exe run_scripts/westbrook_illingworth_nml.in 
@@ -213,6 +213,25 @@ mpiexec -n 24 ./main.exe run_scripts/westbrook_illingworth_nml.in
 mv /tmp/output_pc01.nc /tmp/output0012.nc
 
 
+
+# run 13: no aerosol above and mode1, mode 2 and collisional breakup on
+git checkout run_scripts/westbrook_illingworth_nml.in
+git checkout run_scripts/westbrook_illingworth_pamm_nml.in 
+
+sed -e "s/n_read(1,1:4)     = 250e6, 250e6, 250e6,250e6,/n_read(1,1:4)     = 250e6, 250e6, 250e6,0.1e6,/" run_scripts/westbrook_illingworth_pamm_nml.in > /tmp/namelist.tmp
+sed -e "s/n_read(2,1:4)     = 250e6, 250e6, 250e6,250e6,/n_read(2,1:4)     = 250e6, 250e6, 250e6,0.1e6,/" /tmp/namelist.tmp > /tmp/namelist.tmp2
+sed -e "s/z_read(1:4)       = 0.,740,3260,4000/z_read(1:4)       = 0.,740,3700,3701/" /tmp/namelist.tmp2 > run_scripts/westbrook_illingworth_pamm_nml.in 
+
+sed -e "s/nm1%mode2_ice_flag=0,/nm1%mode2_ice_flag=1,/" run_scripts/westbrook_illingworth_nml.in > /tmp/namelist.tmp
+sed -e "s/nm1%mode1_ice_flag=0,/nm1%mode1_ice_flag=1,/" /tmp/namelist.tmp > /tmp/namelist2.tmp
+sed -e "s/nm1%coll_breakup_flag1=0,/nm1%coll_breakup_flag1=2,/" /tmp/namelist2.tmp > /tmp/namelist3.tmp
+cp /tmp/namelist3.tmp run_scripts/westbrook_illingworth_nml.in
+
+mpiexec -n 24 ./main.exe run_scripts/westbrook_illingworth_nml.in 
+
+mv /tmp/output_pc01.nc /tmp/output0013.nc
+
 git checkout run_scripts/westbrook_illingworth_nml.in
 git checkout run_scripts/westbrook_illingworth_pamm_nml.in
+
 
