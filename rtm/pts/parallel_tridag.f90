@@ -5,17 +5,23 @@
 	!> see https://web.alcf.anl.gov/~zippy/publications/partrid/partrid.html
 	!> but note there are two errors in part 1 of the algorithm (corrected here)
     module pts
-    use nrtype
+    use numerics_type
     use mpi
     implicit none
     !>variables for mpi
+#if VAR_TYPE==0
+		integer(i4b), parameter :: MPIREAL=MPI_REAL4
+#endif
+#if VAR_TYPE==1
+		integer(i4b), parameter :: MPIREAL=MPI_REAL8
+#endif
     type pts_vars
         integer(i4b), dimension(:), allocatable :: kps, ids
 		integer(i4b), allocatable, dimension(:) :: request
 		integer(i4b), dimension(MPI_STATUS_SIZE, 12) :: status
 		integer(i4b) :: error, tag1,num_messages,imess, tag2,id2,nprocv,sz,thispe
-        real(sp), allocatable, dimension(:) :: mvrecv
-        real(sp), allocatable, dimension(:) :: outdata,reduca,reducb,reducc,reducr, &
+        real(wp), allocatable, dimension(:) :: mvrecv
+        real(wp), allocatable, dimension(:) :: outdata,reduca,reducb,reducc,reducr, &
                         coeffs,a,b,c,r,an,bn,cn,rn,un,up,xsol
 
     end type pts_vars
@@ -41,7 +47,7 @@
     !>@param[in] comm3d,id, dims, coords: mpi stuff
 	subroutine set_tridag(init_flag,an,bn,cn,rn,un,up,a,b,c,r,x, &
 	    kp,kpp,kpstart,coords,dims,id,comm3d)
-        use nr, only : tridag
+        use numerics, only : tridiagonal
         use mpi
         use mpi_module
         implicit none
@@ -51,10 +57,10 @@
         integer(i4b), dimension(3), intent(in) :: dims
         integer(i4b), intent(in) :: id, comm3d
 
-        real(sp), dimension(:),allocatable, intent(inout) :: bn,rn,un,up
-        real(sp), dimension(:),allocatable, intent(inout) :: an,cn
+        real(wp), dimension(:),allocatable, intent(inout) :: bn,rn,un,up
+        real(wp), dimension(:),allocatable, intent(inout) :: an,cn
         
-        real(sp), dimension(:),allocatable, intent(inout) :: a,b,c,r,x
+        real(wp), dimension(:),allocatable, intent(inout) :: a,b,c,r,x
 	
 	    !local variables
 	    integer(i4b) :: AllocateStatus,error,i
@@ -76,13 +82,13 @@
 		if (AllocateStatus /= 0) STOP "*** Not enough memory ***"
 
         ! lower diag:
-        a(:) = 0.5_sp
+        a(:) = 0.5_wp
         ! upper diag:
-        c(:) = 1._sp
+        c(:) = 1._wp
         ! diagonal:
-        b(:)=2._sp
+        b(:)=2._wp
         ! rhs:
-        r(:) = 1._sp
+        r(:) = 1._wp
 
 		if(init_flag) then
             allocate( an(1:kp-1), STAT = AllocateStatus)
@@ -101,13 +107,13 @@
             ! set the problem                                                            !
             !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
             ! lower diag:
-            an(:) = 0.5_sp
+            an(:) = 0.5_wp
             ! upper diag:
-            cn(:) = 1._sp
+            cn(:) = 1._wp
             ! diagonal:
-            bn(:)=2._sp
+            bn(:)=2._wp
             ! rhs:
-            rn(:) = 1._sp
+            rn(:) = 1._wp
             !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
             !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -117,7 +123,7 @@
             r=rn(kpstart:kpstart+kpp-1) ! set submatrix rhs 
             ! set submatrix lower diagonal
             if(coords(3)==0) then
-                a(1)=0._sp
+                a(1)=0._wp
                 a(2:kpp)=an(kpstart:kpstart+kpp-2) 
             else
                 a=an(kpstart-1:kpstart+kpp-2)
@@ -125,7 +131,7 @@
         
             ! set submatrix upper diagonal
             if(coords(3)==(dims(3)-1)) then
-                c(kpp)=0._sp
+                c(kpp)=0._wp
                 c(1:kpp-1)=cn(kpstart:kpstart+kpp-2) 
             else
                 c=cn(kpstart:kpstart+kpp-1)
@@ -186,7 +192,7 @@
             !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
             ! solve tridiagonal matrix:								    		     !
             !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-            call tridag(an,bn,cn,rn,un)
+            call tridiagonal(an,bn,cn,rn,un)
             !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         
         endif
@@ -209,13 +215,13 @@
     !>@param[in] comm3d,id, dims, coords: mpi stuff
 	subroutine re_write_full(up,un,x, &
 	    kp,kpp,kpstart,coords,dims,id,comm3d)
-        use nr, only : tridag
+        use numerics, only : tridiagonal
         use mpi
         use mpi_module
         implicit none
-        real(sp), intent(inout),dimension(kp) :: up
-        real(sp), intent(in),dimension(kp) :: un
-        real(sp), intent(in),dimension(kpp) :: x
+        real(wp), intent(inout),dimension(kp) :: up
+        real(wp), intent(in),dimension(kp) :: un
+        real(wp), intent(in),dimension(kpp) :: x
         integer(i4b), intent(in) :: kp,kpp,kpstart
         integer(i4b), dimension(3), intent(inout) :: coords
         integer(i4b), dimension(3), intent(in) :: dims
@@ -227,19 +233,19 @@
 	    if(pts1%nprocv .gt. 1) then
             tag1=10
             call MPI_allgather(kpp,1,MPI_INTEGER,pts1%kps,1,MPI_INTEGER,&
-                comm3d,pts1%status(:,1),error)
+                comm3d,error)
 
             ! id2 is the id in this communicator
             ! nprocv is number of processors in this topology
             if(pts1%id2/=0) then
-                call MPI_issend(x,kpp, MPI_REAL8, 0, tag1, comm3d, pts1%request(1),error)
+                call MPI_issend(x,kpp, MPIREAL, 0, tag1, comm3d, pts1%request(1),error)
             endif
 
             if(pts1%id2 == 0) then
                 up(1:kpp)=x
                 do i=2,pts1%nprocv
                     call MPI_recv(up(sum(pts1%kps(1:i-1))+1:pts1%kps(i)),&
-                        pts1%kps(i), MPI_REAL8, i-1, tag1, comm3d, &
+                        pts1%kps(i), MPIREAL, i-1, tag1, comm3d, &
                         pts1%status(:,1),error)
                 enddo
             endif
@@ -268,7 +274,7 @@
     !>@param[in] comm3d,id, dims, coords: mpi stuff
     subroutine parallel_tridag(a,b,c,r,x, &
         kpp,coords,dims, id, comm3d)
-        use nr, only : tridag
+        use numerics, only : tridiagonal
         use mpi
         use mpi_module
         implicit none
@@ -277,12 +283,12 @@
         integer(i4b), dimension(3), intent(in) :: dims
         integer(i4b), intent(in) :: id, comm3d
         
-        real(sp), dimension(kpp), intent(inout) :: a,b,c,r,x
+        real(wp), dimension(kpp), intent(inout) :: a,b,c,r,x
         
         ! local variables:        
-        real(sp), dimension(kpp) :: xuh,xlh,xr
-        real(sp), dimension(8) :: msend
-        real(sp) :: denom, uhcoeff,lhcoeff
+        real(wp), dimension(kpp) :: xuh,xlh,xr
+        real(wp), dimension(8) :: msend
+        real(wp) :: denom, uhcoeff,lhcoeff
         integer(i4b) :: i,j,k, ibase,ifirst,nsig,error
         integer(i4b), dimension(3) :: coords_t
 
@@ -299,7 +305,7 @@
         ! forward elimination
         do i=2,kpp
             denom=b(i)-a(i)*xuh(i-1)
-            if(denom .eq. 0._sp) stop
+            if(denom .eq. 0._wp) stop
             xuh(i)=c(i)/denom
             xlh(i)=(r(i)-a(i)*xlh(i-1))/denom
         enddo
@@ -313,8 +319,8 @@
             xr(i)=xlh(i)-xuh(i)*xr(i+1)
             xlh(i)=-xuh(i)*xlh(i+1)
             denom=b(i)-c(i)*xuh(i+1)
-            denom=sign(1._sp,denom+1.e-60_sp)*max(abs(denom),1.e-15)
-            if(denom .eq. 0._sp) stop
+            denom=sign(1._wp,denom+1.e-60_wp)*max(abs(denom),1.e-15)
+            if(denom .eq. 0._wp) stop
             xuh(i)=a(i)/denom
         enddo
         
@@ -335,20 +341,20 @@
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         ! part 2: find data for reduced tridiagonal form                             !
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-        pts1%outdata=0._sp
+        pts1%outdata=0._wp
         ! set outdata array for message passing
-        pts1%outdata(1+(pts1%thispe-1)*8)=-1._sp
+        pts1%outdata(1+(pts1%thispe-1)*8)=-1._wp
         pts1%outdata(2+(pts1%thispe-1)*8)=xuh(1)
         pts1%outdata(3+(pts1%thispe-1)*8)=xlh(1)
         pts1%outdata(4+(pts1%thispe-1)*8)=-xr(1)
         pts1%outdata(5+(pts1%thispe-1)*8)=xuh(kpp)
         pts1%outdata(6+(pts1%thispe-1)*8)=xlh(kpp)
-        pts1%outdata(7+(pts1%thispe-1)*8)=-1._sp
+        pts1%outdata(7+(pts1%thispe-1)*8)=-1._wp
         pts1%outdata(8+(pts1%thispe-1)*8)=-xr(kpp) 
         ! http://mpitutorial.com/tutorials/mpi-scatter-gather-and-allgather/
         msend=pts1%outdata(1+(pts1%thispe-1)*8:8+(pts1%thispe-1)*8)  ! message to send
         
-        call MPI_allgather(msend,8,MPI_REAL8,pts1%mvrecv,8,MPI_REAL8,comm3d,error)
+        call MPI_allgather(msend,8,MPIREAL,pts1%mvrecv,8,MPIREAL,comm3d,error)
         pts1%outdata=pts1%mvrecv
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
@@ -367,7 +373,7 @@
             pts1%reducr(i)=pts1%outdata(ibase+3)
         enddo
         ! solve reduced system
-        call tridag(pts1%reduca(2:pts1%sz),pts1%reducb,pts1%reducc(1:pts1%sz-1),&
+        call tridiagonal(pts1%reduca(2:pts1%sz),pts1%reducb,pts1%reducc(1:pts1%sz-1),&
             pts1%reducr,pts1%coeffs)
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         !print *,xr
@@ -377,13 +383,13 @@
         ! part 4: pick out the appropriate elements of coeffs                        !
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         if(coords(3)==0) then
-            uhcoeff=0._sp
+            uhcoeff=0._wp
         else
             uhcoeff=pts1%coeffs(2*pts1%thispe-2)
         endif
         
         if(coords(3)==(dims(3)-1)) then
-            lhcoeff=0._sp
+            lhcoeff=0._wp
         else
             lhcoeff=pts1%coeffs(2*pts1%thispe-1)
         endif

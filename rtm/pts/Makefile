@@ -1,3 +1,9 @@
+OSNF_DIR = osnf
+
+.PHONY: osnf cleanall
+CLEANDIRS = $(OSNF_DIR) ./
+
+
 DEBUG = -fbounds-check -g 
 OPT    =-O3
 
@@ -21,6 +27,7 @@ OBJ = o
 FFLAGS = $(OPT)  $(DEBUG) -w -o 
 FFLAGSOMP = -fopenmp-simd $(FFLAGS)
 FFLAGS2 =  $(DEBUG) -w -O3 -o 
+VAR_TYPE = 1 # 0 single, 1 double
 
 
 main.exe	:  main.$(OBJ) variables.$(OBJ)  parallel_tridag.$(OBJ) mpi_module.$(OBJ) \
@@ -33,50 +40,41 @@ main.exe	:  main.$(OBJ) variables.$(OBJ)  parallel_tridag.$(OBJ) mpi_module.$(OB
 # 			 mpi_module.$(OBJ) \
 # 			 initialisation.$(OBJ) -lm model_lib.a \
 # 		 ${NETCDFLIB} -I ${NETCDFMOD} ${NETCDF_LIB} $(DEBUG)
-pts_lib.a	:   nrtype.$(OBJ) nr.$(OBJ) nrutil.$(OBJ) locate.$(OBJ) polint.$(OBJ) \
-				tridag.$(OBJ) rkqs.$(OBJ) rkck.$(OBJ) odeint.$(OBJ) zbrent.$(OBJ) \
-				random.$(OBJ)
-	$(AR) rc pts_lib.a nrutil.$(OBJ) locate.$(OBJ) polint.$(OBJ) tridag.$(OBJ) \
-				rkqs.$(OBJ) rkck.$(OBJ) odeint.$(OBJ) zbrent.$(OBJ) \
-				random.$(OBJ)
-locate.$(OBJ)	: locate.f90
-	$(FOR) locate.f90 $(FFLAGS)locate.$(OBJ)
-polint.$(OBJ)	: polint.f90
-	$(FOR) polint.f90 $(FFLAGS)polint.$(OBJ)
-tridag.$(OBJ)	: tridag.f90
-	$(FOR) tridag.f90 $(FFLAGS)tridag.$(OBJ)
-nrtype.$(OBJ)	: nrtype.f90
-	$(FOR) nrtype.f90 $(FFLAGS)nrtype.$(OBJ)
-nr.$(OBJ)	: nr.f90 
-	$(FOR) nr.f90 $(FFLAGS)nr.$(OBJ)
-nrutil.$(OBJ)	: nrutil.f90
-	$(FOR) nrutil.f90 $(FFLAGS)nrutil.$(OBJ)
-rkqs.$(OBJ)	: rkqs.f90
-	$(FOR) rkqs.f90 $(FFLAGS)rkqs.$(OBJ)	
-rkck.$(OBJ)	: rkck.f90
-	$(FOR) rkck.f90 $(FFLAGS)rkck.$(OBJ)	
-odeint.$(OBJ)	: odeint.f90
-	$(FOR) odeint.f90 $(FFLAGS)odeint.$(OBJ)	
-zbrent.$(OBJ)	: zbrent.f90
-	$(FOR) zbrent.f90 $(FFLAGS2)zbrent.$(OBJ)	
-random.$(OBJ) : random.f90 
-	$(FOR) random.f90 $(FFLAGS)random.$(OBJ) 
-variables.$(OBJ) : variables.f90 nrtype.$(OBJ)
-	$(FOR) variables.f90 $(FFLAGS)variables.$(OBJ)
-initialisation.$(OBJ) : initialisation.f90 random.$(OBJ) nr.$(OBJ) nrtype.$(OBJ)
-	$(FOR) initialisation.f90 $(FFLAGS)initialisation.$(OBJ)
+pts_lib.a	:   osnf_code		
+	$(AR) rc pts_lib.a 	$(OSNF_DIR)/numerics.$(OBJ) $(OSNF_DIR)/zeroin.$(OBJ) $(OSNF_DIR)/sfmin.$(OBJ) \
+                $(OSNF_DIR)/fmin.$(OBJ) $(OSNF_DIR)/r1mach.$(OBJ) \
+                $(OSNF_DIR)/d1mach.$(OBJ) $(OSNF_DIR)/dfsid1.$(OBJ) \
+                $(OSNF_DIR)/poly_int.$(OBJ) $(OSNF_DIR)/find_pos.$(OBJ) \
+                $(OSNF_DIR)/svode.$(OBJ) \
+                $(OSNF_DIR)/slinpk.$(OBJ) $(OSNF_DIR)/vode.$(OBJ) \
+                $(OSNF_DIR)/dlinpk.$(OBJ) $(OSNF_DIR)/vode_integrate.$(OBJ) \
+                $(OSNF_DIR)/erfinv.$(OBJ) $(OSNF_DIR)/tridiagonal.$(OBJ) \
+                $(OSNF_DIR)/hygfx.$(OBJ) $(OSNF_DIR)/random.$(OBJ)					
+
+variables.$(OBJ) : variables.f90 osnf_code
+	$(FOR) variables.f90 -I$(OSNF_DIR) $(FFLAGS)variables.$(OBJ)
+initialisation.$(OBJ) : initialisation.f90 osnf_code
+	$(FOR) initialisation.f90 -I$(OSNF_DIR) $(FFLAGS)initialisation.$(OBJ)
 # 	$(FOR) initialisation.f90 -I ${NETCDFMOD}  $(FFLAGS)initialisation.$(OBJ)
-mpi_module.$(OBJ) : mpi_module.f90 
-	$(FOR) mpi_module.f90 $(FFLAGS)mpi_module.$(OBJ)
-parallel_tridag.$(OBJ) : parallel_tridag.f90 nrtype.$(OBJ) nr.$(OBJ) mpi_module.$(OBJ) \
-					initialisation.$(OBJ)
-	$(FOR) parallel_tridag.f90 $(FFLAGSOMP)parallel_tridag.$(OBJ)
-main.$(OBJ)   : main.f90 variables.$(OBJ) nrtype.$(OBJ)  mpi_module.$(OBJ) \
-			initialisation.$(OBJ) parallel_tridag.$(OBJ) 
-	$(FOR)  main.f90 $(FFLAGS)main.$(OBJ) 
+mpi_module.$(OBJ) : mpi_module.f90 osnf_code
+	$(FOR) mpi_module.f90 -I$(OSNF_DIR) -cpp -DVAR_TYPE=$(VAR_TYPE) $(FFLAGS)mpi_module.$(OBJ)
+parallel_tridag.$(OBJ) : parallel_tridag.f90 mpi_module.$(OBJ) \
+					initialisation.$(OBJ) osnf_code
+	$(FOR) parallel_tridag.f90 -I$(OSNF_DIR) -cpp -DVAR_TYPE=$(VAR_TYPE) \
+		$(FFLAGSOMP)parallel_tridag.$(OBJ)
+main.$(OBJ)   : main.f90 variables.$(OBJ) mpi_module.$(OBJ) \
+			initialisation.$(OBJ) parallel_tridag.$(OBJ) osnf_code
+	$(FOR)  main.f90 -I$(OSNF_DIR) $(FFLAGS)main.$(OBJ) 
 # 	$(FOR)  main.f90 -I ${NETCDFMOD} $(FFLAGS)main.$(OBJ) 
 
-clean :
+osnf_code:
+	$(MAKE) -C $(OSNF_DIR)
+
+clean: 
 	rm *.exe  *.o *.mod *~ \
 	pts_lib.a
 
+cleanall:
+	for i in $(CLEANDIRS); do \
+		$(MAKE) -C $$i clean; \
+	done

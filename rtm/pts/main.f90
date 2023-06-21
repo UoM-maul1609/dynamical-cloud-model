@@ -24,7 +24,7 @@
 	!>main programme reads in information, allocates arrays, then calls the model driver
 
     program main
-        use nrtype
+        use numerics_type
         use variables
         use mpi
         use mpi_module
