@@ -3,17 +3,17 @@
 	!>@brief
 	!>subgrid code for the dynamical cloud model
     module subgrid_3d
-    use nrtype
+    use numerics_type
     
     private
     public :: calculate_subgrid_3d,advance_fields_3d,advance_scalar_fields_3d
     
     ! variables / parameters used in subgrid model
     ! note when kvon=0.4, prn should be 0.95 - see Jacobson (page 242 - from Hogstrom)
-    real(sp), parameter :: &!prn=0.7_sp, &
-                        prn=0.95_sp, suba=1._sp/prn, subb=40._sp, subc=16._sp, &
-                        subf=suba, subg=1.2_sp, subh=0._sp, subr=4._sp, ric=0.25_sp, &
-                        grav=9.81_sp, small=1.e-10_sp, kvon=0.4_sp
+    real(wp), parameter :: &!prn=0.7_wp, &
+                        prn=0.95_wp, suba=1._wp/prn, subb=40._wp, subc=16._wp, &
+                        subf=suba, subg=1.2_wp, subh=0._wp, subr=4._wp, ric=0.25_wp, &
+                        grav=9.81_wp, small=1.e-10_wp, kvon=0.4_wp
     
 	contains
 	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -45,7 +45,7 @@
 	                                tau13,tau23, &
 	                                su,sv,sw,sth,sq, moisture, &
 	                                comm3d,id,dims,coords)
-	use nrtype
+	use numerics_type
 	use mpi_module
 	use mpi
 	
@@ -53,33 +53,33 @@
 
     integer(i4b), intent(in) :: id, comm3d
     integer(i4b), dimension(3), intent(in) :: dims, coords
-	real(sp), intent(in) :: dt
+	real(wp), intent(in) :: dt
 	integer(i4b), intent(in) :: ip, jp, kp, l_h, r_h, nq
-	real(sp), dimension(-r_h+1:kp+r_h,-r_h+1:jp+r_h,-l_h+1:ip+r_h), &
+	real(wp), dimension(-r_h+1:kp+r_h,-r_h+1:jp+r_h,-l_h+1:ip+r_h), &
 		intent(in) :: u, zu
-	real(sp), dimension(-r_h+1:kp+r_h,-l_h+1:jp+r_h,-r_h+1:ip+r_h), &
+	real(wp), dimension(-r_h+1:kp+r_h,-l_h+1:jp+r_h,-r_h+1:ip+r_h), &
 		intent(in) :: v, zv
-	real(sp), dimension(-l_h+1:kp+r_h,-r_h+1:jp+r_h,-r_h+1:ip+r_h), &
+	real(wp), dimension(-l_h+1:kp+r_h,-r_h+1:jp+r_h,-r_h+1:ip+r_h), &
 		intent(in) :: w, zw, th
-	real(sp), dimension(-r_h+1:kp+r_h,-r_h+1:jp+r_h,-r_h+1:ip+r_h,nq), &
+	real(wp), dimension(-r_h+1:kp+r_h,-r_h+1:jp+r_h,-r_h+1:ip+r_h,nq), &
 		intent(in) :: q
-	real(sp), dimension(-r_h+1:kp+r_h,-r_h+1:jp+r_h,-r_h+1:ip+r_h,nq), &
+	real(wp), dimension(-r_h+1:kp+r_h,-r_h+1:jp+r_h,-r_h+1:ip+r_h,nq), &
 		intent(inout) :: viss,sq
-	real(sp), dimension(-r_h+1:kp+r_h,-r_h+1:jp+r_h,-r_h+1:ip+r_h), &
+	real(wp), dimension(-r_h+1:kp+r_h,-r_h+1:jp+r_h,-r_h+1:ip+r_h), &
 		intent(inout) :: vism, vist, &
 		                strain, tau11, tau22, tau33, tau12, tau13, tau23, &
 		                su, sv, sw, sth
-	real(sp), dimension(-l_h+1:ip+r_h), intent(in) :: dx, dxn
-	real(sp), dimension(-l_h+1:jp+r_h), intent(in) :: dy, dyn
-	real(sp), dimension(-l_h+1:kp+r_h), intent(in) :: z, zn,&
+	real(wp), dimension(-l_h+1:ip+r_h), intent(in) :: dx, dxn
+	real(wp), dimension(-l_h+1:jp+r_h), intent(in) :: dy, dyn
+	real(wp), dimension(-l_h+1:kp+r_h), intent(in) :: z, zn,&
 	        dz, dzn, rhoa, rhoan, theta, thetan
-    real(sp), dimension(-l_h+1:kp+r_h), intent(in) :: lamsq
-    real(sp), intent(in) :: z0,z0th
+    real(wp), dimension(-l_h+1:kp+r_h), intent(in) :: lamsq
+    real(wp), intent(in) :: z0,z0th
     logical, intent(in) :: moisture
 	
 	! locals
 	integer(i4b) :: i,j,k,n, ktmp,ktmp1
-	real(sp), dimension(-r_h+1:kp+r_h,-r_h+1:jp+r_h,-r_h+1:ip+r_h) :: rip, fm, fh
+	real(wp), dimension(-r_h+1:kp+r_h,-r_h+1:jp+r_h,-r_h+1:ip+r_h) :: rip, fm, fh
 
     ! u is on x levels, v on y levels, w on z levels. 
     ! so distance between u(i) and u(i+1) is dx(i)
@@ -105,16 +105,16 @@
                               ((w(k+1,j,i)-w(k,j,i))/dz(k))**2 
                               
                 ! 2*s13*s13 - du/dz+dw/dx - averaging over 2 points
-                strain(k,j,i)=strain(k,j,i)+ 0.5_sp * &
+                strain(k,j,i)=strain(k,j,i)+ 0.5_wp * &
                    (((u(k+1,j,i)-u(k,j,i))/dzn(k)+(w(k,j,i+1)-w(k,j,i))/dxn(i))**2 + &
                    ((u(k+1,j,i-1)-u(k,j,i-1))/dz(k)+(w(k,j,i)-w(k,j,i-1))/dxn(i-1))**2)
                 ! 2*s23*s23 - dw/dy+dv/dz - averaging over 2 points
-                strain(k,j,i)=strain(k,j,i)+ 0.5_sp * &
+                strain(k,j,i)=strain(k,j,i)+ 0.5_wp * &
                    (((w(k,j,i)-w(k,j-1,i))/dyn(j-1)+(v(k+1,j-1,i)-v(k,j-1,i))/dzn(k))**2 + &
                    ((w(k,j+1,i)-w(k,j,i))/dyn(j)+(v(k+1,j,i)-v(k,j,i))/dzn(k))**2)
                    
                 ! 2*s12*s12 - du/dy+dv/dx - averaging over 8 points
-                strain(k,j,i)=strain(k,j,i)+ 0.125_sp * &
+                strain(k,j,i)=strain(k,j,i)+ 0.125_wp * &
                    (((u(k,j,i-1)-u(k,j-1,i-1))/dyn(j-1)+(v(k,j-1,i)-v(k,j-1,i-1))/dxn(i-1))**2 + &
                    ((u(k,j+1,i-1)-u(k,j,i-1))/dyn(j)+(v(k,j,i)-v(k,j,i-1))/dxn(i-1))**2  &
                    + &
@@ -161,8 +161,8 @@
 !$omp end simd
 !     vist=vism
     if(coords(3)==(dims(3)-1)) then
-        vism(kp-1:kp,:,:)=0._sp
-        vist(kp-1:kp,:,:)=0._sp
+        vism(kp-1:kp,:,:)=0._wp
+        vist(kp-1:kp,:,:)=0._wp
     endif
     if(coords(3)==0) then
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -191,16 +191,16 @@
     do i=1,ip
         do j=1,jp
             do k=1,kp
-                tau11(k,j,i)=rhoan(k)*1._sp*(vism(k,j,i)+vism(k-1,j,i))* &
+                tau11(k,j,i)=rhoan(k)*1._wp*(vism(k,j,i)+vism(k-1,j,i))* &
                             (zu(k,j,i)-zu(k,j,i-1))/dx(i-1)
-                tau22(k,j,i)=rhoan(k)*1._sp*(vism(k,j,i)+vism(k-1,j,i))* &
+                tau22(k,j,i)=rhoan(k)*1._wp*(vism(k,j,i)+vism(k-1,j,i))* &
                             (zv(k,j,i)-zv(k,j-1,i))/dy(j-1)
-                tau33(k,j,i)=rhoan(k)*1._sp*(vism(k,j,i)+vism(k-1,j,i))* &
+                tau33(k,j,i)=rhoan(k)*1._wp*(vism(k,j,i)+vism(k-1,j,i))* &
                             (zw(k,j,i)-zw(k-1,j,i))/dz(k-1)
                             
                 !i+1/2, j+1/2
                 tau12(k,j,i)=rhoan(k)* &
-                    0.125_sp* (vism(k,j,i)+vism(k,j+1,i)+vism(k-1,j,i)+vism(k-1,j+1,i) + &
+                    0.125_wp* (vism(k,j,i)+vism(k,j+1,i)+vism(k-1,j,i)+vism(k-1,j+1,i) + &
                     vism(k,j,i+1)+vism(k,j+1,i+1)+vism(k-1,j,i+1)+vism(k-1,j+1,i+1) ) * &
                     ((zu(k,j+1,i)-zu(k,j,i))/dyn(j)+(zv(k,j,i+1)-zv(k,j,i))/dxn(i))
             enddo
@@ -213,11 +213,11 @@
         do j=1,jp
             do k=1,kp
                 ! on i+1/2
-                tau13(k,j,i)=rhoa(k)*0.5_sp*(vism(k,j,i)+vism(k,j,i+1))* &
+                tau13(k,j,i)=rhoa(k)*0.5_wp*(vism(k,j,i)+vism(k,j,i+1))* &
                     ( (zu(k+1,j,i)-zu(k,j,i))/dzn(k) + (zw(k,j,i+1)-zw(k,j,i))/dxn(i))
                     
                 ! on j+1/2
-                tau23(k,j,i)=rhoa(k)*0.5_sp*(vism(k,j,i)+vism(k,j+1,i))* &
+                tau23(k,j,i)=rhoa(k)*0.5_wp*(vism(k,j,i)+vism(k,j+1,i))* &
                     ( (zw(k,j+1,i)-zw(k,j,i))/dyn(j) + (zv(k+1,j,i)-zv(k,j,i))/dzn(k))
             enddo
         enddo
@@ -226,17 +226,17 @@
     
     ! full exchange
     call exchange_along_dim(comm3d, id, kp, jp, ip, r_h,r_h,r_h,r_h,l_h,r_h,tau11,&
-        0._sp,0._sp,dims,coords)
+        0._wp,0._wp,dims,coords)
     call exchange_along_dim(comm3d, id, kp, jp, ip, r_h,r_h,r_h,r_h,l_h,r_h,tau22,&
-        0._sp,0._sp,dims,coords)
+        0._wp,0._wp,dims,coords)
     call exchange_along_dim(comm3d, id, kp, jp, ip, r_h,r_h,r_h,r_h,l_h,r_h,tau33,&
-        0._sp,0._sp,dims,coords)
+        0._wp,0._wp,dims,coords)
     call exchange_along_dim(comm3d, id, kp, jp, ip, r_h,r_h,r_h,r_h,l_h,r_h,tau12,&
-        0._sp,0._sp,dims,coords)
+        0._wp,0._wp,dims,coords)
     call exchange_along_dim(comm3d, id, kp, jp, ip, r_h,r_h,r_h,r_h,l_h,r_h,tau13,&
-        0._sp,0._sp,dims,coords)
+        0._wp,0._wp,dims,coords)
     call exchange_along_dim(comm3d, id, kp, jp, ip, r_h,r_h,r_h,r_h,l_h,r_h,tau23,&
-        0._sp,0._sp,dims,coords)
+        0._wp,0._wp,dims,coords)
         
 
     if(coords(3) == (dims(3)-1)) then
@@ -277,26 +277,26 @@
     
     ! full exchange    
     call exchange_full(comm3d, id, kp, jp, ip, r_h,r_h,r_h,r_h,l_h,r_h,su,&
-        0._sp,0._sp,dims,coords)
+        0._wp,0._wp,dims,coords)
     call exchange_full(comm3d, id, kp, jp, ip, r_h,r_h,r_h,r_h,l_h,r_h,sv,&
-        0._sp,0._sp,dims,coords)
+        0._wp,0._wp,dims,coords)
     call exchange_full(comm3d, id, kp, jp, ip, r_h,r_h,r_h,r_h,l_h,r_h,sw,&
-        0._sp,0._sp,dims,coords)
+        0._wp,0._wp,dims,coords)
     
     ! calculate th sources due to viscosity
     ! diffusion along i calculated via i+1/2 and i-1/2 terms
-!     sth=0._sp
+!     sth=0._wp
     do i=1,ip
         do j=1,jp
             do k=1,kp
                 ! note, vist has already been multiplied by rhoa
                 sth(k,j,i)=sth(k,j,i)+ &
-                 (0.25_sp*((vist(k,j,i)+vist(k,j,i-1)+vist(k-1,j,i)+vist(k-1,j,i-1))*&
+                 (0.25_wp*((vist(k,j,i)+vist(k,j,i-1)+vist(k-1,j,i)+vist(k-1,j,i-1))*&
                           (th(k,j,i-1)-th(k,j,i))/dxn(i-1) - &
                           (vist(k,j,i+1)+vist(k,j,i)+vist(k-1,j,i+1)+vist(k-1,j,i))*&
                           (th(k,j,i)-th(k,j,i+1))/dxn(i) ) / dx(i-1)  &
                  + &
-                 0.25_sp*((vist(k,j,i)+vist(k,j-1,i)+vist(k-1,j,i)+vist(k-1,j-1,i))*&
+                 0.25_wp*((vist(k,j,i)+vist(k,j-1,i)+vist(k-1,j,i)+vist(k-1,j-1,i))*&
                           (th(k,j-1,i)-th(k,j,i))/dyn(j-1) - &
                           (vist(k,j+1,i)+vist(k,j,i)+vist(k-1,j+1,i)+vist(k-1,j,i))*&
                           (th(k,j,i)-th(k,j+1,i))/dyn(j) ) / dy(j-1)  &
@@ -312,11 +312,11 @@
     
     ! full exchange    
     call exchange_full(comm3d, id, kp, jp, ip, r_h,r_h,r_h,r_h,l_h,r_h,sth,&
-        0._sp,0._sp,dims,coords)
+        0._wp,0._wp,dims,coords)
         
         
     if(moisture) then
-        !sq=0._sp
+        !sq=0._wp
         ! q-fields
         do n=1,nq
             ! calculate q sources due to viscosity
@@ -326,13 +326,13 @@
                     do k=1,kp
                         ! note, vist has already been multiplied by rhoa
                         sq(k,j,i,n)=sq(k,j,i,n)+ &
-                         (0.25_sp*&
+                         (0.25_wp*&
                          ((vist(k,j,i)+vist(k,j,i-1)+vist(k-1,j,i)+vist(k-1,j,i-1))*&
                                   (q(k,j,i-1,n)-q(k,j,i,n))/dxn(i-1) - &
                         (vist(k,j,i+1)+vist(k,j,i)+vist(k-1,j,i+1)+vist(k-1,j,i))*&
                                   (q(k,j,i,n)-q(k,j,i+1,n))/dxn(i) ) / dx(i-1)  &
                          + &
-                         0.25_sp*&
+                         0.25_wp*&
                          ((vist(k,j,i)+vist(k,j-1,i)+vist(k-1,j,i)+vist(k-1,j-1,i))*&
                                   (q(k,j-1,i,n)-q(k,j,i,n))/dyn(j-1) - &
                         (vist(k,j+1,i)+vist(k,j,i)+vist(k-1,j+1,i)+vist(k-1,j,i))*&
@@ -349,7 +349,7 @@
     
             ! full exchange    
             call exchange_full(comm3d, id, kp, jp, ip, r_h,r_h,r_h,r_h,l_h,r_h,&
-                sq(:,:,:,n),0._sp,0._sp,dims,coords)
+                sq(:,:,:,n),0._wp,0._wp,dims,coords)
         enddo
     endif
 
@@ -371,22 +371,22 @@
 	!>@param[in] z0,z0th,theta,thetan,z,zn,th,u,v,ip,jp,kp,l_h,r_h
 	!>@param[inout] vism,vist
     subroutine monin_obukhov(z0,z0th,theta,thetan,z,zn,th,u,v,vism,vist,ip,jp,kp,l_h,r_h)
-	use nrtype
+	use numerics_type
 	use mpi_module
 	use mpi
     
     implicit none
     integer(i4b), intent(in) :: ip, jp, kp, l_h, r_h
-    real(sp), intent(in), dimension(-r_h+1:kp+r_h,-r_h+1:jp+r_h,-l_h+1:ip+r_h) :: &
+    real(wp), intent(in), dimension(-r_h+1:kp+r_h,-r_h+1:jp+r_h,-l_h+1:ip+r_h) :: &
             th, u, v
-    real(sp), intent(inout), dimension(-r_h+1:kp+r_h,-r_h+1:jp+r_h,-l_h+1:ip+r_h) :: &
+    real(wp), intent(inout), dimension(-r_h+1:kp+r_h,-r_h+1:jp+r_h,-l_h+1:ip+r_h) :: &
             vism,vist
-    real(sp), intent(in), dimension(-r_h+1:kp+r_h) :: thetan, zn,z,theta
-    real(sp), intent(in) :: z0, z0th
+    real(wp), intent(in), dimension(-r_h+1:kp+r_h) :: thetan, zn,z,theta
+    real(wp), intent(in) :: z0, z0th
             
     ! locals
     integer(i4b) :: i,j
-    real(sp), dimension(-r_h+1:jp+r_h,-l_h+1:ip+r_h) :: vmag,rib,gm,gh, &
+    real(wp), dimension(-r_h+1:jp+r_h,-l_h+1:ip+r_h) :: vmag,rib,gm,gh, &
                                                             ustar,thstar
     
     
@@ -394,7 +394,7 @@
     do i=1,ip
         do j=1,jp
             ! wind speed in first layer above surface 
-            vmag(j,i)=0.5_sp*sqrt((u(1,j,i)+u(1,j,i-1))**2 + &
+            vmag(j,i)=0.5_wp*sqrt((u(1,j,i)+u(1,j,i-1))**2 + &
                                   (v(1,j,i)+v(1,j-1,i))**2  )+small
             
             ! bulk richardson number
@@ -403,14 +403,14 @@
                 (theta(0)*vmag(j,i)**2*(z(1)-z0th)) 
             
             ! equation 8.41 (Jacobson pp 243) - need to use z(1)
-            if(rib(j,i) .le. 0._sp) then
-                gm(j,i)=1._sp-9.4_sp*rib(j,i)/ &
-                    (1._sp+70._sp*kvon**2*sqrt(abs(rib(j,i)*z(1)/z0))/(log(z(1)/z0))**2)
-                gh(j,i)=1._sp-9.4_sp*rib(j,i)/ &
-                    (1._sp+50._sp*kvon**2*sqrt(abs(rib(j,i)*z(1)/z0))/(log(z(1)/z0))**2)
+            if(rib(j,i) .le. 0._wp) then
+                gm(j,i)=1._wp-9.4_wp*rib(j,i)/ &
+                    (1._wp+70._wp*kvon**2*sqrt(abs(rib(j,i)*z(1)/z0))/(log(z(1)/z0))**2)
+                gh(j,i)=1._wp-9.4_wp*rib(j,i)/ &
+                    (1._wp+50._wp*kvon**2*sqrt(abs(rib(j,i)*z(1)/z0))/(log(z(1)/z0))**2)
             else
-                gm(j,i)=1._sp/(1._sp+4.7_sp*rib(j,i))**2
-                gh(j,i)=1._sp/(1._sp+4.7_sp*rib(j,i))**2
+                gm(j,i)=1._wp/(1._wp+4.7_wp*rib(j,i))**2
+                gh(j,i)=1._wp/(1._wp+4.7_wp*rib(j,i))**2
             endif
             
             ! equation 8.40 (Jacobson pp 243) - need to use z(1)
@@ -446,16 +446,16 @@
 	!>@param[in] strain, thetan, theta, dzn, th, ip, jp, kp, l_h, r_h
 	!>@param[inout] rip, fm, fh
     subroutine richardson(strain,thetan,theta,dzn,th,ip,jp,kp,l_h,r_h,rip,fm,fh)
-	use nrtype
+	use numerics_type
 	use mpi_module
 	use mpi
     
     implicit none
     integer(i4b), intent(in) :: ip, jp, kp, l_h, r_h
-    real(sp), intent(in), dimension(-r_h+1:kp+r_h,-r_h+1:jp+r_h,-l_h+1:ip+r_h) :: &
+    real(wp), intent(in), dimension(-r_h+1:kp+r_h,-r_h+1:jp+r_h,-l_h+1:ip+r_h) :: &
             strain, th
-    real(sp), intent(in), dimension(-r_h+1:kp+r_h) :: thetan, theta, dzn
-    real(sp), intent(inout), dimension(-r_h+1:kp+r_h,-r_h+1:jp+r_h,-l_h+1:ip+r_h) :: &
+    real(wp), intent(in), dimension(-r_h+1:kp+r_h) :: thetan, theta, dzn
+    real(wp), intent(inout), dimension(-r_h+1:kp+r_h,-r_h+1:jp+r_h,-l_h+1:ip+r_h) :: &
             rip,fm, fh
             
     ! locals
@@ -475,15 +475,15 @@
     do i=1,ip
         do j=1,jp
             do k=1,kp
-                if(rip(k,j,i) .lt. 0._sp) then
-                    fm(k,j,i)=(1._sp-subc*rip(k,j,i))**0.5_sp
-                    fh(k,j,i)=suba*(1._sp-subb*rip(k,j,i))**0.5_sp
-                elseif((rip(k,j,i).ge.0._sp).and.(rip(k,j,i).lt.ric)) then
-                    fm(k,j,i)=(1._sp-rip(k,j,i)/ric)**subr*(1._sp-subh*rip(k,j,i))
-                    fh(k,j,i)=subf*(1._sp-rip(k,j,i)/ric)**subr*(1._sp-subg*rip(k,j,i))
+                if(rip(k,j,i) .lt. 0._wp) then
+                    fm(k,j,i)=(1._wp-subc*rip(k,j,i))**0.5_wp
+                    fh(k,j,i)=suba*(1._wp-subb*rip(k,j,i))**0.5_wp
+                elseif((rip(k,j,i).ge.0._wp).and.(rip(k,j,i).lt.ric)) then
+                    fm(k,j,i)=(1._wp-rip(k,j,i)/ric)**subr*(1._wp-subh*rip(k,j,i))
+                    fh(k,j,i)=subf*(1._wp-rip(k,j,i)/ric)**subr*(1._wp-subg*rip(k,j,i))
                 else
-                    fm(k,j,i)=0._sp
-                    fh(k,j,i)=0._sp
+                    fm(k,j,i)=0._wp
+                    fh(k,j,i)=0._wp
                 endif
 
             enddo
@@ -506,28 +506,28 @@
 	!>@param[inout] q,th,u,v,w
     subroutine advance_fields_3d(dt,tu,tv,tw, &
         zu,zv,zw,su,sv,sw,q,sq,th,sth,rhoa,rhoan,ip,jp,kp,nq,l_h,r_h)
-	use nrtype
+	use numerics_type
 	use mpi_module
 	use mpi
     
     implicit none
     integer(i4b), intent(in) :: ip, jp, kp, nq, l_h, r_h
-    real(sp), intent(in), dimension(-r_h+1:kp+r_h,-r_h+1:jp+r_h,-l_h+1:ip+r_h) :: &
+    real(wp), intent(in), dimension(-r_h+1:kp+r_h,-r_h+1:jp+r_h,-l_h+1:ip+r_h) :: &
         su,sv,sw,sth
-    real(sp), intent(in), dimension(-r_h+1:kp+r_h) :: &
+    real(wp), intent(in), dimension(-r_h+1:kp+r_h) :: &
         rhoa,rhoan
-    real(sp), intent(inout), dimension(-r_h+1:kp+r_h,-r_h+1:jp+r_h,-l_h+1:ip+r_h) :: &
+    real(wp), intent(inout), dimension(-r_h+1:kp+r_h,-r_h+1:jp+r_h,-l_h+1:ip+r_h) :: &
         tu,tv,tw,zu,zv,zw,th
-    real(sp), intent(in), dimension(-r_h+1:kp+r_h,-r_h+1:jp+r_h,-l_h+1:ip+r_h,nq) :: sq
-    real(sp), intent(inout), dimension(-r_h+1:kp+r_h,-r_h+1:jp+r_h,-l_h+1:ip+r_h,nq) :: q
-    real(sp), intent(in) :: dt
+    real(wp), intent(in), dimension(-r_h+1:kp+r_h,-r_h+1:jp+r_h,-l_h+1:ip+r_h,nq) :: sq
+    real(wp), intent(inout), dimension(-r_h+1:kp+r_h,-r_h+1:jp+r_h,-l_h+1:ip+r_h,nq) :: q
+    real(wp), intent(in) :: dt
     ! locals
     integer(i4b) :: i,j,k,n
     
     do i=1-l_h,ip+r_h
         do j=1-l_h,jp+r_h
             do k=1-l_h,kp+r_h
-                tu(k,j,i)=zu(k,j,i)+su(k,j,i)*dt*2._sp/rhoan(k)
+                tu(k,j,i)=zu(k,j,i)+su(k,j,i)*dt*2._wp/rhoan(k)
             enddo
         enddo
     enddo
@@ -535,7 +535,7 @@
     do i=1-l_h,ip+r_h
         do j=1-l_h,jp+r_h
             do k=1-l_h,kp+r_h
-                tv(k,j,i)=zv(k,j,i)+sv(k,j,i)*dt*2._sp/rhoan(k)
+                tv(k,j,i)=zv(k,j,i)+sv(k,j,i)*dt*2._wp/rhoan(k)
             enddo
         enddo
     enddo
@@ -543,7 +543,7 @@
     do i=1-l_h,ip+r_h
         do j=1-l_h,jp+r_h
             do k=1-l_h,kp+r_h
-                tw(k,j,i)=zw(k,j,i)+sw(k,j,i)*dt*2._sp/rhoa(k)
+                tw(k,j,i)=zw(k,j,i)+sw(k,j,i)*dt*2._wp/rhoa(k)
             enddo
         enddo
     enddo
@@ -581,21 +581,21 @@
 	!>@param[in] moisture
     subroutine advance_scalar_fields_3d(dt, &
         q,sq,th,sth,rhoa,rhoan,ip,jp,kp,nq,l_h,r_h,moisture)
-	use nrtype
+	use numerics_type
 	use mpi_module
 	use mpi
     
     implicit none
     integer(i4b), intent(in) :: ip, jp, kp, nq, l_h, r_h
-    real(sp), intent(in), dimension(-r_h+1:kp+r_h,-r_h+1:jp+r_h,-l_h+1:ip+r_h) :: &
+    real(wp), intent(in), dimension(-r_h+1:kp+r_h,-r_h+1:jp+r_h,-l_h+1:ip+r_h) :: &
         sth
-    real(sp), intent(in), dimension(-r_h+1:kp+r_h) :: &
+    real(wp), intent(in), dimension(-r_h+1:kp+r_h) :: &
         rhoa,rhoan
-    real(sp), intent(inout), dimension(-r_h+1:kp+r_h,-r_h+1:jp+r_h,-l_h+1:ip+r_h) :: &
+    real(wp), intent(inout), dimension(-r_h+1:kp+r_h,-r_h+1:jp+r_h,-l_h+1:ip+r_h) :: &
         th
-    real(sp), intent(in), dimension(-r_h+1:kp+r_h,-r_h+1:jp+r_h,-l_h+1:ip+r_h,nq) :: sq
-    real(sp), intent(inout), dimension(-r_h+1:kp+r_h,-r_h+1:jp+r_h,-l_h+1:ip+r_h,nq) :: q
-    real(sp), intent(in) :: dt
+    real(wp), intent(in), dimension(-r_h+1:kp+r_h,-r_h+1:jp+r_h,-l_h+1:ip+r_h,nq) :: sq
+    real(wp), intent(inout), dimension(-r_h+1:kp+r_h,-r_h+1:jp+r_h,-l_h+1:ip+r_h,nq) :: q
+    real(wp), intent(in) :: dt
     logical, intent(in) :: moisture
     ! locals
     integer(i4b) :: i,j,k,n

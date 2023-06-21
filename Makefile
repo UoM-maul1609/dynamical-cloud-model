@@ -1,3 +1,9 @@
+OSNF_DIR = osnf
+
+.PHONY: osnf cleanall
+CLEANDIRS = $(OSNF_DIR) ./
+
+
 DEBUG = -fbounds-check -g 
 OPT    =-O3
 
@@ -22,62 +28,61 @@ OBJ = o
 FFLAGS = $(OPT)  $(DEBUG) -w -o 
 FFLAGSOMP = -fopenmp-simd $(FFLAGS)
 FFLAGS2 =  $(DEBUG) -w -O3 -o 
+VAR_TYPE = 1 # 0 single, 1 double
 
 all: main.exe main_ser_1d.exe main_ser_2d.exe
 
-main.exe	:  main.$(OBJ) variables.$(OBJ) nrtype.$(OBJ) mpi_module.$(OBJ) \
+main.exe	:  main.$(OBJ) variables.$(OBJ) osnf_code mpi_module.$(OBJ) \
 			 initialisation.$(OBJ) driver_code.$(OBJ) \
 			  sg_model_lib.a  
 	$(FOR2) $(FFLAGSOMP)main.exe main.$(OBJ) variables.$(OBJ) mpi_module.$(OBJ) \
 		 initialisation.$(OBJ) driver_code.$(OBJ) \
 		  -lm sg_model_lib.a \
 		 ${NETCDFLIB} -I ${NETCDFMOD} ${NETCDF_LIB} $(DEBUG)	 
-main_ser_1d.exe	:  main_ser_1d.$(OBJ) variables.$(OBJ) nrtype.$(OBJ) mpi_module.$(OBJ) \
+main_ser_1d.exe	:  main_ser_1d.$(OBJ) variables.$(OBJ) osnf_code mpi_module.$(OBJ) \
 			 initialisation.$(OBJ) driver_code_ser.$(OBJ) \
 			  sg_model_lib.a  
 	$(FOR2) $(FFLAGSOMP)main_ser_1d.exe main_ser_1d.$(OBJ) variables.$(OBJ) mpi_module.$(OBJ) \
 		 initialisation.$(OBJ) driver_code_ser.$(OBJ) \
 		  -lm sg_model_lib.a \
 		 ${NETCDFLIB} -I ${NETCDFMOD} ${NETCDF_LIB} $(DEBUG)
-main_ser_2d.exe	:  main_ser_2d.$(OBJ) variables.$(OBJ) nrtype.$(OBJ) mpi_module.$(OBJ) \
+main_ser_2d.exe	:  main_ser_2d.$(OBJ) variables.$(OBJ) osnf_code mpi_module.$(OBJ) \
 			 initialisation.$(OBJ) driver_code_ser.$(OBJ) \
 			  sg_model_lib.a  
 	$(FOR2) $(FFLAGSOMP)main_ser_2d.exe main_ser_2d.$(OBJ) variables.$(OBJ) mpi_module.$(OBJ) \
 		 initialisation.$(OBJ) driver_code_ser.$(OBJ) \
 		  -lm sg_model_lib.a \
 		 ${NETCDFLIB} -I ${NETCDFMOD} ${NETCDF_LIB} $(DEBUG)
-sg_model_lib.a	:   nrtype.$(OBJ) nr.$(OBJ) nrutil.$(OBJ) \
-				random.$(OBJ) subgrid_1d.$(OBJ) subgrid_2d.$(OBJ) \
-				subgrid_3d.$(OBJ)
-	$(AR) rc sg_model_lib.a nrtype.$(OBJ) nrutil.$(OBJ) \
-				random.$(OBJ) subgrid_1d.$(OBJ) subgrid_2d.$(OBJ) \
-				subgrid_3d.$(OBJ)
-nrtype.$(OBJ)	: nrtype.f90
-	$(FOR) nrtype.f90 $(FFLAGS)nrtype.$(OBJ)
-nr.$(OBJ)	: nr.f90 
-	$(FOR) nr.f90 $(FFLAGS)nr.$(OBJ)
-nrutil.$(OBJ)	: nrutil.f90
-	$(FOR) nrutil.f90 $(FFLAGS)nrutil.$(OBJ)
-random.$(OBJ) : random.f90 
-	$(FOR) random.f90 $(FFLAGS)random.$(OBJ) 
-variables.$(OBJ) : variables.f90 nrtype.$(OBJ)
-	$(FOR) variables.f90 $(FFLAGS)variables.$(OBJ)
-initialisation.$(OBJ) : initialisation.f90 random.$(OBJ) nr.$(OBJ) nrtype.$(OBJ)
-	$(FOR) initialisation.f90 -I ${NETCDFMOD}  $(FFLAGS)initialisation.$(OBJ)
-driver_code.$(OBJ) : driver_code.f90 nrtype.$(OBJ) subgrid_1d.$(OBJ) \
-subgrid_2d.$(OBJ) subgrid_3d.$(OBJ) 
-	$(FOR) driver_code.f90 -I ${NETCDFMOD}  $(FFLAGS)driver_code.$(OBJ)
-driver_code_ser.$(OBJ) : driver_code_ser.f90 nrtype.$(OBJ) subgrid_1d.$(OBJ) \
-subgrid_2d.$(OBJ) subgrid_3d.$(OBJ) 
-	$(FOR) driver_code_ser.f90 -I ${NETCDFMOD}  $(FFLAGS)driver_code_ser.$(OBJ)
-mpi_module.$(OBJ) : mpi_module.f90 
-	$(FOR) mpi_module.f90 $(FFLAGS)mpi_module.$(OBJ)
-subgrid_1d.$(OBJ) : subgrid_1d.f90 
-	$(FOR) subgrid_1d.f90 -cpp $(FFLAGSOMP)subgrid_1d.$(OBJ)
-subgrid_2d.$(OBJ) : subgrid_2d.f90 
-	$(FOR) subgrid_2d.f90 -cpp $(FFLAGSOMP)subgrid_2d.$(OBJ)
-subgrid_3d.$(OBJ) : subgrid_3d.f90 
-	$(FOR) subgrid_3d.f90 $(FFLAGSOMP)subgrid_3d.$(OBJ)
+sg_model_lib.a	:   osnf_code subgrid_1d.$(OBJ) subgrid_2d.$(OBJ) subgrid_3d.$(OBJ)
+	$(AR) rc sg_model_lib.a \
+				subgrid_1d.$(OBJ) subgrid_2d.$(OBJ) subgrid_3d.$(OBJ) \
+				$(OSNF_DIR)/numerics.$(OBJ) $(OSNF_DIR)/zeroin.$(OBJ) $(OSNF_DIR)/sfmin.$(OBJ) \
+                $(OSNF_DIR)/fmin.$(OBJ) $(OSNF_DIR)/r1mach.$(OBJ) \
+                $(OSNF_DIR)/d1mach.$(OBJ) $(OSNF_DIR)/dfsid1.$(OBJ) \
+                $(OSNF_DIR)/poly_int.$(OBJ) $(OSNF_DIR)/find_pos.$(OBJ) \
+                $(OSNF_DIR)/svode.$(OBJ) \
+                $(OSNF_DIR)/slinpk.$(OBJ) $(OSNF_DIR)/vode.$(OBJ) \
+                $(OSNF_DIR)/dlinpk.$(OBJ) $(OSNF_DIR)/vode_integrate.$(OBJ) \
+                $(OSNF_DIR)/erfinv.$(OBJ) $(OSNF_DIR)/tridiagonal.$(OBJ) \
+                $(OSNF_DIR)/hygfx.$(OBJ) $(OSNF_DIR)/random.$(OBJ)					
+variables.$(OBJ) : variables.f90 osnf_code
+	$(FOR) variables.f90 -I$(OSNF_DIR) $(FFLAGS)variables.$(OBJ)
+initialisation.$(OBJ) : initialisation.f90 osnf_code
+	$(FOR) initialisation.f90 -I$(OSNF_DIR) -I ${NETCDFMOD}  $(FFLAGS)initialisation.$(OBJ)
+driver_code.$(OBJ) : driver_code.f90 subgrid_1d.$(OBJ) \
+	subgrid_2d.$(OBJ) subgrid_3d.$(OBJ) osnf_code
+	$(FOR) driver_code.f90 -I$(OSNF_DIR) -I ${NETCDFMOD}  $(FFLAGS)driver_code.$(OBJ)
+driver_code_ser.$(OBJ) : driver_code_ser.f90 subgrid_1d.$(OBJ) \
+	subgrid_2d.$(OBJ) subgrid_3d.$(OBJ) osnf_code
+	$(FOR) driver_code_ser.f90 -I$(OSNF_DIR) -I ${NETCDFMOD}  $(FFLAGS)driver_code_ser.$(OBJ)
+mpi_module.$(OBJ) : mpi_module.f90 osnf_code
+	$(FOR) mpi_module.f90 -I$(OSNF_DIR) -cpp -DVAR_TYPE=$(VAR_TYPE) $(FFLAGS)mpi_module.$(OBJ)
+subgrid_1d.$(OBJ) : subgrid_1d.f90 osnf_code
+	$(FOR) subgrid_1d.f90 -I$(OSNF_DIR) -cpp $(FFLAGSOMP)subgrid_1d.$(OBJ)
+subgrid_2d.$(OBJ) : subgrid_2d.f90 osnf_code
+	$(FOR) subgrid_2d.f90 -I$(OSNF_DIR) -cpp $(FFLAGSOMP)subgrid_2d.$(OBJ)
+subgrid_3d.$(OBJ) : subgrid_3d.f90 osnf_code
+	$(FOR) subgrid_3d.f90 -I$(OSNF_DIR) $(FFLAGSOMP)subgrid_3d.$(OBJ)
 main.$(OBJ)   : main.f90 variables.$(OBJ) mpi_module.$(OBJ) initialisation.$(OBJ) \
 				 driver_code.$(OBJ) subgrid_1d.$(OBJ) subgrid_2d.$(OBJ) \
 				 subgrid_3d.$(OBJ) 
@@ -91,7 +96,15 @@ main_ser_2d.$(OBJ)   : main_ser_2d.f90 variables.$(OBJ) mpi_module.$(OBJ) initia
 				 subgrid_3d.$(OBJ) 
 	$(FOR)  main_ser_2d.f90 -I ${NETCDFMOD} $(FFLAGS)main_ser_2d.$(OBJ) 
 
-clean :
+osnf_code:
+	$(MAKE) -C $(OSNF_DIR)
+
+clean: 
 	rm *.exe  *.o *.mod *~ \
 	sg_model_lib.a
 
+cleanall:
+	for i in $(CLEANDIRS); do \
+		$(MAKE) -C $$i clean; \
+	done
+	
