@@ -3,11 +3,11 @@
 	!>@brief
 	!>initialisation for the dynamical cloud model
     module initialisation
-    use nrtype
+	use numerics_type
     implicit none
     
-    real(sp), parameter :: ra=287._sp, grav=9.81_sp,cp=1005._sp
-	real(sp), dimension(:), pointer :: zr1, thr1
+    real(wp), parameter :: ra=287._wp, grav=9.81_wp,cp=1005._wp
+	real(wp), dimension(:), pointer :: zr1, thr1
 	integer(i4b) :: nl1
 	
     private
@@ -61,47 +61,47 @@
 			l_h,r_h, &
 			coords,dims, id, comm3d)
 				
-		use nrtype
+        use numerics_type
 		use mpi
 		use netcdf
-		use nr, only : locate, polint, rkqs, odeint
+		use numerics, only : find_pos, poly_int, vode_integrate
 		use random, only : random_normal
 		use mpi_module
 		
 		implicit none
-		real(sp), dimension(:,:,:), allocatable, intent(inout) :: &
+		real(wp), dimension(:,:,:), allocatable, intent(inout) :: &
 														u,v,w,zu,zv,zw,tu,tv,tw,&
 														p,th,rho, &
 														su,sv,sw,psrc
-		real(sp), dimension(:), allocatable, intent(inout) :: x,y,z,xn,yn,zn,dx,dy,dz, &
+		real(wp), dimension(:), allocatable, intent(inout) :: x,y,z,xn,yn,zn,dx,dy,dz, &
 															dxn,dyn,dzn, theta,thetan, &
 															rhoa, rhoan, tref, trefn, &
 															lamsq, lamsqn
 
-		real(sp), intent(in) :: dx_nm, dy_nm, dz_nm, cvis
-		real(sp), intent(in) :: dt, runtime
+		real(wp), intent(in) :: dx_nm, dy_nm, dz_nm, cvis
+		real(wp), intent(in) :: dt, runtime
 		integer(i4b), intent(inout) :: ipp, jpp, kpp, ipstart, jpstart, kpstart
 		integer(i4b), intent(inout) :: ntim
 		integer(i4b), intent(in) :: ip, jp, kp, l_h, r_h
 		integer(i4b), intent(in) :: n_levels
-		real(sp), dimension(n_levels), target, intent(in) :: z_read,theta_read
-		real(sp), intent(in) :: psurf, tsurf
+		real(wp), dimension(n_levels), target, intent(in) :: z_read,theta_read
+		real(wp), intent(in) :: psurf, tsurf
 		integer(i4b), dimension(3), intent(inout) :: coords
 		integer(i4b), dimension(3), intent(in) :: dims
 		integer(i4b), intent(in) :: id, comm3d
 		
 		! locals:
 		integer(i4b) :: error, AllocateStatus,i,j,k
-		real(sp) :: rho_surf, htry, hmin, eps2=1.e-5_sp
-		real(sp), dimension(1) :: psolve
-		real(sp) :: var, dummy
+		real(wp) :: rho_surf, htry, hmin, eps2=1.e-5_wp
+		real(wp), dimension(1) :: psolve
+		real(wp) :: var, dummy
 		integer(i4b) :: iloc
 		! for random number:
-		real(sp) :: r
-		real(sp), dimension(10,10) :: rs
+		real(wp) :: r
+		real(wp), dimension(10,10) :: rs
 		integer(i4b) :: l, nbottom, ntop, tag1
 		integer(i4b), allocatable, dimension(:) :: seed
-		real(sp) :: rad
+		real(wp) :: rad
 		
 ! if the pe is not being used in the cartesian topology, do not use here
 		if(id>=dims(1)*dims(2)*dims(3)) return 
@@ -124,19 +124,19 @@
 		! print *,'Coords of ',id,' are ',coords
 
         ! number of grid points in all but last:
-		ipp = floor(real(ip,sp)/real(dims(1),sp)) 
+		ipp = floor(real(ip,wp)/real(dims(1),wp)) 
 		ipstart = ipp*(coords(1))  +1   
 		if(coords(1) == (dims(1)-1)) then
 			ipp=ip-(dims(1)-1)*ipp ! number of grid points in last
 		endif
 		! number of grid points in all but last:
-		jpp = floor(real(jp,sp)/real(dims(2),sp))      
+		jpp = floor(real(jp,wp)/real(dims(2),wp))      
 		jpstart = jpp*(coords(2))  +1 
 		if(coords(2) == (dims(2)-1)) then
 			jpp=jp-(dims(2)-1)*jpp ! number of grid points in last
 		endif
 		! number of grid points in all but last:
-		kpp = floor(real(kp,sp)/real(dims(3),sp))      
+		kpp = floor(real(kp,wp)/real(dims(3),wp))      
 		kpstart = kpp*(coords(3)) +1    
 		if(coords(3) == (dims(3)-1)) then
 			kpp=kp-(dims(3)-1)*kpp ! number of grid points in last
@@ -245,21 +245,21 @@
 		dyn(:)=dy_nm
 		dzn(:)=dz_nm
 		! set up horizontal level array
-		x=dx_nm*(/(i,i=-l_h+ipstart,ipp+r_h+ipstart-1)/) - real(ip-1,sp)/2._sp*dx_nm 
-		xn=x-0.5_sp*dx_nm
+		x=dx_nm*(/(i,i=-l_h+ipstart,ipp+r_h+ipstart-1)/) - real(ip-1,wp)/2._wp*dx_nm 
+		xn=x-0.5_wp*dx_nm
 		! set up horizontal level array
-		y=dy_nm*(/(i,i=-l_h+jpstart,jpp+r_h+jpstart-1)/) - real(jp-1,sp)/2._sp*dy_nm
-		yn=y-0.5_sp*dy_nm
+		y=dy_nm*(/(i,i=-l_h+jpstart,jpp+r_h+jpstart-1)/) - real(jp-1,wp)/2._wp*dy_nm
+		yn=y-0.5_wp*dy_nm
 
 		! set up vertical level array
-		z=dz_nm*(/(i,i=-l_h+kpstart-1,kpp+r_h+kpstart-2)/)+1.0_sp*dz_nm
-		zn=z-0.5_sp*dz_nm
+		z=dz_nm*(/(i,i=-l_h+kpstart-1,kpp+r_h+kpstart-2)/)+1.0_wp*dz_nm
+		zn=z-0.5_wp*dz_nm
 		
 		! set up mixing length array
-		lamsq=1._sp / (1._sp/(cvis*(dx_nm+dy_nm+dz)/3._sp)**2._sp + &
-				1._sp/(0.4_sp*(z + 1.e-4_sp))**2._sp)
-		lamsqn=1._sp / (1._sp/(cvis*(dx_nm+dy_nm+dzn)/3._sp)**2._sp + &
-				1._sp/(0.4_sp*(zn + 1.e-4_sp))**2._sp)		
+		lamsq=1._wp / (1._wp/(cvis*(dx_nm+dy_nm+dz)/3._wp)**2._wp + &
+				1._wp/(0.4_wp*(z + 1.e-4_wp))**2._wp)
+		lamsqn=1._wp / (1._wp/(cvis*(dx_nm+dy_nm+dzn)/3._wp)**2._wp + &
+				1._wp/(0.4_wp*(zn + 1.e-4_wp))**2._wp)		
 		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 
@@ -275,14 +275,14 @@
 			! solve the hydrostatic equation											 !
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 			psolve=psurf
-			if( z(i) < 0._sp ) then
-				hmin=-1.e-2_sp
+			if( z(i) < 0._wp ) then
+				hmin=-1.e-2_wp
 				htry=-dz(i)
-				call odeint(psolve,0._sp,z(i),eps2,htry,hmin,hydrostatic1a,rkqs)
+				call vode_integrate(psolve,0._wp,z(i),eps2,htry,hmin,hydrostatic1a)
 			else
-				hmin=1.e-2_sp
+				hmin=1.e-2_wp
 				htry=dz(i)
-				call odeint(psolve,0._sp,z(i),eps2,htry,hmin,hydrostatic1a,rkqs)
+				call vode_integrate(psolve,0._wp,z(i),eps2,htry,hmin,hydrostatic1a)
 			endif
 			p(i,:,:)=psolve(1)
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -292,11 +292,11 @@
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 			! locate and interpolate to find theta:										 !
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-			iloc=locate(z_read(1:n_levels),z(i))
+			iloc=find_pos(z_read(1:n_levels),z(i))
 			iloc=min(n_levels-1,iloc)
 			iloc=max(1,iloc)
 			! linear interp theta
-			call polint(z_read(iloc:iloc+1), theta_read(iloc:iloc+1), &
+			call poly_int(z_read(iloc:iloc+1), theta_read(iloc:iloc+1), &
 						min(z(i),z_read(n_levels)), var,dummy)
 !			th(:,:,i)=var
 			theta(i)=var
@@ -310,14 +310,14 @@
 			! solve the hydrostatic equation for k+1/2 levels							 !
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 			psolve=psurf
-			if( zn(i) < 0._sp ) then
-				hmin=-1.e-2_sp
+			if( zn(i) < 0._wp ) then
+				hmin=-1.e-2_wp
 				htry=-dzn(i)
-				call odeint(psolve,0._sp,zn(i),eps2,htry,hmin,hydrostatic1a,rkqs)
+				call vode_integrate(psolve,0._wp,zn(i),eps2,htry,hmin,hydrostatic1a)
 			else
-				hmin=1.e-2_sp
+				hmin=1.e-2_wp
 				htry=dzn(i)
-				call odeint(psolve,0._sp,zn(i),eps2,htry,hmin,hydrostatic1a,rkqs)
+				call vode_integrate(psolve,0._wp,zn(i),eps2,htry,hmin,hydrostatic1a)
 			endif
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
@@ -326,11 +326,11 @@
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 			! locate and interpolate to find theta:										 !
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-			iloc=locate(z_read(1:n_levels),zn(i))
+			iloc=find_pos(z_read(1:n_levels),zn(i))
 			iloc=min(n_levels-1,iloc)
 			iloc=max(1,iloc)
 			! linear interp theta
-			call polint(z_read(iloc:iloc+1), theta_read(iloc:iloc+1), &
+			call poly_int(z_read(iloc:iloc+1), theta_read(iloc:iloc+1), &
 						min(zn(i),z_read(n_levels)), var,dummy)
 			thetan(i)=var
 			rhoan(i)=psolve(1)/(ra*thetan(i)*(psolve(1)/psurf)**(ra/cp))
@@ -338,9 +338,9 @@
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 		enddo
-		p(:,:,:)=0._sp
-! 		rhoa=1._sp
-! 		rhoan=1._sp
+		p(:,:,:)=0._wp
+! 		rhoa=1._wp
+! 		rhoan=1._wp
 		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -349,17 +349,17 @@
 		do i=1,ipp
 			do j=1,jpp
 				do k=1,kpp
-					u(k,j,i)=-5._sp*(y(j))/sqrt(xn(i)*xn(i)+y(j)*y(j))
-					v(k,j,i)=5._sp*(x(i))/sqrt(x(i)*x(i)+yn(j)*yn(j))
+					u(k,j,i)=-5._wp*(y(j))/sqrt(xn(i)*xn(i)+y(j)*y(j))
+					v(k,j,i)=5._wp*(x(i))/sqrt(x(i)*x(i)+yn(j)*yn(j))
 				enddo
 			enddo
 		enddo
-		u(:,:,:)=0._sp
-		v(:,:,:)=0._sp
-		w(:,:,:)=0._sp
-		zu(:,:,:)=0._sp
-		zv(:,:,:)=0._sp
-		zw(:,:,:)=0._sp
+		u(:,:,:)=0._wp
+		v(:,:,:)=0._wp
+		w(:,:,:)=0._wp
+		zu(:,:,:)=0._wp
+		zv(:,:,:)=0._wp
+		zw(:,:,:)=0._wp
 		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!		
 
 
@@ -380,8 +380,8 @@
 						.and. (j >= jpstart) .and. (j <= jpstart+jpp+1) &
 						.and. (k >= kpstart) .and. (k <= kpstart+kpp+1) ) then
 					
-						if ( (z(k-kpstart)>3000._sp) .and. (z(k-kpstart)<6000._sp) ) &
-							th(k-kpstart,j-jpstart,i-ipstart) = + r / 30._sp
+						if ( (z(k-kpstart)>3000._wp) .and. (z(k-kpstart)<6000._wp) ) &
+							th(k-kpstart,j-jpstart,i-ipstart) = + r / 30._wp
 						
 
 					endif
@@ -393,7 +393,7 @@
 			enddo
 		enddo
 
- 		th=0._sp
+ 		th=0._wp
 		
 		
 		do i=1-r_h,ipp+r_h
@@ -401,16 +401,16 @@
 				do k=1-r_h,kpp+r_h
 					!th(k,j,i)=theta(k)
 				
-					rad = (z(k)-3000._sp)**2._sp
+					rad = (z(k)-3000._wp)**2._wp
 						
-					if (ip > 1) rad=rad+x(i)**2._sp
-					if (jp > 1) rad=rad+y(j)**2._sp
+					if (ip > 1) rad=rad+x(i)**2._wp
+					if (jp > 1) rad=rad+y(j)**2._wp
 					
 					rad=sqrt(rad)
-					if(rad<=1000._sp) then
-						th(k,j,i)=th(k,j,i)+0.1_sp
+					if(rad<=1000._wp) then
+						th(k,j,i)=th(k,j,i)+0.1_wp
 					else
-						!th(k,j,i)=0._sp
+						!th(k,j,i)=0._wp
 					endif
 				enddo
 			enddo
@@ -424,13 +424,13 @@
 		! set halos																		 !
 		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!		
 		call exchange_full(comm3d, id, kpp, jpp, ipp, r_h,r_h,r_h,r_h,l_h,r_h, &
-		    u,0._sp,0._sp, dims,coords)
+		    u,0._wp,0._wp, dims,coords)
 		call exchange_full(comm3d, id, kpp, jpp, ipp, r_h,r_h,l_h,r_h,r_h,r_h, &
-		    v,0._sp,0._sp, dims,coords)
+		    v,0._wp,0._wp, dims,coords)
 		call exchange_full(comm3d, id, kpp, jpp, ipp, l_h,r_h,r_h,r_h,r_h,r_h, &
-		    w,0._sp,0._sp, dims,coords)
+		    w,0._wp,0._wp, dims,coords)
 		call exchange_full(comm3d, id, kpp, jpp, ipp, r_h,r_h,r_h,r_h,r_h,r_h, &
-		    th,0._sp,0._sp, dims,coords)
+		    th,0._wp,0._wp, dims,coords)
 		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!		
 
 
@@ -458,27 +458,27 @@
 	!>@param[in] z,p
 	!>@param[inout] dpdz
 	subroutine hydrostatic1a(z,p,dpdz)
-		use nrtype
+        use numerics_type
 		use variables, only : nm1
-		use nr, only : locate, polint
+		use numerics, only : find_pos, poly_int
 		implicit none
-		real(sp), intent(in) :: z
-		real(sp), dimension(:), intent(in) :: p
-		real(sp), dimension(:), intent(out) :: dpdz
-		real(sp) :: t,theta, var, dummy
+		real(wp), intent(in) :: z
+		real(wp), dimension(:), intent(in) :: p
+		real(wp), dimension(:), intent(out) :: dpdz
+		real(wp) :: t,theta, var, dummy
 		integer(i4b) :: iloc
 		
 		! locate and interpolate to find theta:
-		iloc=locate(zr1(1:nl1),z)
+		iloc=find_pos(zr1(1:nl1),z)
 		iloc=min(nl1-1,iloc)
 		iloc=max(1,iloc)
 		! linear interp theta
-		call polint(zr1(iloc:iloc+1), thr1(iloc:iloc+1), &
+		call poly_int(zr1(iloc:iloc+1), thr1(iloc:iloc+1), &
 					min(z,zr1(nl1)), var,dummy)
 		theta=var
 		
 		! calculate t from theta and p:
-		t=theta*(p(1)/1.e5_sp)**(ra/cp)
+		t=theta*(p(1)/1.e5_wp)**(ra/cp)
 		! hydrostatic equation:
 		dpdz(1)=-(grav*p(1)) / (ra*t) 
 	
@@ -494,7 +494,7 @@
 	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 	subroutine check(status)
 	use netcdf
-	use nrtype
+	use numerics_type
 	integer(i4b), intent ( in) :: status
 
 	if(status /= nf90_noerr) then
