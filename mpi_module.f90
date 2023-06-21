@@ -7,11 +7,18 @@
 	!> could probably also do away with the if statements - call isend and irecv anyway 
 	!> - even if an mpi call is not required
     module mpi_module
-    use nrtype
+    use numerics_type
     use mpi
     implicit none
 		!>@brief
 		!>variables for mpi
+		
+#if VAR_TYPE==0
+		integer(i4b), parameter :: MPIREAL=MPI_REAL4
+#endif
+#if VAR_TYPE==1
+		integer(i4b), parameter :: MPIREAL=MPI_REAL8
+#endif
         type mpi_faces
         	integer(i4b) :: s_west, r_west
         	integer(i4b) :: s_east, r_east
@@ -41,7 +48,7 @@
 
         type mpi_vars
         	integer(i4b) :: rank, id, error, dx, dy, dz
-        	real(sp) :: wtime
+        	real(wp) :: wtime
         	logical, dimension(3) :: periods
         	logical :: reorder=.true.
         	integer(i4b) :: ndim=3
@@ -100,7 +107,7 @@
 	!>define some types to be used in the model
 	!>@param[in] ip, jp, kp
 	subroutine mpi_cart_initialise(kp,jp,ip)
-		use nrtype
+		use numerics_type
 		implicit none
 		integer(i4b), intent(in) :: ip, jp, kp
 		
@@ -114,14 +121,10 @@
         ! Set-up the Cartesian topology									             	 !
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 		! note the min is so that there is not more than 1 proc per grid point
-! 		mp1%dx=min( floor( (real(mp1%rank,sp))**(1._sp/3._sp) ) , ip)
-! 		mp1%dy=min( floor( &
-! 					(real(mp1%rank,sp)/real(mp1%dx,sp))**(1._sp/2._sp) ) , jp)
-! 		mp1%dz=min( floor( real(mp1%rank,sp) / real(mp1%dx*mp1%dy,sp) ), kp )
-
-		mp1%dz=1
-		mp1%dx=min( floor( (real(mp1%rank,sp))**(1._sp/2._sp) ) , ip)
-		mp1%dy=min( floor( real(mp1%rank,sp) / real(mp1%dx*mp1%dz,sp) ), jp )
+		mp1%dx=min( floor( (real(mp1%rank,wp))**(1._wp/3._wp) ) , ip)
+		mp1%dy=min( floor( &
+					(real(mp1%rank,wp)/real(mp1%dx,wp))**(1._wp/2._wp) ) , jp)
+		mp1%dz=min( floor( real(mp1%rank,wp) / real(mp1%dx*mp1%dy,wp) ), kp )
 
 		if(mp1%id == world_process) then
 			print *,'Cartesian topology: ',mp1%dx, mp1%dy, mp1%dz		
@@ -303,8 +306,8 @@
     subroutine find_base_top(comm3d, id, kpp,d_h,u_h,array,base,top, dims,coords)
         implicit none
 		integer(i4b), intent(in) :: comm3d, id, kpp, d_h,u_h
-		real(sp), intent(in), dimension(1-d_h:u_h+kpp) :: array
-		real(sp), intent(inout) :: base, top
+		real(wp), intent(in), dimension(1-d_h:u_h+kpp) :: array
+		real(wp), intent(inout) :: base, top
 		integer(i4b), dimension(3), intent(in) :: dims,coords
 		
 		! locals:
@@ -318,10 +321,10 @@
 		
 		
         base=array(0)
-        call MPI_Bcast(base,1,MPI_REAL8,rankl,comm3d,error)
+        call MPI_Bcast(base,1,MPIREAL,rankl,comm3d,error)
 
         top=array(kpp+1)
-        call MPI_Bcast(top,1,MPI_REAL8,ranku,comm3d,error)
+        call MPI_Bcast(top,1,MPIREAL,ranku,comm3d,error)
     
     end subroutine find_base_top
 	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -339,8 +342,8 @@
     subroutine find_top(comm3d, id, kpp,d_h,u_h,array,top, dims,coords)
         implicit none
 		integer(i4b), intent(in) :: comm3d, id, kpp, d_h,u_h
-		real(sp), intent(in), dimension(1-d_h:u_h+kpp) :: array
-		real(sp), intent(inout) :: top
+		real(wp), intent(in), dimension(1-d_h:u_h+kpp) :: array
+		real(wp), intent(inout) :: top
 		integer(i4b), dimension(3), intent(in) :: dims,coords
 		
 		! locals:
@@ -354,7 +357,7 @@
 		
 
         top=array(kpp)
-        call MPI_Bcast(top,1,MPI_REAL8,ranku,comm3d,error)
+        call MPI_Bcast(top,1,MPIREAL,ranku,comm3d,error)
     
     end subroutine find_top
 	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -378,7 +381,7 @@
 		
 		integer(i4b), intent(in) :: comm3d, id, ipp, jpp, kpp, nbands,&
 		     w_h, e_h, s_h,n_h,d_h,u_h
-		real(sp), intent(inout), &
+		real(wp), intent(inout), &
 			 dimension(1-d_h:u_h+kpp,1-s_h:n_h+jpp,1-w_h:e_h+ipp,nbands) :: &
 			 array
 		integer(i4b), dimension(3), intent(in) :: dims,coords
@@ -397,12 +400,12 @@
 		tag1=11
 		! send to the bottom:
 		call MPI_Issend(array(0:1,1:jpp,1:ipp,1:nbands), &
-			(ipp*jpp*nbands)*(u_h+1), MPI_REAL8, mp1%face%s_bottom, &
+			(ipp*jpp*nbands)*(u_h+1), MPIREAL, mp1%face%s_bottom, &
 			tag1, comm3d, request(1),error)
 
 		! receive from the bottom of upper cell:
 		call MPI_Recv(array(kpp:kpp+1,1:jpp,1:ipp,1:nbands), &
-			(ipp*jpp*nbands)*(u_h+1), MPI_REAL8, mp1%face%r_bottom, &
+			(ipp*jpp*nbands)*(u_h+1), MPIREAL, mp1%face%r_bottom, &
 			tag1, comm3d, status(:,1),error)
 ! 		call MPI_Wait(request(1), status(:,1), error)
 		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -413,12 +416,12 @@
 		tag1=12
 		! send to the top:
 		call MPI_Issend(array(kpp,1:jpp,1:ipp,1:nbands), &
-			(ipp*jpp*nbands)*(u_h), MPI_REAL8, mp1%face%s_top, &
+			(ipp*jpp*nbands)*(u_h), MPIREAL, mp1%face%s_top, &
 			tag1, comm3d, request(2),error)
 
 		! receive from the bottom of upper cell:
 		call MPI_Recv(array(0,1:jpp,1:ipp,1:nbands), &
-			(ipp*jpp*nbands)*(u_h), MPI_REAL8, mp1%face%r_top, &
+			(ipp*jpp*nbands)*(u_h), MPIREAL, mp1%face%r_top, &
 			tag1, comm3d, status(:,2),error)
 		call MPI_Wait(request(1), status(:,1), error)
 		call MPI_Wait(request(2), status(:,2), error)
@@ -445,7 +448,7 @@
 		
 		integer(i4b), intent(in) :: comm3d, id, ipp, jpp, kpp, nbands,&
 		     w_h, e_h, s_h,n_h,d_h,u_h
-		real(sp), intent(inout), &
+		real(wp), intent(inout), &
 			 dimension(1-d_h:u_h+kpp,1-s_h:n_h+jpp,1-w_h:e_h+ipp,nbands) :: &
 			 array
 		integer(i4b), dimension(3), intent(in) :: dims,coords
@@ -464,12 +467,12 @@
 		tag1=11
 		! send to the bottom:
 		call MPI_Issend(array(1,1:jpp,1:ipp,1:nbands), &
-			(ipp*jpp*nbands)*(u_h), MPI_REAL8, mp1%face%s_bottom, &
+			(ipp*jpp*nbands)*(u_h), MPIREAL, mp1%face%s_bottom, &
 			tag1, comm3d, request(1),error)
 
 		! receive from the bottom of upper cell:
 		call MPI_Recv(array(kpp+1,1:jpp,1:ipp,1:nbands), &
-			(ipp*jpp*nbands)*(u_h+1), MPI_REAL8, mp1%face%r_bottom, &
+			(ipp*jpp*nbands)*(u_h+1), MPIREAL, mp1%face%r_bottom, &
 			tag1, comm3d, status(:,1),error)
 ! 		call MPI_Wait(request(1), status(:,1), error)
 		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -480,12 +483,12 @@
 		tag1=12
 		! send to the top:
 		call MPI_Issend(array(kpp,1:jpp,1:ipp,1:nbands), &
-			(ipp*jpp*nbands)*(u_h), MPI_REAL8, mp1%face%s_top, &
+			(ipp*jpp*nbands)*(u_h), MPIREAL, mp1%face%s_top, &
 			tag1, comm3d, request(2),error)
 
 		! receive from the bottom of upper cell:
 		call MPI_Recv(array(0,1:jpp,1:ipp,1:nbands), &
-			(ipp*jpp*nbands)*(u_h), MPI_REAL8, mp1%face%r_top, &
+			(ipp*jpp*nbands)*(u_h), MPIREAL, mp1%face%r_top, &
 			tag1, comm3d, status(:,2),error)
 		call MPI_Wait(request(1), status(:,1), error)
 		call MPI_Wait(request(2), status(:,2), error)
@@ -501,7 +504,7 @@
 ! 		
 ! 		integer(i4b), intent(in) :: comm3d, id, ipp, jpp, kpp, nbands,&
 ! 		     w_h, e_h, s_h,n_h,d_h,u_h
-! 		real(sp), intent(inout), &
+! 		real(wp), intent(inout), &
 ! 			 dimension(1-d_h:u_h+kpp,1-s_h:n_h+jpp,1-w_h:e_h+ipp,nbands) :: &
 ! 			 array
 ! 		integer(i4b), dimension(3), intent(in) :: dims,coords
@@ -513,7 +516,7 @@
 ! 		
 ! 		! buffers for receiving data
 ! 	    integer(i4b) :: count
-! 		real(sp), dimension(jpp,ipp,nbands) :: top_buf
+! 		real(wp), dimension(jpp,ipp,nbands) :: top_buf
 ! 		
 ! 
 ! 			
@@ -526,7 +529,7 @@
 ! 		if(mp1%face%s_bottom /= id) then
 !             count=count+1
 !             call MPI_Isend(array(0,1:jpp,1:ipp,1:nbands), &
-!                 (ipp*jpp*nbands)*u_h, MPI_REAL8, mp1%face%s_bottom, &
+!                 (ipp*jpp*nbands)*u_h, MPIREAL, mp1%face%s_bottom, &
 !                 tag1, comm3d, request(count),error)
 !         endif
 !         
@@ -534,7 +537,7 @@
 ! 		if(mp1%face%r_bottom /= id) then
 !             count=count+1
 !             call MPI_IRecv(top_buf, &
-!                 (ipp*jpp*nbands)*u_h, MPI_REAL8, mp1%face%r_bottom, &
+!                 (ipp*jpp*nbands)*u_h, MPIREAL, mp1%face%r_bottom, &
 !                 tag1, comm3d, request(count),error)
 !         endif
 ! 		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -579,10 +582,10 @@
 		implicit none
 		
 		integer(i4b), intent(in) :: comm3d, id, ipp, jpp, kpp, w_h, e_h, s_h,n_h,d_h,u_h
-		real(sp), intent(inout), &
+		real(wp), intent(inout), &
 			 dimension(1-d_h:u_h+kpp,1-s_h:n_h+jpp,1-w_h:e_h+ipp) :: &
 			 array
-		real(sp), intent(in) :: lbc, ubc
+		real(wp), intent(in) :: lbc, ubc
 		integer(i4b), dimension(3), intent(in) :: dims,coords
 		
 		! locals:
@@ -592,7 +595,7 @@
 
 		! buffers for receiving data
 	    integer(i4b) :: count
-		real(sp), dimension(jpp,ipp) :: top_buf, bot_buf
+		real(wp), dimension(jpp,ipp) :: top_buf, bot_buf
 		
 		
 			
@@ -605,7 +608,7 @@
         if(mp1%face%r_top /= mp1%face_v%id) then
 		    count=count+1
             call MPI_IRecv(bot_buf, &!array(1-d_h:0,1:jpp,1:ipp), &
-                (ipp*jpp)*d_h, MPI_REAL8, mp1%face_v%r_top, &
+                (ipp*jpp)*d_h, MPIREAL, mp1%face_v%r_top, &
                 tag1, comm3d, request(count),error)
         endif
 		tag1=11
@@ -613,7 +616,7 @@
 		if(mp1%face%r_bottom /= mp1%face_v%id) then
 		    count=count+1
             call MPI_IRecv(top_buf, & !array(kpp+1:kpp+u_h,1:jpp,1:ipp), &
-                (ipp*jpp)*u_h, MPI_REAL8, mp1%face_v%r_bottom, &
+                (ipp*jpp)*u_h, MPIREAL, mp1%face_v%r_bottom, &
                 tag1, comm3d, request(count),error)
         endif
         tag1=10
@@ -621,7 +624,7 @@
 		if(mp1%face%s_top /= mp1%face_v%id) then
 		    count=count+1
             call MPI_Isend(array(kpp+1-d_h:kpp,1:jpp,1:ipp), &
-                (ipp*jpp)*d_h, MPI_REAL8, mp1%face_v%s_top, &
+                (ipp*jpp)*d_h, MPIREAL, mp1%face_v%s_top, &
                 tag1, comm3d, request(count),error)
         endif
 		tag1=11
@@ -629,7 +632,7 @@
 		if(mp1%face%s_bottom /= mp1%face_v%id) then
 		    count=count+1
             call MPI_Isend(array(1:u_h,1:jpp,1:ipp), &
-                (ipp*jpp)*u_h, MPI_REAL8, mp1%face_v%s_bottom, &
+                (ipp*jpp)*u_h, MPIREAL, mp1%face_v%s_bottom, &
                 tag1, comm3d, request(count),error)
         endif
         
@@ -695,10 +698,10 @@
 		implicit none
 		
 		integer(i4b), intent(in) :: comm3d, id, ipp, jpp, kpp, w_h, e_h, s_h,n_h,d_h,u_h
-		real(sp), intent(inout), &
+		real(wp), intent(inout), &
 			 dimension(1-d_h:u_h+kpp,1-s_h:n_h+jpp,1-w_h:e_h+ipp) :: &
 			 array
-		real(sp), intent(in) :: lbc, ubc
+		real(wp), intent(in) :: lbc, ubc
 		integer(i4b), dimension(3), intent(in) :: dims,coords
 		
 		! locals:
@@ -708,9 +711,9 @@
 		
 		! buffers for receiving data
 	    integer(i4b) :: count
-		real(sp), dimension(jpp,ipp) :: top_buf, bot_buf
-		real(sp), dimension(kpp,jpp) :: east_buf,west_buf
-		real(sp), dimension(kpp,ipp) :: south_buf,north_buf
+		real(wp), dimension(jpp,ipp) :: top_buf, bot_buf
+		real(wp), dimension(kpp,jpp) :: east_buf,west_buf
+		real(wp), dimension(kpp,ipp) :: south_buf,north_buf
 		
 		
 
@@ -725,7 +728,7 @@
         if(mp1%face%r_top /= id) then
 		    count=count+1
             call MPI_IRecv(bot_buf, &!array(1-d_h:0,1:jpp,1:ipp), &
-                (ipp*jpp)*d_h, MPI_REAL8, mp1%face%r_top, &
+                (ipp*jpp)*d_h, MPIREAL, mp1%face%r_top, &
                 tag1, comm3d, request(count),error)
         endif
         tag1=11
@@ -733,7 +736,7 @@
 		if(mp1%face%r_bottom /= id) then
 		    count=count+1
             call MPI_IRecv(top_buf, & !array(kpp+1:kpp+u_h,1:jpp,1:ipp), &
-                (ipp*jpp)*u_h, MPI_REAL8, mp1%face%r_bottom, &
+                (ipp*jpp)*u_h, MPIREAL, mp1%face%r_bottom, &
                 tag1, comm3d, request(count),error)
         endif
         tag1=10
@@ -741,7 +744,7 @@
 		if(mp1%face%s_top /= id) then
 		    count=count+1
             call MPI_Isend(array(kpp+1-d_h:kpp,1:jpp,1:ipp), &
-                (ipp*jpp)*d_h, MPI_REAL8, mp1%face%s_top, &
+                (ipp*jpp)*d_h, MPIREAL, mp1%face%s_top, &
                 tag1, comm3d, request(count),error)
         endif
 		tag1=11
@@ -749,7 +752,7 @@
 		if(mp1%face%s_bottom /= id) then
 		    count=count+1
             call MPI_Isend(array(1:u_h,1:jpp,1:ipp), &
-                (ipp*jpp)*u_h, MPI_REAL8, mp1%face%s_bottom, &
+                (ipp*jpp)*u_h, MPIREAL, mp1%face%s_bottom, &
                 tag1, comm3d, request(count),error)
         endif
         
@@ -768,7 +771,7 @@
 		if( mp1%face%r_east /= id ) then
 		    count=count+1
 			call MPI_IRecv(west_buf, & !array(1:kpp,1:jpp,1-w_h:0), &
-				(jpp*kpp)*w_h, MPI_REAL8, mp1%face%r_east, &
+				(jpp*kpp)*w_h, MPIREAL, mp1%face%r_east, &
 				tag1, comm3d, request(count),error)
 		endif
 		tag1=13
@@ -776,7 +779,7 @@
 		if( mp1%face%r_west /= id ) then
 		    count=count+1
 			call MPI_IRecv(east_buf, & !array(1:kpp,1:jpp,ipp+1:ipp+e_h), &
-				(jpp*kpp)*e_h, MPI_REAL8, mp1%face%r_west, &
+				(jpp*kpp)*e_h, MPIREAL, mp1%face%r_west, &
 				tag1, comm3d, request(count),error)
 		endif
 		
@@ -785,7 +788,7 @@
 		if ( mp1%face%s_east /= id ) then 
 		    count=count+1
 			call MPI_Isend(array(1:kpp,1:jpp,ipp+1-w_h:ipp), &
-				(jpp*kpp)*w_h, MPI_REAL8, mp1%face%s_east, &
+				(jpp*kpp)*w_h, MPIREAL, mp1%face%s_east, &
 				tag1, comm3d, request(count),error)
 		endif
 
@@ -794,7 +797,7 @@
 		if ( mp1%face%s_west /= id ) then	
 		    count=count+1
 			call MPI_Isend(array(1:kpp,1:jpp,1:e_h), &
-				(jpp*kpp)*e_h, MPI_REAL8, mp1%face%s_west, &
+				(jpp*kpp)*e_h, MPIREAL, mp1%face%s_west, &
 				tag1, comm3d, request(count),error)
 		endif
 
@@ -811,7 +814,7 @@
 		if( mp1%face%r_north /= id ) then
 		    count=count+1
 			call MPI_IRecv(south_buf, &!array(1:kpp,1-s_h:0,1:ipp), &
-				(ipp*kpp)*s_h, MPI_REAL8, mp1%face%r_north, &
+				(ipp*kpp)*s_h, MPIREAL, mp1%face%r_north, &
 				tag1, comm3d, request(count),error)
 		endif
 		tag1=15
@@ -819,7 +822,7 @@
 		if( mp1%face%r_south /= id ) then
 		    count=count+1
 			call MPI_IRecv(north_buf, &!array(1:kpp,jpp+1:jpp+n_h,1:ipp), &
-				(ipp*kpp)*n_h, MPI_REAL8, mp1%face%r_south, &
+				(ipp*kpp)*n_h, MPIREAL, mp1%face%r_south, &
 				tag1, comm3d, request(count),error)
 		endif
 		tag1=14
@@ -827,7 +830,7 @@
 		if ( mp1%face%s_north /= id ) then 
 		    count=count+1
 			call MPI_Isend(array(1:kpp,jpp+1-s_h:jpp,1:ipp), &
-				(ipp*kpp)*s_h, MPI_REAL8, mp1%face%s_north, &
+				(ipp*kpp)*s_h, MPIREAL, mp1%face%s_north, &
 				tag1, comm3d, request(count),error)
 		endif
 		tag1=15
@@ -835,7 +838,7 @@
 		if ( mp1%face%s_south /= id ) then
 		    count=count+1
 			call MPI_Isend(array(1:kpp,1:n_h,1:ipp), &
-				(ipp*kpp)*n_h, MPI_REAL8, mp1%face%s_south, &
+				(ipp*kpp)*n_h, MPIREAL, mp1%face%s_south, &
 				tag1, comm3d, request(count),error)
 		endif
 
@@ -921,10 +924,10 @@
 		implicit none
 		
 		integer(i4b), intent(in) :: comm3d, id, ipp, jpp, kpp, w_h, e_h, s_h,n_h,d_h,u_h
-		real(sp), intent(inout), &
+		real(wp), intent(inout), &
 			 dimension(1-d_h:u_h+kpp,1-s_h:n_h+jpp,1-w_h:e_h+ipp) :: &
 			 array
-		real(sp), intent(in) :: lbc, ubc
+		real(wp), intent(in) :: lbc, ubc
 		integer(i4b), dimension(3), intent(in) :: dims,coords
 		
 		! locals:
@@ -934,11 +937,11 @@
 		
 		! buffers for receiving data
 		! edges
-		real(sp), dimension(kpp) :: ws_bt, wn_bt, es_bt, en_bt
-		real(sp), dimension(ipp) :: bs_we, bn_we, ts_we, tn_we
-		real(sp), dimension(jpp) :: bw_sn, be_sn, tw_sn, te_sn
+		real(wp), dimension(kpp) :: ws_bt, wn_bt, es_bt, en_bt
+		real(wp), dimension(ipp) :: bs_we, bn_we, ts_we, tn_we
+		real(wp), dimension(jpp) :: bw_sn, be_sn, tw_sn, te_sn
 		! corners
-		real(sp) :: wsb, wnb, wst, wnt, esb, enb, est, ent
+		real(wp) :: wsb, wnb, wst, wnt, esb, enb, est, ent
 				
 
 		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -1155,10 +1158,10 @@
 											s_kl,s_ku,s_jl,s_ju,s_il,s_iu, &
 											r_kl,r_ku,r_jl,r_ju,r_il,r_iu, send,recv, &
 											lenm
-				real(sp), intent(inout), &
+				real(wp), intent(inout), &
 					 dimension(1-d_h:u_h+kp,1-s_h:n_h+jp,1-w_h:e_h+ip) :: &
 					 array
-			    real(sp), intent(inout) :: buf
+			    real(wp), intent(inout) :: buf
 				integer(i4b), dimension(lenm), intent(inout) :: request
 				integer(i4b), dimension(MPI_STATUS_SIZE,lenm), intent(inout) :: status
 				integer(i4b), intent(inout) :: count
@@ -1176,7 +1179,7 @@
 				if( (recv /= id) ) then
 				    count=count+1
 					call MPI_IRecv(buf, &!array(r_kl:r_ku,r_jl:r_ju,r_il:r_iu), &
-						size1, MPI_REAL8, recv, &
+						size1, MPIREAL, recv, &
 						tag1, comm3d, request(count),error)
 					!call MPI_Wait(request1(1), status1(:,1), error)
 				endif	
@@ -1184,7 +1187,7 @@
 				if ( (send /= id) ) then 
 				    count=count+1
 					call MPI_Isend(array(s_kl:s_ku,s_jl:s_ju,s_il:s_iu), &
-						size1, MPI_REAL8, send, &
+						size1, MPIREAL, send, &
 						tag1, comm3d, request(count),error)
 				endif
 				!----	
@@ -1221,10 +1224,10 @@
 											s_kl,s_ku,s_jl,s_ju,s_il,s_iu, &
 											r_kl,r_ku,r_jl,r_ju,r_il,r_iu, send,recv, &
 											lenm,lenb
-				real(sp), intent(inout), &
+				real(wp), intent(inout), &
 					 dimension(1-d_h:u_h+kp,1-s_h:n_h+jp,1-w_h:e_h+ip) :: &
 					 array
-			    real(sp), intent(inout), dimension(lenb) :: buf
+			    real(wp), intent(inout), dimension(lenb) :: buf
 			    integer(i4b), intent(inout) :: count
 				integer(i4b), dimension(lenm), intent(inout) :: request
 				integer(i4b), dimension(MPI_STATUS_SIZE,lenm), intent(inout) :: status
@@ -1244,14 +1247,14 @@
 				    count=count+1
 ! 
 					call MPI_IRecv(buf, &!array(r_kl:r_ku,r_jl:r_ju,r_il:r_iu), &
-						size1, MPI_REAL8, recv, &
+						size1, MPIREAL, recv, &
 						tag1, comm3d, request(count),error)
 				endif	
 				! send:
 				if ( (send /= mp1%id) ) then 
 				    count=count+1
 					call MPI_Isend(array(s_kl:s_ku,s_jl:s_ju,s_il:s_iu), &
-						size1, MPI_REAL8, send, &
+						size1, MPIREAL, send, &
 						tag1, comm3d, request(count),error)
 				endif
 				!----
@@ -1280,7 +1283,7 @@
 		implicit none
 		
 		integer(i4b), intent(in) :: comm3d, id, ipp, jpp, kpp, w_h, e_h, s_h,n_h,d_h,u_h
-		real(sp), intent(inout), &
+		real(wp), intent(inout), &
 			 dimension(1-d_h:u_h+kpp,1-s_h:n_h+jpp,1-w_h:e_h+ipp) :: &
 			 array
 		integer(i4b), dimension(3), intent(in) :: dims,coords
@@ -1292,9 +1295,9 @@
 		
 		! buffers for receiving data
 	    integer(i4b) :: count
-		real(sp), dimension(jpp,ipp) :: top_buf, bot_buf
-		real(sp), dimension(kpp,jpp) :: east_buf,west_buf
-		real(sp), dimension(kpp,ipp) :: south_buf,north_buf
+		real(wp), dimension(jpp,ipp) :: top_buf, bot_buf
+		real(wp), dimension(kpp,jpp) :: east_buf,west_buf
+		real(wp), dimension(kpp,ipp) :: south_buf,north_buf
 		
 		
 
@@ -1309,7 +1312,7 @@
         if(mp1%face%r_top /= id) then
 		    count=count+1
             call MPI_IRecv(bot_buf, &!array(1-d_h:0,1:jpp,1:ipp), &
-                (ipp*jpp)*d_h, MPI_REAL8, mp1%face%r_top, &
+                (ipp*jpp)*d_h, MPIREAL, mp1%face%r_top, &
                 tag1, comm3d, request(count),error)
         endif
         tag1=11
@@ -1317,7 +1320,7 @@
 		if(mp1%face%r_bottom /= id) then
 		    count=count+1
             call MPI_IRecv(top_buf, & !array(kpp+1:kpp+u_h,1:jpp,1:ipp), &
-                (ipp*jpp)*u_h, MPI_REAL8, mp1%face%r_bottom, &
+                (ipp*jpp)*u_h, MPIREAL, mp1%face%r_bottom, &
                 tag1, comm3d, request(count),error)
         endif
         tag1=10
@@ -1325,7 +1328,7 @@
 		if(mp1%face%s_top /= id) then
 		    count=count+1
             call MPI_Isend(array(kpp+1-d_h:kpp,1:jpp,1:ipp), &
-                (ipp*jpp)*d_h, MPI_REAL8, mp1%face%s_top, &
+                (ipp*jpp)*d_h, MPIREAL, mp1%face%s_top, &
                 tag1, comm3d, request(count),error)
         endif
 		tag1=11
@@ -1333,7 +1336,7 @@
 		if(mp1%face%s_bottom /= id) then
 		    count=count+1
             call MPI_Isend(array(1:u_h,1:jpp,1:ipp), &
-                (ipp*jpp)*u_h, MPI_REAL8, mp1%face%s_bottom, &
+                (ipp*jpp)*u_h, MPIREAL, mp1%face%s_bottom, &
                 tag1, comm3d, request(count),error)
         endif
         
@@ -1352,7 +1355,7 @@
 		if( mp1%face%r_east /= id ) then
 		    count=count+1
 			call MPI_IRecv(west_buf, & !array(1:kpp,1:jpp,1-w_h:0), &
-				(jpp*kpp)*w_h, MPI_REAL8, mp1%face%r_east, &
+				(jpp*kpp)*w_h, MPIREAL, mp1%face%r_east, &
 				tag1, comm3d, request(count),error)
 		endif
 		tag1=13
@@ -1360,7 +1363,7 @@
 		if( mp1%face%r_west /= id ) then
 		    count=count+1
 			call MPI_IRecv(east_buf, & !array(1:kpp,1:jpp,ipp+1:ipp+e_h), &
-				(jpp*kpp)*e_h, MPI_REAL8, mp1%face%r_west, &
+				(jpp*kpp)*e_h, MPIREAL, mp1%face%r_west, &
 				tag1, comm3d, request(count),error)
 		endif
 		
@@ -1369,7 +1372,7 @@
 		if ( mp1%face%s_east /= id ) then 
 		    count=count+1
 			call MPI_Isend(array(1:kpp,1:jpp,ipp+1-w_h:ipp), &
-				(jpp*kpp)*w_h, MPI_REAL8, mp1%face%s_east, &
+				(jpp*kpp)*w_h, MPIREAL, mp1%face%s_east, &
 				tag1, comm3d, request(count),error)
 		endif
 
@@ -1378,7 +1381,7 @@
 		if ( mp1%face%s_west /= id ) then	
 		    count=count+1
 			call MPI_Isend(array(1:kpp,1:jpp,1:e_h), &
-				(jpp*kpp)*e_h, MPI_REAL8, mp1%face%s_west, &
+				(jpp*kpp)*e_h, MPIREAL, mp1%face%s_west, &
 				tag1, comm3d, request(count),error)
 		endif
 
@@ -1395,7 +1398,7 @@
 		if( mp1%face%r_north /= id ) then
 		    count=count+1
 			call MPI_IRecv(south_buf, &!array(1:kpp,1-s_h:0,1:ipp), &
-				(ipp*kpp)*s_h, MPI_REAL8, mp1%face%r_north, &
+				(ipp*kpp)*s_h, MPIREAL, mp1%face%r_north, &
 				tag1, comm3d, request(count),error)
 		endif
 		tag1=15
@@ -1403,7 +1406,7 @@
 		if( mp1%face%r_south /= id ) then
 		    count=count+1
 			call MPI_IRecv(north_buf, &!array(1:kpp,jpp+1:jpp+n_h,1:ipp), &
-				(ipp*kpp)*n_h, MPI_REAL8, mp1%face%r_south, &
+				(ipp*kpp)*n_h, MPIREAL, mp1%face%r_south, &
 				tag1, comm3d, request(count),error)
 		endif
 		tag1=14
@@ -1411,7 +1414,7 @@
 		if ( mp1%face%s_north /= id ) then 
 		    count=count+1
 			call MPI_Isend(array(1:kpp,jpp+1-s_h:jpp,1:ipp), &
-				(ipp*kpp)*s_h, MPI_REAL8, mp1%face%s_north, &
+				(ipp*kpp)*s_h, MPIREAL, mp1%face%s_north, &
 				tag1, comm3d, request(count),error)
 		endif
 		tag1=15
@@ -1419,7 +1422,7 @@
 		if ( mp1%face%s_south /= id ) then
 		    count=count+1
 			call MPI_Isend(array(1:kpp,1:n_h,1:ipp), &
-				(ipp*kpp)*n_h, MPI_REAL8, mp1%face%s_south, &
+				(ipp*kpp)*n_h, MPIREAL, mp1%face%s_south, &
 				tag1, comm3d, request(count),error)
 		endif
 
@@ -1506,7 +1509,7 @@
 		implicit none
 		
 		integer(i4b), intent(in) :: comm3d, id, ipp, jpp, kpp, w_h, e_h, s_h,n_h,d_h,u_h
-		real(sp), intent(inout), &
+		real(wp), intent(inout), &
 			 dimension(1-d_h:u_h+kpp,1-s_h:n_h+jpp,1-w_h:e_h+ipp) :: &
 			 array
 		integer(i4b), dimension(3), intent(in) :: dims,coords
@@ -1518,11 +1521,11 @@
 		
 		! buffers for receiving data
 		! edges
-		real(sp), dimension(kpp) :: ws_bt, wn_bt, es_bt, en_bt
-		real(sp), dimension(ipp) :: bs_we, bn_we, ts_we, tn_we
-		real(sp), dimension(jpp) :: bw_sn, be_sn, tw_sn, te_sn
+		real(wp), dimension(kpp) :: ws_bt, wn_bt, es_bt, en_bt
+		real(wp), dimension(ipp) :: bs_we, bn_we, ts_we, tn_we
+		real(wp), dimension(jpp) :: bw_sn, be_sn, tw_sn, te_sn
 		! corners
-		real(sp) :: wsb, wnb, wst, wnt, esb, enb, est, ent
+		real(wp) :: wsb, wnb, wst, wnt, esb, enb, est, ent
 				
 
 		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -1739,10 +1742,10 @@
 											s_kl,s_ku,s_jl,s_ju,s_il,s_iu, &
 											r_kl,r_ku,r_jl,r_ju,r_il,r_iu, send,recv, &
 											lenm
-				real(sp), intent(inout), &
+				real(wp), intent(inout), &
 					 dimension(1-d_h:u_h+kp,1-s_h:n_h+jp,1-w_h:e_h+ip) :: &
 					 array
-			    real(sp), intent(inout) :: buf
+			    real(wp), intent(inout) :: buf
 				integer(i4b), dimension(lenm), intent(inout) :: request
 				integer(i4b), dimension(MPI_STATUS_SIZE,lenm), intent(inout) :: status
 				integer(i4b), intent(inout) :: count
@@ -1760,7 +1763,7 @@
 				if( (recv /= id) ) then
 				    count=count+1
 					call MPI_IRecv(buf, &!array(r_kl:r_ku,r_jl:r_ju,r_il:r_iu), &
-						size1, MPI_REAL8, recv, &
+						size1, MPIREAL, recv, &
 						tag1, comm3d, request(count),error)
 					!call MPI_Wait(request1(1), status1(:,1), error)
 				endif	
@@ -1768,7 +1771,7 @@
 				if ( (send /= id) ) then 
 				    count=count+1
 					call MPI_Isend(array(s_kl:s_ku,s_jl:s_ju,s_il:s_iu), &
-						size1, MPI_REAL8, send, &
+						size1, MPIREAL, send, &
 						tag1, comm3d, request(count),error)
 				endif
 				!----	
@@ -1805,10 +1808,10 @@
 											s_kl,s_ku,s_jl,s_ju,s_il,s_iu, &
 											r_kl,r_ku,r_jl,r_ju,r_il,r_iu, send,recv, &
 											lenm,lenb
-				real(sp), intent(inout), &
+				real(wp), intent(inout), &
 					 dimension(1-d_h:u_h+kp,1-s_h:n_h+jp,1-w_h:e_h+ip) :: &
 					 array
-			    real(sp), intent(inout), dimension(lenb) :: buf
+			    real(wp), intent(inout), dimension(lenb) :: buf
 			    integer(i4b), intent(inout) :: count
 				integer(i4b), dimension(lenm), intent(inout) :: request
 				integer(i4b), dimension(MPI_STATUS_SIZE,lenm), intent(inout) :: status
@@ -1828,14 +1831,14 @@
 				    count=count+1
 ! 
 					call MPI_IRecv(buf, &!array(r_kl:r_ku,r_jl:r_ju,r_il:r_iu), &
-						size1, MPI_REAL8, recv, &
+						size1, MPIREAL, recv, &
 						tag1, comm3d, request(count),error)
 				endif	
 				! send:
 				if ( (send /= mp1%id) ) then 
 				    count=count+1
 					call MPI_Isend(array(s_kl:s_ku,s_jl:s_ju,s_il:s_iu), &
-						size1, MPI_REAL8, send, &
+						size1, MPIREAL, send, &
 						tag1, comm3d, request(count),error)
 				endif
 				!----
