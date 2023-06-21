@@ -3,7 +3,7 @@
 	!>@brief
 	!>drivers for the dynamical cloud model
     module drivers
-    use nrtype
+    use numerics_type
     !use variables
     private
     public :: model_driver
@@ -133,7 +133,7 @@
                     nprocv,mvrecv, &
 				coords, &
 				dims,id, world_process, rank, ring_comm,sub_horiz_comm,sub_vert_comm)
-		use nrtype
+		use numerics_type
 		use mpi_module, only : exchange_full, exchange_along_dim, exchange_along_dim_wo
         use advection_s_3d, only : first_order_upstream_3d, &
                     mpdata_3d, mpdata_vec_3d, adv_ref_state, mpdata_3d_add, &
@@ -161,94 +161,94 @@
 						advection_scheme, kord, nq,nprec,ncat, microphysics_flag, &
 						nmolecule, nweights, npress, ntemp, nh2o
         integer(i4b), intent(in), dimension(1-r_h:kp+r_h) :: itemp, ipress
-        real(sp), intent(in), dimension(1:nbands,1:nmolecule,1:nweights, &
+        real(wp), intent(in), dimension(1:nbands,1:nmolecule,1:nweights, &
                     1:ntemp,1:npress, 1:nh2o) :: bli_read
-        real(sp), intent(in), dimension(1:nweights) :: probs_read
-        real(sp), intent(in), dimension(1:nh2o) :: h2o_read
+        real(wp), intent(in), dimension(1:nweights) :: probs_read
+        real(wp), intent(in), dimension(1:nh2o) :: h2o_read
         integer(i4b), intent(in), dimension(1:nmolecule) :: moleculeID
-        real(sp), intent(in), dimension(1:nmolecule) :: moleculePPM, molecularWeights
+        real(wp), intent(in), dimension(1:nmolecule) :: moleculePPM, molecularWeights
 
 		integer(i4b), intent(in) :: id, world_process, ring_comm, sub_horiz_comm, &
 		    sub_vert_comm,rank
 		integer(i4b), dimension(3), intent(in) :: coords, dims
 		character (len=*), intent(in) :: outputfile
-		real(sp), intent(in) :: output_interval, dt, z0,z0th, ptol, forcing_tau, &
+		real(wp), intent(in) :: output_interval, dt, z0,z0th, ptol, forcing_tau, &
 		                        j_stochastic
         integer(i4b), dimension(ncat), intent(in) :: c_s, c_e
         integer(i4b), intent(in) :: cat_am,cat_c, cat_r, cat_i,n_mode,inc,iqc,inr,iqr, &
                                 ini, iqi, iai
 		
-		real(sp), intent(inout) :: thbase, thtop
-		real(sp), dimension(1-l_h:ipp+r_h), intent(in) :: x,xn,dx, dxn
-		real(sp), dimension(1-l_h:jpp+r_h), intent(in) :: y,yn,dy,dyn
-		real(sp), dimension(1-l_h:kpp+r_h), intent(in) :: z,zn,dz,dzn, theta, thetan, &
+		real(wp), intent(inout) :: thbase, thtop
+		real(wp), dimension(1-l_h:ipp+r_h), intent(in) :: x,xn,dx, dxn
+		real(wp), dimension(1-l_h:jpp+r_h), intent(in) :: y,yn,dy,dyn
+		real(wp), dimension(1-l_h:kpp+r_h), intent(in) :: z,zn,dz,dzn, theta, thetan, &
 		                                                tref,trefn, &
 														rhoa, rhoan,lamsq, lamsqn, &
 														u_force, v_force, w_subs
-		real(sp), dimension(1-l_h:kpp+r_h), intent(inout) :: ubar,vbar,wbar,thbar,qbar
-		real(sp), dimension(1-l_h:kpp+r_h), intent(in) :: dampfacn,dampfac
-		real(sp), dimension(1-l_h:kpp+r_h), intent(in) :: pref,prefn
-		real(sp), &
+		real(wp), dimension(1-l_h:kpp+r_h), intent(inout) :: ubar,vbar,wbar,thbar,qbar
+		real(wp), dimension(1-l_h:kpp+r_h), intent(in) :: dampfacn,dampfac
+		real(wp), dimension(1-l_h:kpp+r_h), intent(in) :: pref,prefn
+		real(wp), &
 			dimension(1-r_h:kpp+r_h,1-r_h:jpp+r_h,1-r_h:ipp+r_h), &
 			intent(inout) :: th,p,su,sv,sw,psrc,div
 			
-		real(sp), &
+		real(wp), &
 			dimension(1-r_h:kpp+r_h,1-r_h:jpp+r_h,1-l_h:ipp+r_h), target, &
 			intent(inout) :: ut,zut,tut
-		real(sp), &
+		real(wp), &
 			dimension(1-r_h:kpp+r_h,1-l_h:jpp+r_h,1-r_h:ipp+r_h), target, &
 			intent(inout) :: vt,zvt,tvt
-		real(sp), &
+		real(wp), &
 			dimension(1-l_h:kpp+r_h,1-r_h:jpp+r_h,1-r_h:ipp+r_h), target, &
 			intent(inout) :: wt,zwt,twt
 
-		real(sp), &
+		real(wp), &
 			dimension(1-l_h:kpp+r_h,1-r_h:jpp+r_h,1-r_h:ipp+r_h), &
 			intent(inout) ::sth,strain,vism,vist
 
-		real(sp), &
+		real(wp), &
 			dimension(1-l_h:kpp+r_h,1-r_h:jpp+r_h,1-r_h:ipp+r_h,1:nq), &
 			intent(inout) :: q,sq,viss
 
-		real(sp), &
+		real(wp), &
 			dimension(1:kpp,1-l_h:jpp+r_h,1-l_h:ipp+r_h,1:nprec), &
 			intent(inout) :: precip
 					
-		real(sp), &
+		real(wp), &
 			dimension(1-l_h:kpp+r_h,1-r_h:jpp+r_h,1-r_h:ipp+r_h,1:nrad), &
 			intent(inout) :: ngs,lamgs,mugs
 
         character(len=20), intent(in), dimension(nq) :: q_name
 
         ! radiation variables		
-		real(sp), dimension(nbands), intent(in) :: lambda, b_s_g, lambda_low,&
+		real(wp), dimension(nbands), intent(in) :: lambda, b_s_g, lambda_low,&
 							lambda_high, delta_lambda, nrwbin,niwbin, sflux_l
-		real(sp), intent(in), dimension(nprocv) :: mvrecv
+		real(wp), intent(in), dimension(nprocv) :: mvrecv
 		integer(i4b), intent(in) :: nbands, ns, nl, tdstart,tdend
 		integer(i4b), intent(in) :: nprocv
-		real(sp), intent(inout), dimension(1:tdend) :: a,b,c,r,usol
-		real(sp), dimension(1-r_h:kpp+r_h,1-r_h:jpp+r_h,1-r_h:ipp+r_h,1:nbands) :: &
+		real(wp), intent(inout), dimension(1:tdend) :: a,b,c,r,usol
+		real(wp), dimension(1-r_h:kpp+r_h,1-r_h:jpp+r_h,1-r_h:ipp+r_h,1:nbands) :: &
 						flux_d,flux_u
-		real(sp), dimension(1-r_h:jpp+r_h,1-r_h:ipp+r_h) :: fng
-		real(sp), dimension(1-r_h:kpp+r_h,1-r_h:jpp+r_h,1-r_h:ipp+r_h) :: &
+		real(wp), dimension(1-r_h:jpp+r_h,1-r_h:ipp+r_h) :: fng
+		real(wp), dimension(1-r_h:kpp+r_h,1-r_h:jpp+r_h,1-r_h:ipp+r_h) :: &
 						rad_power
-		real(sp), intent(in) :: lat, lon, albedo, emiss, asymmetry_water
+		real(wp), intent(in) :: lat, lon, albedo, emiss, asymmetry_water
 		integer(i4b), intent(in) :: quad_flag, start_year, start_mon, start_day, &
 									start_hour, start_min, start_sec
         ! land surface model variables
-        real(sp), intent(in) :: psurf
+        real(wp), intent(in) :: psurf
 		integer(i4b), intent(in) :: tdend_lsm, skp
-		real(sp), dimension(1-l_h:skp+r_h), intent(in) :: sz,szn, dsz, dszn, pscs_lsm, &
+		real(wp), dimension(1-l_h:skp+r_h), intent(in) :: sz,szn, dsz, dszn, pscs_lsm, &
 		                                                b1_lsm,wgs_lsm,wfc_lsm, &
 		                                                    phi_ps_lsm,kgs_lsm
 
-        real(sp), dimension(1-l_h:skp+r_h,1-l_h:jpp+r_h,1-l_h:ipp+r_h), & 
+        real(wp), dimension(1-l_h:skp+r_h,1-l_h:jpp+r_h,1-l_h:ipp+r_h), & 
             intent(inout) :: t_lsm,wg_lsm
-        real(sp), dimension(1-l_h:jpp+r_h,1-l_h:ipp+r_h), & 
+        real(wp), dimension(1-l_h:jpp+r_h,1-l_h:ipp+r_h), & 
             intent(inout) :: tsurf_lsm
-        real(sp), dimension(tdend_lsm), intent(inout) :: b_lsm,r_lsm,u_lsm
-        real(sp), dimension(tdend_lsm-1), intent(inout) :: a_lsm,c_lsm
-		real(sp), dimension(1-r_h:jpp+r_h,1-r_h:ipp+r_h) :: flux2d_1, flux2d_2, &
+        real(wp), dimension(tdend_lsm), intent(inout) :: b_lsm,r_lsm,u_lsm
+        real(wp), dimension(tdend_lsm-1), intent(inout) :: a_lsm,c_lsm
+		real(wp), dimension(1-r_h:jpp+r_h,1-r_h:ipp+r_h) :: flux2d_1, flux2d_2, &
 		    hf_lsm, lef_lsm
         
 		!-
@@ -257,12 +257,12 @@
 
 		! locals:		
 		integer(i4b) :: n,n2, cur=1, i,j,k,nqc, error, rank2
-		real(sp) :: time, time_last_output, output_time, t1=0._sp,t2=0._sp
-		real(sp), dimension(nq) :: q1,q2
-		real(sp), dimension(:,:,:), pointer :: u,zu,tu
-		real(sp), dimension(:,:,:), pointer :: v,zv,tv
-		real(sp), dimension(:,:,:), pointer :: w,zw,tw
-! 		real(sp), &
+		real(wp) :: time, time_last_output, output_time, t1=0._wp,t2=0._wp
+		real(wp), dimension(nq) :: q1,q2
+		real(wp), dimension(:,:,:), pointer :: u,zu,tu
+		real(wp), dimension(:,:,:), pointer :: v,zv,tv
+		real(wp), dimension(:,:,:), pointer :: w,zw,tw
+! 		real(wp), &
 ! 			dimension(1-r_h:kpp+r_h,1-r_h:jpp+r_h,1-r_h:ipp+r_h) :: th2
 		
 
@@ -271,9 +271,9 @@
 		rank2=dims(1)*dims(2)*dims(3)
 		if(id>=rank2) return 
 
-		q1=0._sp
-		q2=0._sp
-		fng=0._sp
+		q1=0._wp
+		q2=0._wp
+		fng=0._wp
 		
 		
 		! associate pointers - for efficiency, when swapping arrays in leap-frog scheme
@@ -284,13 +284,13 @@
 		
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         if(coords(3)==0) then
-            zw(0,:,:)=-zw(1,:,:); zu(1,:,:)=0._sp; zv(1,:,:)=0._sp
+            zw(0,:,:)=-zw(1,:,:); zu(1,:,:)=0._wp; zv(1,:,:)=0._wp
         endif
         
         if(coords(3)==(dims(3)-1)) then
-            zw(kpp,:,:)=-zw(kpp-1,:,:); zw(kpp+1,:,:)=0._sp
-            zu(kpp,:,:)=0._sp
-            zv(kpp,:,:)=0._sp
+            zw(kpp,:,:)=-zw(kpp-1,:,:); zw(kpp+1,:,:)=0._wp
+            zu(kpp,:,:)=0._wp
+            zv(kpp,:,:)=0._wp
         endif
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 		
@@ -305,7 +305,7 @@
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 			! write netcdf variables                                                     !
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-			time=real(n-1,sp)*dt
+			time=real(n-1,wp)*dt
 			if (time-time_last_output >= output_interval) then
 			
 			
@@ -336,9 +336,9 @@
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 			! microphysics                                                               !
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-			sth = 0._sp
+			sth = 0._wp
             if(moisture) then
-                sq = 0._sp
+                sq = 0._wp
                 select case (microphysics_flag)
                     case (0) ! null microphysics
 
@@ -357,7 +357,7 @@
                                         nrad,ngs(:,:,:,:),lamgs(:,:,:,:),mugs(:,:,:,:), &
                                         th(:,:,:),prefn, &
                                         zn(:),thetan,rhoa,rhoan,w(:,:,:), &
-                                        micro_init,hm_flag,wr_flag, 1.e-14_sp, &
+                                        micro_init,hm_flag,wr_flag, 1.e-14_wp, &
                                         ice_flag, theta_flag, &
                                         j_stochastic, ice_nuc_flag, mode1_ice_flag, &
                                         mode2_ice_flag, &
@@ -414,7 +414,7 @@
                     th,wg_lsm(1,:,:),q(:,:,:,1), sth, sq, hf_lsm, lef_lsm )
                     
                 flux2d_1=fng-hf_lsm-lef_lsm
-                flux2d_2=-(precip(1,:,:,1)/3.6e6_sp-lef_lsm/lv/1000._sp)
+                flux2d_2=-(precip(1,:,:,1)/3.6e6_wp-lef_lsm/lv/1000._wp)
 		        
                 call soil_solver(ipp,jpp,skp,l_h,r_h, &
                     tdend_lsm,a_lsm,b_lsm,c_lsm,r_lsm,u_lsm, pscs_lsm, &
@@ -525,7 +525,7 @@
                 ! set halos																 !
                 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!		
                 call exchange_full(ring_comm, id, kpp, jpp, ipp, &
-                                    r_h,r_h,r_h,r_h,r_h,r_h,th,0._sp,0._sp,dims,coords)
+                                    r_h,r_h,r_h,r_h,r_h,r_h,th,0._wp,0._wp,dims,coords)
                 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!	
             endif
 
@@ -599,7 +599,7 @@
 			! advance momentum 1 time-step                                               !
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 			call advance_momentum(ring_comm, id, rank2,&
-				2._sp*dt,dx,dy,dz,dxn,dyn,dzn,rhoa,rhoan,ipp,jpp,kpp,l_h,r_h,&
+				2._wp*dt,dx,dy,dz,dxn,dyn,dzn,rhoa,rhoan,ipp,jpp,kpp,l_h,r_h,&
 				tu,tv,tw,zu,zv,zw,su,sv,sw,p,dims,coords)
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
@@ -626,9 +626,9 @@
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 			! time-smoothing                                                             !
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-            u=0.99_sp*u+0.01_sp*zu
-            v=0.99_sp*v+0.01_sp*zv
-            w=0.99_sp*w+0.01_sp*zw
+            u=0.99_wp*u+0.01_wp*zu
+            v=0.99_wp*v+0.01_wp*zv
+            w=0.99_wp*w+0.01_wp*zw
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 
@@ -659,21 +659,21 @@
 			! set halos																	 !
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!		
 			call exchange_full(ring_comm, id, kpp, jpp, ipp, r_h,r_h,r_h,r_h,l_h,r_h,u,&
-								0._sp,0._sp,dims,coords)
+								0._wp,0._wp,dims,coords)
 			call exchange_full(ring_comm, id, kpp, jpp, ipp, r_h,r_h,l_h,r_h,r_h,r_h,v,&
-								0._sp,0._sp,dims,coords)
+								0._wp,0._wp,dims,coords)
 			call exchange_full(ring_comm, id, kpp, jpp, ipp, l_h,r_h,r_h,r_h,r_h,r_h,w,&
-								0._sp,0._sp,dims,coords)
+								0._wp,0._wp,dims,coords)
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 			if(coords(3)==0) then			
-                w(0,:,:)=0._sp ! the vertical velocity at the surface is zero
+                w(0,:,:)=0._wp ! the vertical velocity at the surface is zero
                 u(0,:,:)=-u(1,:,:) ! average results in zero horizontal velocity at ground
                 v(0,:,:)=-v(1,:,:)
             endif
             
             if(coords(3)==(dims(3)-1)) then
                 !w(kpp,:,:)=-w(kpp-1,:,:)
-                w(kpp+1,:,:)=0._sp
+                w(kpp+1,:,:)=0._wp
                 u(kpp+1,:,:)=u(kpp,:,:)
                 v(kpp+1,:,:)=v(kpp,:,:)
             endif
@@ -746,26 +746,26 @@
 		character (len=*), intent(in) :: outputfile
 		integer(i4b), intent(in) :: n, ip, ipp, ipstart, jp, jpp, jpstart, &
 									kp, kpp, kpstart, l_h,r_h, nq,nprec
-		real(sp), intent(in) :: time
-		real(sp), dimension(1-l_h:ipp+r_h), intent(in) :: x
-		real(sp), dimension(1-l_h:jpp+r_h), intent(in) :: y
-		real(sp), dimension(1-l_h:kpp+r_h), intent(in) :: z,rhoa, thetan, trefn
-		real(sp), &
+		real(wp), intent(in) :: time
+		real(wp), dimension(1-l_h:ipp+r_h), intent(in) :: x
+		real(wp), dimension(1-l_h:jpp+r_h), intent(in) :: y
+		real(wp), dimension(1-l_h:kpp+r_h), intent(in) :: z,rhoa, thetan, trefn
+		real(wp), &
 			dimension(1-r_h:kpp+r_h,1-r_h:jpp+r_h,1-r_h:ipp+r_h), &
 			intent(inout) :: th,p,div
-		real(sp), &
+		real(wp), &
 			dimension(1-r_h:kpp+r_h,1-r_h:jpp+r_h,1-l_h:ipp+r_h), &
 			intent(inout) :: u
-		real(sp), &
+		real(wp), &
 			dimension(1-r_h:kpp+r_h,1-l_h:jpp+r_h,1-r_h:ipp+r_h), &
 			intent(inout) :: v
-		real(sp), &
+		real(wp), &
 			dimension(1-l_h:kpp+r_h,1-r_h:jpp+r_h,1-r_h:ipp+r_h), &
 			intent(inout) :: w
 
         character(len=20), intent(in), dimension(nq) :: q_name
-        real(sp), dimension(1-l_h:kpp+r_h,1-r_h:jpp+r_h,1-r_h:ipp+r_h,nq), intent(in) :: q
-        real(sp), dimension(1:kpp,1-r_h:jpp+r_h,1-r_h:ipp+r_h,1:nprec), &
+        real(wp), dimension(1-l_h:kpp+r_h,1-r_h:jpp+r_h,1-r_h:ipp+r_h,nq), intent(in) :: q
+        real(wp), dimension(1:kpp,1-r_h:jpp+r_h,1-r_h:ipp+r_h,1:nprec), &
             intent(in) :: precip
 		logical, intent(in) :: moisture
 		integer(i4b), intent(in) :: id ,world_process, rank, ring_comm
@@ -1154,7 +1154,7 @@
 	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 	subroutine check(status)
 		use netcdf
-		use nrtype
+		use numerics_type
 		integer(i4b), intent ( in) :: status
 
 		if(status /= nf90_noerr) then

@@ -3,7 +3,7 @@
 	!>@brief
 	!>variables for the dynamical cloud model
     module variables
-    use nrtype
+    use numerics_type
 	!>@author
 	!>Paul J. Connolly, The University of Manchester
 	!>@brief
@@ -22,14 +22,14 @@
                             iqv, iqc, iqr, iqi, iqs, iqg, inc, inr, ini, ins, ing, &
                             cat_am, cat_c, cat_r, cat_i, iai
             integer(i4b), dimension(3) :: coords
-            real(sp) :: f, re, g, dt, forcing_tau
-            real(sp), dimension(:,:,:), allocatable :: u,v, w, rho, th, p, &
+            real(wp) :: f, re, g, dt, forcing_tau
+            real(wp), dimension(:,:,:), allocatable :: u,v, w, rho, th, p, &
             										su, sv, sw, psrc,zu,zv,zw,tu,tv,tw, &
             										sth,strain,vism,vist, div
 
-            real(sp), dimension(:,:,:,:), allocatable :: q, sq, viss, &
+            real(wp), dimension(:,:,:,:), allocatable :: q, sq, viss, &
             										precip, ngs,lamgs,mugs
-            real(sp), dimension(:), allocatable ::	dx, dy, dz, dxn,dyn,dzn, &
+            real(wp), dimension(:), allocatable ::	dx, dy, dz, dxn,dyn,dzn, &
             										x, y, z, xn,yn,zn, theta, thetan, &
             										rhoa, rhoan, lamsq, lamsqn, &
             										ubar,vbar,wbar,thbar, &
@@ -40,8 +40,8 @@
             integer(i4b), dimension(:), allocatable :: c_s, c_e
             character(len=20), dimension(:), allocatable :: q_name
             integer(i4b) :: n_mode, nrad=0
-            real(sp), dimension(:,:), allocatable :: qbar
-            real(sp) :: thbase, thtop
+            real(wp), dimension(:,:), allocatable :: qbar
+            real(wp) :: thbase, thtop
             
             integer(i4b), dimension(:), allocatable :: q_type
             logical :: micro_init=.true.
@@ -77,7 +77,7 @@
             integer(i4b) :: nq,ip, jp, kp, subgrid_model, advection_scheme, kord, &
                         microphysics_flag,nprec, ice_nuc_flag=1, mode1_ice_flag=0, &
                         mode2_ice_flag=0, coll_breakup_flag1=0, land_surface_init=0
-            real(sp) :: vis, &
+            real(wp) :: vis, &
             			runtime, dt, output_interval, &
             			rotation_period_hours, &
             			nudge_timescale, &
@@ -87,14 +87,14 @@
             			divergence_val,divergence_hgt, &
             			adiabatic_frac,t_cbase,t_ctop,rh_above,th_jump,th_grad, &
             			param_vmax, param_z, param_sigz, param_delz
-            real(sp) :: psurf,tsurf,z0,z0th, ptol=1.e-8_sp, drop_num, &
-                        j_stochastic=0.5e-9_sp
+            real(wp) :: psurf,tsurf,z0,z0th, ptol=1.e-8_wp, drop_num, &
+                        j_stochastic=0.5e-9_wp
             integer(i4b) :: n_levels
         end type namelist_input
 
 
-        real(sp), allocatable, dimension(:) :: theta_read, z_read, u_read, v_read
-        real(sp), allocatable, dimension(:,:) :: q_read
+        real(wp), allocatable, dimension(:) :: theta_read, z_read, u_read, v_read
+        real(wp), allocatable, dimension(:,:) :: q_read
         integer(i4b), dimension(:), allocatable :: q_type
         logical, dimension(:), allocatable :: q_init
         
