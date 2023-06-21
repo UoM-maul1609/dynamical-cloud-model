@@ -3,7 +3,7 @@
 	!>@brief
 	!>drivers for the dynamical cloud model
     module drivers_ser
-    use nrtype
+    use numerics_type
     !use variables
     private
     public :: model_driver, model_driver_2d
@@ -41,7 +41,7 @@
 				new_file,outputfile, output_interval, &
 				viscous, &
 				advection_scheme, kord, monotone,neumann)
-		use nrtype
+		use numerics_type
 		use advection_s_2d, only : first_order_upstream_2d, mpdata_2d, &
 		                    mpdata_vec_2d
 
@@ -52,26 +52,26 @@
 						l_h,r_h, ipstart, kpstart, &
 						advection_scheme, kord, neumann
 		character (len=*), intent(in) :: outputfile
-		real(sp), intent(in) :: output_interval, dt
-		real(sp), dimension(1-l_h:ipp+r_h), intent(in) :: x,dx, dxn
-		real(sp), dimension(1-l_h:kpp+r_h), intent(in) :: z,dz,dzn,&
+		real(wp), intent(in) :: output_interval, dt
+		real(wp), dimension(1-l_h:ipp+r_h), intent(in) :: x,dx, dxn
+		real(wp), dimension(1-l_h:kpp+r_h), intent(in) :: z,dz,dzn,&
 		                                        rhoa, rhoan,lamsq, lamsqn
 			
-		real(sp), &
+		real(wp), &
 			dimension(1-r_h:kpp+r_h,1-l_h:ipp+r_h), target, &
 			intent(inout) :: ut
-		real(sp), &
+		real(wp), &
 			dimension(1-l_h:kpp+r_h,1-r_h:ipp+r_h), target, &
 			intent(inout) :: wt
-		real(sp), &
+		real(wp), &
 			dimension(1-l_h:kpp+r_h,1-r_h:ipp+r_h,1:nq), target, &
 			intent(inout) :: q
 					
 		! locals:		
 		integer(i4b) :: n,n2, cur=1, i,j,k, error, rank2
-		real(sp) :: time, time_last_output, output_time, a
-		real(sp), dimension(:,:), pointer :: u,zu,tu
-		real(sp), dimension(:,:), pointer :: w,zw,tw
+		real(wp) :: time, time_last_output, output_time, a
+		real(wp), dimension(:,:), pointer :: u,zu,tu
+		real(wp), dimension(:,:), pointer :: w,zw,tw
 
 		
 
@@ -91,7 +91,7 @@
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 			! write netcdf variables                                                     !
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-			time=real(n-1,sp)*dt
+			time=real(n-1,wp)*dt
 			if (time-time_last_output >= output_interval) then
 			
 			
@@ -116,7 +116,7 @@
 			endif
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-! 			if(coords(3) == 0) w(1-l_h:0,:,:)=0._sp
+! 			if(coords(3) == 0) w(1-l_h:0,:,:)=0._wp
 			
 						
 						
@@ -237,7 +237,7 @@
 				new_file,outputfile, output_interval, &
 				viscous, &
 				advection_scheme, kord, monotone, neumann)
-		use nrtype
+		use numerics_type
 		use advection_s_1d, only : first_order_upstream_1d, mpdata_1d, &
 		                    mpdata_vec_1d
 
@@ -248,21 +248,21 @@
 						l_h,r_h, kpstart, &
 						advection_scheme, kord, neumann
 		character (len=*), intent(in) :: outputfile
-		real(sp), intent(in) :: output_interval, dt
-		real(sp), dimension(1-l_h:kpp+r_h), intent(in) :: z,dz,dzn,&
+		real(wp), intent(in) :: output_interval, dt
+		real(wp), dimension(1-l_h:kpp+r_h), intent(in) :: z,dz,dzn,&
 		                                        rhoa, rhoan,lamsq, lamsqn
 			
-		real(sp), &
+		real(wp), &
 			dimension(1-l_h:kpp+r_h), target, &
 			intent(inout) :: wt
-		real(sp), &
+		real(wp), &
 			dimension(1-l_h:kpp+r_h,1:nq), target, &
 			intent(inout) :: q
 					
 		! locals:		
 		integer(i4b) :: n,n2, cur=1, i,j,k, error, rank2
-		real(sp) :: time, time_last_output, output_time, a
-		real(sp), dimension(:), pointer :: w,zw,tw
+		real(wp) :: time, time_last_output, output_time, a
+		real(wp), dimension(:), pointer :: w,zw,tw
 		
 
 		time_last_output=-output_interval
@@ -278,8 +278,8 @@
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 			! write netcdf variables                                                     !
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-			time=real(n-1,sp)*dt
-            w=sin(2._sp*PI/1200._sp*time)
+			time=real(n-1,wp)*dt
+            w=sin(2._wp*PI/1200._wp*time)
 			if (time-time_last_output >= output_interval) then
 			
 			
@@ -304,7 +304,7 @@
 			endif
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-			!w(1-l_h:0)=0._sp
+			!w(1-l_h:0)=0._wp
 			
 						
 						
@@ -393,16 +393,16 @@
 		character (len=*), intent(in) :: outputfile
 		integer(i4b), intent(in) :: n, nq,ip, ipp, ipstart, &
 									kp, kpp, kpstart, l_h,r_h
-		real(sp), intent(in) :: time
-		real(sp), dimension(1-l_h:ipp+r_h), intent(in) :: x
-		real(sp), dimension(1-l_h:kpp+r_h), intent(in) :: z,rhoa
-		real(sp), &
+		real(wp), intent(in) :: time
+		real(wp), dimension(1-l_h:ipp+r_h), intent(in) :: x
+		real(wp), dimension(1-l_h:kpp+r_h), intent(in) :: z,rhoa
+		real(wp), &
 			dimension(1-r_h:kpp+r_h,1-r_h:ipp+r_h,1:nq), &
 			intent(inout) :: q
-		real(sp), &
+		real(wp), &
 			dimension(1-r_h:kpp+r_h,1-l_h:ipp+r_h), &
 			intent(inout) :: u
-		real(sp), &
+		real(wp), &
 			dimension(1-l_h:kpp+r_h,1-r_h:ipp+r_h), &
 			intent(inout) :: w
 		
@@ -608,12 +608,12 @@
 		logical, intent(inout) :: new_file
 		character (len=*), intent(in) :: outputfile
 		integer(i4b), intent(in) :: n, nq,kp, kpp, kpstart, l_h,r_h
-		real(sp), intent(in) :: time
-		real(sp), dimension(1-l_h:kpp+r_h), intent(in) :: z,rhoa
-		real(sp), &
+		real(wp), intent(in) :: time
+		real(wp), dimension(1-l_h:kpp+r_h), intent(in) :: z,rhoa
+		real(wp), &
 			dimension(1-r_h:kpp+r_h,1:nq), &
 			intent(inout) :: q
-		real(sp), &
+		real(wp), &
 			dimension(1-l_h:kpp+r_h), &
 			intent(inout) :: w
 		
@@ -769,7 +769,7 @@
 	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 	subroutine check(status)
 		use netcdf
-		use nrtype
+		use numerics_type
 		integer(i4b), intent ( in) :: status
 
 		if(status /= nf90_noerr) then

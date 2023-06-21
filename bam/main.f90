@@ -19,7 +19,7 @@
 	!> calculation
 	
     program main
-        use nrtype1
+	    use numerics_type
         use random, only : random_normal
         use bam, only : n_mode, n_sv, giant_flag, method_flag, sv_flag, &
         	n_aer1, d_aer1, sig_aer1, molw_core1, density_core1, nu_core1, org_content1, &

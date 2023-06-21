@@ -13,9 +13,8 @@
 	!>@brief
 	!>microphysics code for the different cloud models
     module p_micro_module
-    use nrtype
-    use nr, only : locate, polint
-    use erfinv_m, only : erfinv
+    use numerics_type
+    use numerics, only : find_pos, poly_int, erfinv
 
     use bam, only : n_mode, n_sv, giant_flag, method_flag, sv_flag, &
         	n_aer1, d_aer1, sig_aer1, molw_core1, density_core1, nu_core1, org_content1, &
@@ -31,85 +30,85 @@
             p_initialise_aerosol_3d,p_initialise_aerosol, p_initialise_aerosol_1d, &
             calculate_gamma_params
             
-    real(sp) :: mrthresh, mrupper, miupper, f_mode2, lambda0r, lambda0i, n0r, n0i, &
+    real(wp) :: mrthresh, mrupper, miupper, f_mode2, lambda0r, lambda0i, n0r, n0i, &
             pthreshr, pthreshi
-    real(sp), parameter :: phi_mode2=0.35_sp, probthresh=0.9999_sp, grav=9.81_sp
+    real(wp), parameter :: phi_mode2=0.35_wp, probthresh=0.9999_wp, grav=9.81_wp
     
     ! Chen and Lamb (1994) Gamma variable fit (scaled and centred logarithm)
     integer(i4b), parameter :: n_cl=18
-    real(sp), dimension(n_cl), parameter :: gam_cl=[-0.072328469664620_sp, &
-        -0.324623262465577_sp, 0.363138099937540_sp, 3.323089908344732_sp, &
-        0.874844989423720_sp, &
-        -13.554426432462339_sp, -9.810322482346461_sp, 27.846739088352344_sp, &
-        26.480447842355410_sp,&
-         -29.890199206698309_sp, -32.327548996894521_sp, 15.827423311652167_sp, &
-         18.466605783503052_sp, -4.158566361058538_sp, -5.039533848938808_sp, &
-         1.477272813054374_sp, 1.038600921563425_sp, -0.457007828432810_sp]
-    real(sp), dimension(2), parameter :: gam_mu_cl=[260.163817050062335_sp, &
-                                                8.274747821396463_sp]
+    real(wp), dimension(n_cl), parameter :: gam_cl=[-0.072328469664620_wp, &
+        -0.324623262465577_wp, 0.363138099937540_wp, 3.323089908344732_wp, &
+        0.874844989423720_wp, &
+        -13.554426432462339_wp, -9.810322482346461_wp, 27.846739088352344_wp, &
+        26.480447842355410_wp,&
+         -29.890199206698309_wp, -32.327548996894521_wp, 15.827423311652167_wp, &
+         18.466605783503052_wp, -4.158566361058538_wp, -5.039533848938808_wp, &
+         1.477272813054374_wp, 1.038600921563425_wp, -0.457007828432810_wp]
+    real(wp), dimension(2), parameter :: gam_mu_cl=[260.163817050062335_wp, &
+                                                8.274747821396463_wp]
                                                 
     ! Vardiman (1978) fits to figure 6 - note delta M in units on g cm s-1
-    real(sp), dimension(3), parameter :: vard01=[0.000495314304309_sp, &
-                                                 0.281199363154805_sp, &
-                                                 3.380130133900658_sp], &
-                                         vard02=[0.304288838581395_sp, &
-                                                 4.452491028368538_sp, &
-                                                 17.511640705855431_sp], &
-                                         vard03=[1.549508244781713_sp, &
-                                                 21.756014605694737_sp, &
-                                                 77.539493556502251_sp], &
-                                         vard04=[0.924318964759507_sp, &
-                                                 15.774108106443462_sp, &
-                                                 68.805308506959534_sp], &
-                                         vard05=[0.162609020092783_sp, &
-                                                 3.031949785103254_sp, &
-                                                 15.296369750198556_sp]
+    real(wp), dimension(3), parameter :: vard01=[0.000495314304309_wp, &
+                                                 0.281199363154805_wp, &
+                                                 3.380130133900658_wp], &
+                                         vard02=[0.304288838581395_wp, &
+                                                 4.452491028368538_wp, &
+                                                 17.511640705855431_wp], &
+                                         vard03=[1.549508244781713_wp, &
+                                                 21.756014605694737_wp, &
+                                                 77.539493556502251_wp], &
+                                         vard04=[0.924318964759507_wp, &
+                                                 15.774108106443462_wp, &
+                                                 68.805308506959534_wp], &
+                                         vard05=[0.162609020092783_wp, &
+                                                 3.031949785103254_wp, &
+                                                 15.296369750198556_wp]
                                           
     
     ! physical constants
-    real(sp), parameter :: rhow=1000._sp, rhoi=920._sp,lv=2.5e6_sp,ls=2.8e6_sp,lf=ls-lv, &
-    					   cp=1005._sp, cw=4187._sp, cice=2093._sp, r=8.314_sp, &
-    						mw=18e-3_sp, ma=29e-3_sp, ra=r/ma,rv=r/mw, eps1=ra/rv, &
-    						ttr=273.15_sp, joules_in_an_erg=1.0e-7_sp, &
-    						joules_in_a_cal=4.187_sp, &
-    						gamma_liq=0.072_sp, DEcrit=0.2_sp, &
-    						oneoversix=1._sp/6._sp, dtt=10.e-6_sp, &
-        					oneoverthree=1._sp/3._sp, oneovernine=1._sp/9._sp, &
-        					oneoverpi=1._sp/pi, phi_phillips=3.5e-3_sp    
+    real(wp), parameter :: rhow=1000._wp, rhoi=920._wp,lv=2.5e6_wp,ls=2.8e6_wp,lf=ls-lv, &
+    					   cp=1005._wp, cw=4187._wp, cice=2093._wp, r=8.314_wp, &
+    						mw=18e-3_wp, ma=29e-3_wp, ra=r/ma,rv=r/mw, eps1=ra/rv, &
+    						ttr=273.15_wp, joules_in_an_erg=1.0e-7_wp, &
+    						joules_in_a_cal=4.187_wp, &
+    						gamma_liq=0.072_wp, DEcrit=0.2_wp, &
+    						oneoversix=1._wp/6._wp, dtt=10.e-6_wp, &
+        					oneoverthree=1._wp/3._wp, oneovernine=1._wp/9._wp, &
+        					oneoverpi=1._wp/pi, phi_phillips=3.5e-3_wp    
 
     ! mass-diameter and size spectra relations
-    real(sp), parameter :: cr=523.6_sp, cc=523.6_sp, &
-                        cs=52.36_sp, cg=261.8_sp, ci=104._sp, &
-    					dr=3_sp, dc=3_sp, ds=3._sp, dg=3._sp, di=3._sp, &
-    					alpha_r=2.5_sp, alpha_c=0.0_sp, & ! note, alpha_c is for a "mass" - number distribution
-    					alpha_s=2.5_sp, alpha_g=2.5_sp, alpha_i=0._sp
+    real(wp), parameter :: cr=523.6_wp, cc=523.6_wp, &
+                        cs=52.36_wp, cg=261.8_wp, ci=104._wp, &
+    					dr=3_wp, dc=3_wp, ds=3._wp, dg=3._wp, di=3._wp, &
+    					alpha_r=2.5_wp, alpha_c=0.0_wp, & ! note, alpha_c is for a "mass" - number distribution
+    					alpha_s=2.5_wp, alpha_g=2.5_wp, alpha_i=0._wp
     					
 	! terminal fall-speed relations
-	real(sp), parameter :: a_r=362._sp, a_c=362._sp, &
-	                        a_s=4.84_sp, a_g=253._sp, a_i=71.34_sp, &
-							b_r=0.65_sp, b_c=0.65_sp, &
-							b_s=0.25_sp, b_g=0.734_sp, b_i=0.6635_sp, &
-							f_r=0._sp, f_c=0._sp, f_s=0._sp, f_g=0._sp, f_i=0._sp
+	real(wp), parameter :: a_r=362._wp, a_c=362._wp, &
+	                        a_s=4.84_wp, a_g=253._wp, a_i=71.34_wp, &
+							b_r=0.65_wp, b_c=0.65_wp, &
+							b_s=0.25_wp, b_g=0.734_wp, b_i=0.6635_wp, &
+							f_r=0._wp, f_c=0._wp, f_s=0._wp, f_g=0._wp, f_i=0._wp
 							
 	! autoconversion
-	real(sp), parameter :: aw0=1e-3_sp, dwa=20e-6_sp, nl=2.4e8_sp, &
-						lw0=rhow*pi/6._sp*nl*dwa**3, &
-						tsaut=60._sp, dimax=0.3e-3_sp, di2s=0.33e-3_sp, &
-						lambda_imin=(1._sp+di+alpha_i)/dimax, &
-						tsbreak=60._sp, lambda_s_break=1000._sp
+	real(wp), parameter :: aw0=1e-3_wp, dwa=20e-6_wp, nl=2.4e8_wp, &
+						lw0=rhow*pi/6._wp*nl*dwa**3, &
+						tsaut=60._wp, dimax=0.3e-3_wp, di2s=0.33e-3_wp, &
+						lambda_imin=(1._wp+di+alpha_i)/dimax, &
+						tsbreak=60._wp, lambda_s_break=1000._wp
 	
     ! microphysical values:
-    real(sp), parameter :: hm_rate=3.5e8_sp, nar=1.1e15_sp, nbr=0._sp, &
-    						rho0=1.2_sp, bbigg=100._sp, abigg=0.66_sp
-    real(sp) :: mi0=1.e-14_sp
+    real(wp), parameter :: hm_rate=3.5e8_wp, nar=1.1e15_wp, nbr=0._wp, &
+    						rho0=1.2_wp, bbigg=100._wp, abigg=0.66_wp
+    real(wp) :: mi0=1.e-14_wp
     
 
 	! coalescence efficiencies
-	real(sp), parameter :: erw=1._sp, erg=1._sp, ers=1._sp, eri=1._sp, esw=1._sp, &
-						egw=1._sp, eiw=1._sp, egs_wet=1._sp, egi_wet=1._sp
+	real(wp), parameter :: erw=1._wp, erg=1._wp, ers=1._wp, eri=1._wp, esw=1._wp, &
+						egw=1._wp, eiw=1._wp, egs_wet=1._wp, egi_wet=1._wp
 	
 	! variables used in various process rates:
-	real(sp) :: gam1r,gam2r,gam3r,gam1c, gam2c, gam3c, &
+	real(wp) :: gam1r,gam2r,gam3r,gam1c, gam2c, gam3c, &
 	            gam1i,gam2i, gam1s, gam2s,gam1g,gam2g, &
 	            gam3ai,gam3bi,gam4ai,gam4bi,gam5ai,gam5bi, fall_q_i_hw,fall_n_i_hw, &
 				fall_q_r, fall_q_c, fall_q_s, fall_q_g, fall_n_r, fall_n_s, fall_n_g, &
@@ -132,22 +131,22 @@
 				gam1cr,gam2cr ! for radiation
 				
 	! some work space to transfer data between functions
-	real(sp), dimension(5) :: phillips_br_workspace
+	real(wp), dimension(5) :: phillips_br_workspace
 				
 	! Seifert and Beheng autoconversion
-	real(sp) :: kc, kr, xstar
+	real(wp) :: kc, kr, xstar
 				
-	real(sp), dimension(3) :: c=[1._sp,2._sp,1._sp]
+	real(wp), dimension(3) :: c=[1._wp,2._wp,1._wp]
 	integer(i4b) :: k
-	real(sp) :: isnow, iice, iice2, f1,f2,a,b, qsmall=1.e-30_sp
+	real(wp) :: isnow, iice, iice2, f1,f2,a,b, qsmall=1.e-30_wp
 	
 	! to send to integrator
-	real(sp) :: a_hw_new, pre_hw_new, ci_new, t_send, lam_freeze, n0_freeze
+	real(wp) :: a_hw_new, pre_hw_new, ci_new, t_send, lam_freeze, n0_freeze
 	
 	integer :: n_modes_prof, n_levels_s
-	real(sp), allocatable, dimension(:,:) :: n_read, sig_read, d_read
-	real(sp), allocatable, dimension(:) :: z_read
-	real(sp) :: small_number
+	real(wp), allocatable, dimension(:,:) :: n_read, sig_read, d_read
+	real(wp), allocatable, dimension(:) :: z_read
+	real(wp) :: small_number
     contains
     
 	!>@author
@@ -177,10 +176,10 @@
     function ln_mom(k,n,sig,d) 
         implicit none
         integer(i4b), intent(in) :: k
-        real(sp), intent(in) :: n,sig,d
-        real(sp) :: ln_mom
+        real(wp), intent(in) :: n,sig,d
+        real(wp) :: ln_mom
         
-        ln_mom=n*exp(real(k,sp)*log(d)+real(k,sp)**2*sig**2/2._sp)
+        ln_mom=n*exp(real(k,wp)*log(d)+real(k,wp)**2*sig**2/2._wp)
     end function ln_mom
     
     
@@ -198,16 +197,16 @@
     function ln_part_mom(k,a,n,sig,d) 
         implicit none
         integer(i4b), intent(in) :: k
-        real(sp), intent(in) :: a,n,sig,d
-        real(sp) :: ln_part_mom
+        real(wp), intent(in) :: a,n,sig,d
+        real(wp) :: ln_part_mom
         
-        real(sp) :: x1, phi1
+        real(wp) :: x1, phi1
         
-        x1=(log(a)-log(d)-sig**2*real(k,sp))/(sig*sqrt(2._sp))
-        phi1=0.5_sp*(1._sp+erf(x1))
+        x1=(log(a)-log(d)-sig**2*real(k,wp))/(sig*sqrt(2._wp))
+        phi1=0.5_wp*(1._wp+erf(x1))
 
         ln_part_mom= &
-            max(n*exp(log(d)*real(k,sp)+sig**2*real(k,sp)**2*0.5_sp)* (1._sp-phi1), 0._sp)
+            max(n*exp(log(d)*real(k,wp)+sig**2*real(k,wp)**2*0.5_wp)* (1._wp-phi1), 0._wp)
         
     end function ln_part_mom
     
@@ -220,20 +219,20 @@
 	!>@param[inout] sig_aer,d_aer
 	subroutine ln_params_from_integral_moms(n,s,m,rho,sig_aer,d_aer)
 	    implicit none
-	    real(sp), intent(in) :: n,s,m, rho
-	    real(sp), intent(inout) :: sig_aer, d_aer
+	    real(wp), intent(in) :: n,s,m, rho
+	    real(wp), intent(inout) :: sig_aer, d_aer
 	
-	    if(m .gt. 0._sp) then
+	    if(m .gt. 0._wp) then
             ! this was derived by calculating moments of the distribution
             ! and solving to find dm and sig
-            sig_aer=log( (36._sp*m**2*n*pi/rho**2)**(1._sp/3._sp) / s )
+            sig_aer=log( (36._wp*m**2*n*pi/rho**2)**(1._wp/3._wp) / s )
             sig_aer=sqrt(sig_aer)
         
-            d_aer=(log(6._sp*m/(n*pi*rho))-4.5_sp*sig_aer**2) / 3._sp
+            d_aer=(log(6._wp*m/(n*pi*rho))-4.5_wp*sig_aer**2) / 3._wp
             d_aer=exp(d_aer)	
         else
-            sig_aer=0.3_sp
-            d_aer=60.e-9_sp            
+            sig_aer=0.3_wp
+            d_aer=60.e-9_wp            
         endif	
 	end subroutine ln_params_from_integral_moms
 	
@@ -249,17 +248,17 @@
 	                            sig_aer,d_aer,n_mix,s_mix,m_mix)
 	    implicit none
 	    integer(i4b), intent(in) :: n_mode
-	    real(sp), intent(in) :: n
-	    real(sp), dimension(n_mode-1), intent(in) :: s,m
-	    real(sp), dimension(n_mode), intent(inout) :: rho,molw,nu
-	    real(sp), intent(inout) :: n_aer,sig_aer, d_aer,n_mix,s_mix,m_mix
+	    real(wp), intent(in) :: n
+	    real(wp), dimension(n_mode-1), intent(in) :: s,m
+	    real(wp), dimension(n_mode), intent(inout) :: rho,molw,nu
+	    real(wp), intent(inout) :: n_aer,sig_aer, d_aer,n_mix,s_mix,m_mix
 
         
 	    n_aer=n
 	    n_mix=n
 	    s_mix=sum(s)
 	    m_mix=sum(m)
-        if(m_mix .gt. 0._sp) then
+        if(m_mix .gt. 0._wp) then
             ! conserve volume of particle:	
             rho(n_mode) = sum(m) / sum(m/rho(1:n_mode-1))
             ! conserve total number of moles in particle:	
@@ -269,15 +268,15 @@
 
             ! this was derived by calculating moments of the distribution
             ! and solving to find dm and sig
-            sig_aer=log( (36._sp*m_mix**2*n*pi/rho(n_mode)**2)**(1._sp/3._sp) / s_mix )
-            if(sig_aer.le.0._sp) then
-                sig_aer=0.3_sp
-                d_aer=60.e-9_sp
-                n_aer=0._sp
+            sig_aer=log( (36._wp*m_mix**2*n*pi/rho(n_mode)**2)**(1._wp/3._wp) / s_mix )
+            if(sig_aer.le.0._wp) then
+                sig_aer=0.3_wp
+                d_aer=60.e-9_wp
+                n_aer=0._wp
             else
                 sig_aer=sqrt(sig_aer)
         
-                d_aer=(log(6._sp*m_mix/(n*pi*rho(n_mode)))-4.5_sp*sig_aer**2) / 3._sp
+                d_aer=(log(6._wp*m_mix/(n*pi*rho(n_mode)))-4.5_wp*sig_aer**2) / 3._wp
                 d_aer=exp(d_aer)	
             endif
 
@@ -286,8 +285,8 @@
             molw(n_mode)=molw(n_mode-1)    
             nu(n_mode)=nu(n_mode-1)    
             
-            sig_aer=0.3_sp
-            d_aer=60.e-9_sp
+            sig_aer=0.3_wp
+            d_aer=60.e-9_wp
         endif
         
 	end subroutine ln_params_and_props_from_integral_moms
@@ -523,16 +522,16 @@
         logical :: aero_prof_flag
         integer(i4b), intent(in) :: nq, ncat, inc, kp, o_halo
         integer(i4b), dimension(ncat), intent(in) :: c_s, c_e
-        real(sp), dimension(-o_halo+1:kp+o_halo), intent(in) :: z
-        real(sp), dimension(-o_halo+1:kp+o_halo), intent(in) :: &
+        real(wp), dimension(-o_halo+1:kp+o_halo), intent(in) :: z
+        real(wp), dimension(-o_halo+1:kp+o_halo), intent(in) :: &
     					rho, p, t
-        real(sp), dimension(-o_halo+1:kp+o_halo,nq), &
+        real(wp), dimension(-o_halo+1:kp+o_halo,nq), &
             intent(inout) :: q
 
         ! local variables
         integer(i4b) :: i, k, AllocateStatus, iloc
-        real(sp) :: w, smax, phi, xx, kmom, var, dummy
-        real(sp), dimension(:), allocatable :: act_frac1 , dcrit
+        real(wp) :: w, smax, phi, xx, kmom, var, dummy
+        real(wp), dimension(:), allocatable :: act_frac1 , dcrit
          
         
         allocate(act_frac1(1:n_mode))
@@ -548,20 +547,20 @@
 		
 		
 		    if(aero_prof_flag) then
-                iloc=locate(z_read(1:n_levels_s),z(k))
+                iloc=find_pos(z_read(1:n_levels_s),z(k))
                 iloc=min(n_levels_s-1,iloc)
                 iloc=max(1,iloc)
                 do i=1,n_mode
                     ! linear interp n_aer
-                    call polint(z_read(iloc:iloc+1), n_read(i,iloc:iloc+1), &
+                    call poly_int(z_read(iloc:iloc+1), n_read(i,iloc:iloc+1), &
                                 min(z(k),z_read(n_levels_s)), var,dummy)
                     n_aer1(i)=var
                     ! linear interp sig_aer
-                    call polint(z_read(iloc:iloc+1), sig_read(i,iloc:iloc+1), &
+                    call poly_int(z_read(iloc:iloc+1), sig_read(i,iloc:iloc+1), &
                                 min(z(k),z_read(n_levels_s)), var,dummy)
                     sig_aer1(i)=var
                     ! linear interp d_aer
-                    call polint(z_read(iloc:iloc+1), d_read(i,iloc:iloc+1), &
+                    call poly_int(z_read(iloc:iloc+1), d_read(i,iloc:iloc+1), &
                                 min(z(k),z_read(n_levels_s)), var,dummy)
                     d_aer1(i)=var
                 enddo
@@ -574,7 +573,7 @@
                 ! surface area: 2nd moment x pi:
                 q(k,(i-1)*3+3)= pi* ln_mom(2,n_aer1(i),sig_aer1(i),d_aer1(i))
                 ! mass: 3rd moment x pi/6*rho:
-                q(k,(i-1)*3+4)= pi/6._sp*density_core1(i)* &
+                q(k,(i-1)*3+4)= pi/6._wp*density_core1(i)* &
                     ln_mom(3,n_aer1(i),sig_aer1(i),d_aer1(i))
 
             enddo
@@ -587,7 +586,7 @@
             !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
             ! initialise aerosol in cloud water    
             !  
-            if(q(k,(n_mode-1)*6+3) .gt. 0._sp) then 
+            if(q(k,(n_mode-1)*6+3) .gt. 0._wp) then 
 
                 
                 call find_d_and_s_crits(p(k),t(k),q(k,(n_mode-1)*6+3),w,smax,dcrit)
@@ -609,15 +608,15 @@
                     
                     
                     ! mass
-                    q(k,(n_mode-1)*6+7+(i-1)*3)= pi/6._sp*density_core1(i)* &
+                    q(k,(n_mode-1)*6+7+(i-1)*3)= pi/6._wp*density_core1(i)* &
                         ln_part_mom(3,dcrit(i),n_aer1(i),sig_aer1(i),d_aer1(i))
                     q(k,(i-1)*3+4)=q(k,(i-1)*3+4)-q(k,(n_mode-1)*6+7+(i-1)*3)
                 enddo
                 
                 
             else
-                smax=0._sp
-                dcrit=1000._sp
+                smax=0._wp
+                dcrit=1000._wp
             endif
         enddo
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -662,17 +661,17 @@
         logical :: aero_prof_flag
         integer(i4b), intent(in) :: nq, ncat, inc, ip, kp, o_halo
         integer(i4b), dimension(ncat), intent(in) :: c_s, c_e
-        real(sp), dimension(-o_halo+1:ip+o_halo), intent(in) :: x
-        real(sp), dimension(-o_halo+1:kp+o_halo), intent(in) :: z
-        real(sp), dimension(-o_halo+1:kp+o_halo,-o_halo+1:ip+o_halo), intent(in) :: &
+        real(wp), dimension(-o_halo+1:ip+o_halo), intent(in) :: x
+        real(wp), dimension(-o_halo+1:kp+o_halo), intent(in) :: z
+        real(wp), dimension(-o_halo+1:kp+o_halo,-o_halo+1:ip+o_halo), intent(in) :: &
     					rho, p, t
-        real(sp), dimension(-o_halo+1:kp+o_halo,-o_halo+1:ip+o_halo,nq), &
+        real(wp), dimension(-o_halo+1:kp+o_halo,-o_halo+1:ip+o_halo,nq), &
             intent(inout) :: q, q_old
 
         ! local variables
         integer(i4b) :: i, k, AllocateStatus, iloc
-        real(sp) :: w, smax, phi, xx, kmom, var, dummy
-        real(sp), dimension(:), allocatable :: act_frac1 , dcrit
+        real(wp) :: w, smax, phi, xx, kmom, var, dummy
+        real(wp), dimension(:), allocatable :: act_frac1 , dcrit
          
         
         allocate(act_frac1(1:n_mode))
@@ -688,20 +687,20 @@
 		
 		
 		    if(aero_prof_flag) then
-                iloc=locate(z_read(1:n_levels_s),z(k))
+                iloc=find_pos(z_read(1:n_levels_s),z(k))
                 iloc=min(n_levels_s-1,iloc)
                 iloc=max(1,iloc)
                 do i=1,n_mode
                     ! linear interp n_aer
-                    call polint(z_read(iloc:iloc+1), n_read(i,iloc:iloc+1), &
+                    call poly_int(z_read(iloc:iloc+1), n_read(i,iloc:iloc+1), &
                                 min(z(k),z_read(n_levels_s)), var,dummy)
                     n_aer1(i)=var
                     ! linear interp sig_aer
-                    call polint(z_read(iloc:iloc+1), sig_read(i,iloc:iloc+1), &
+                    call poly_int(z_read(iloc:iloc+1), sig_read(i,iloc:iloc+1), &
                                 min(z(k),z_read(n_levels_s)), var,dummy)
                     sig_aer1(i)=var
                     ! linear interp d_aer
-                    call polint(z_read(iloc:iloc+1), d_read(i,iloc:iloc+1), &
+                    call poly_int(z_read(iloc:iloc+1), d_read(i,iloc:iloc+1), &
                                 min(z(k),z_read(n_levels_s)), var,dummy)
                     d_aer1(i)=var
                 enddo
@@ -714,7 +713,7 @@
                 ! surface area: 2nd moment x pi:
                 q(k,:,(i-1)*3+3)= pi* ln_mom(2,n_aer1(i),sig_aer1(i),d_aer1(i))
                 ! mass: 3rd moment x pi/6*rho:
-                q(k,:,(i-1)*3+4)= pi/6._sp*density_core1(i)* &
+                q(k,:,(i-1)*3+4)= pi/6._wp*density_core1(i)* &
                     ln_mom(3,n_aer1(i),sig_aer1(i),d_aer1(i))
 
             enddo
@@ -727,7 +726,7 @@
             !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
             ! initialise aerosol in cloud water    
             !  
-            if(q(k,1,(n_mode-1)*6+3) .gt. 0._sp) then 
+            if(q(k,1,(n_mode-1)*6+3) .gt. 0._wp) then 
 
                 
                 call find_d_and_s_crits(p(k,1),t(k,1),q(k,1,(n_mode-1)*6+3),w,smax,dcrit)
@@ -751,15 +750,15 @@
                     
                     
                     ! mass
-                    q(k,:,(n_mode-1)*6+7+(i-1)*3)= pi/6._sp*density_core1(i)* &
+                    q(k,:,(n_mode-1)*6+7+(i-1)*3)= pi/6._wp*density_core1(i)* &
                         ln_part_mom(3,dcrit(i),n_aer1(i),sig_aer1(i),d_aer1(i))
                     q(k,:,(i-1)*3+4)=q(k,:,(i-1)*3+4)-q(k,:,(n_mode-1)*6+7+(i-1)*3)
                 enddo
                 
                 
             else
-                smax=0._sp
-                dcrit=1000._sp
+                smax=0._wp
+                dcrit=1000._wp
             endif
         enddo
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -801,17 +800,17 @@
         logical :: aero_prof_flag
         integer(i4b), intent(in) :: nq, ncat, inc, ip, jp, kp, o_halo
         integer(i4b), dimension(ncat), intent(in) :: c_s, c_e
-        real(sp), dimension(-o_halo+1:ip+o_halo), intent(in) :: x
-        real(sp), dimension(-o_halo+1:jp+o_halo), intent(in) :: y
-        real(sp), dimension(-o_halo+1:kp+o_halo), intent(in) :: z
-        real(sp), dimension(-o_halo+1:kp+o_halo), intent(in) :: rho, p, t
-        real(sp), dimension(-o_halo+1:kp+o_halo,-o_halo+1:jp+o_halo,-o_halo+1:ip+o_halo,nq), &
+        real(wp), dimension(-o_halo+1:ip+o_halo), intent(in) :: x
+        real(wp), dimension(-o_halo+1:jp+o_halo), intent(in) :: y
+        real(wp), dimension(-o_halo+1:kp+o_halo), intent(in) :: z
+        real(wp), dimension(-o_halo+1:kp+o_halo), intent(in) :: rho, p, t
+        real(wp), dimension(-o_halo+1:kp+o_halo,-o_halo+1:jp+o_halo,-o_halo+1:ip+o_halo,nq), &
             intent(inout) :: q
 
         ! local variables
         integer(i4b) :: i, k, AllocateStatus, iloc
-        real(sp) :: w, smax, phi, xx, kmom, var, dummy
-        real(sp), dimension(:), allocatable :: act_frac1 , dcrit
+        real(wp) :: w, smax, phi, xx, kmom, var, dummy
+        real(wp), dimension(:), allocatable :: act_frac1 , dcrit
          
         
         allocate(act_frac1(1:n_mode))
@@ -827,20 +826,20 @@
 		
 		
 		    if(aero_prof_flag) then
-                iloc=locate(z_read(1:n_levels_s),z(k))
+                iloc=find_pos(z_read(1:n_levels_s),z(k))
                 iloc=min(n_levels_s-1,iloc)
                 iloc=max(1,iloc)
                 do i=1,n_mode
                     ! linear interp n_aer
-                    call polint(z_read(iloc:iloc+1), n_read(i,iloc:iloc+1), &
+                    call poly_int(z_read(iloc:iloc+1), n_read(i,iloc:iloc+1), &
                                 min(z(k),z_read(n_levels_s)), var,dummy)
                     n_aer1(i)=var
                     ! linear interp sig_aer
-                    call polint(z_read(iloc:iloc+1), sig_read(i,iloc:iloc+1), &
+                    call poly_int(z_read(iloc:iloc+1), sig_read(i,iloc:iloc+1), &
                                 min(z(k),z_read(n_levels_s)), var,dummy)
                     sig_aer1(i)=var
                     ! linear interp d_aer
-                    call polint(z_read(iloc:iloc+1), d_read(i,iloc:iloc+1), &
+                    call poly_int(z_read(iloc:iloc+1), d_read(i,iloc:iloc+1), &
                                 min(z(k),z_read(n_levels_s)), var,dummy)
                     d_aer1(i)=var
                 enddo
@@ -853,7 +852,7 @@
                 ! surface area: 2nd moment x pi:
                 q(k,:,:,(i-1)*3+3)= pi* ln_mom(2,n_aer1(i),sig_aer1(i),d_aer1(i))
                 ! mass: 3rd moment x pi/6*rho:
-                q(k,:,:,(i-1)*3+4)= pi/6._sp*density_core1(i)* &
+                q(k,:,:,(i-1)*3+4)= pi/6._wp*density_core1(i)* &
                     ln_mom(3,n_aer1(i),sig_aer1(i),d_aer1(i))
 
             enddo
@@ -866,7 +865,7 @@
             !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
             ! initialise aerosol in cloud water    
             !  
-            if(q(k,1,1,(n_mode-1)*6+3) .gt. 0._sp) then 
+            if(q(k,1,1,(n_mode-1)*6+3) .gt. 0._wp) then 
 
                 
                 call find_d_and_s_crits(p(k),t(k),&
@@ -892,15 +891,15 @@
                     
                     
                     ! mass
-                    q(k,:,:,(n_mode-1)*6+7+(i-1)*3)= pi/6._sp*density_core1(i)* &
+                    q(k,:,:,(n_mode-1)*6+7+(i-1)*3)= pi/6._wp*density_core1(i)* &
                         ln_part_mom(3,dcrit(i),n_aer1(i),sig_aer1(i),d_aer1(i))
                     q(k,:,:,(i-1)*3+4)=q(k,:,:,(i-1)*3+4)-q(k,:,:,(n_mode-1)*6+7+(i-1)*3)
                 enddo
                 
                 
             else
-                smax=0._sp
-                dcrit=1000._sp
+                smax=0._wp
+                dcrit=1000._wp
             endif
         enddo
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -934,185 +933,185 @@
     small_number=epsilon(small_number)
     
 	! used to calculate intercept and slopes
-	gam1r=gamma(1._sp+alpha_r)
-	gam2r=gamma(1._sp+alpha_r+dr)
-	gam3r=gamma(5._sp+alpha_r)
-	gam1c=gamma(1._sp+alpha_c)
-	gam2c=gamma(1._sp+alpha_c+1._sp) ! note the 1, instead of dc - drop distribution
+	gam1r=gamma(1._wp+alpha_r)
+	gam2r=gamma(1._wp+alpha_r+dr)
+	gam3r=gamma(5._wp+alpha_r)
+	gam1c=gamma(1._wp+alpha_c)
+	gam2c=gamma(1._wp+alpha_c+1._wp) ! note the 1, instead of dc - drop distribution
 	                                ! is a mass distribution
-	gam3c=gamma(4._sp/dc+alpha_c+1._sp) ! note different to rain 
+	gam3c=gamma(4._wp/dc+alpha_c+1._wp) ! note different to rain 
 	                                    !because cloud is a mass distribution
-	gam1i=gamma(1._sp+alpha_i)
-	gam2i=gamma(1._sp+alpha_i+di)
-	gam1s=gamma(1._sp+alpha_s)
-	gam2s=gamma(1._sp+alpha_s+ds)
-	gam1g=gamma(1._sp+alpha_g)
-	gam2g=gamma(1._sp+alpha_g+dg)
+	gam1i=gamma(1._wp+alpha_i)
+	gam2i=gamma(1._wp+alpha_i+di)
+	gam1s=gamma(1._wp+alpha_s)
+	gam2s=gamma(1._wp+alpha_s+ds)
+	gam1g=gamma(1._wp+alpha_g)
+	gam2g=gamma(1._wp+alpha_g+dg)
 	
 	! Raphael's "Magic" function representation of fall-speeds
 	! Derived from Heymsfield and Westbrook (2010)
-	gam3ai=1._sp/gamma(alpha_i+di/2._sp)
-	gam3bi=4._sp/gamma(alpha_i+di)
-	gam4ai=1._sp/gamma(alpha_i+di+di/2._sp)
-	gam4bi=4._sp/gamma(alpha_i+2._sp*di)
-	gam5ai=1._sp/gamma(alpha_i+1.5_sp+0.25_sp*di)
-	gam5bi=2._sp/gamma(alpha_i+1.5_sp+0.5_sp*di)
-	fall_q_i_hw=1._sp/ gamma(1._sp+alpha_i+di)
-	fall_n_i_hw=1._sp/ gamma(1._sp+alpha_i)
+	gam3ai=1._wp/gamma(alpha_i+di/2._wp)
+	gam3bi=4._wp/gamma(alpha_i+di)
+	gam4ai=1._wp/gamma(alpha_i+di+di/2._wp)
+	gam4bi=4._wp/gamma(alpha_i+2._wp*di)
+	gam5ai=1._wp/gamma(alpha_i+1.5_wp+0.25_wp*di)
+	gam5bi=2._wp/gamma(alpha_i+1.5_wp+0.5_wp*di)
+	fall_q_i_hw=1._wp/ gamma(1._wp+alpha_i+di)
+	fall_n_i_hw=1._wp/ gamma(1._wp+alpha_i)
 	
 
     ! mass weighted fall for r, c, s, g, i
-    fall_q_r=a_r*gamma(1._sp+alpha_r+dr+b_r) / gamma(1._sp+alpha_r+dr)
-    fall_q_c=a_c*gamma(1._sp+alpha_c+1._sp+b_c) / gamma(1._sp+alpha_c+1._sp)
-    fall_q_s=a_s*gamma(1._sp+alpha_s+ds+b_s) / gamma(1._sp+alpha_s+ds)
-    fall_q_g=a_g*gamma(1._sp+alpha_g+dg+b_g) / gamma(1._sp+alpha_g+dg)
-    fall_q_i=a_i*gamma(1._sp+alpha_i+di+b_i) / gamma(1._sp+alpha_i+di)
+    fall_q_r=a_r*gamma(1._wp+alpha_r+dr+b_r) / gamma(1._wp+alpha_r+dr)
+    fall_q_c=a_c*gamma(1._wp+alpha_c+1._wp+b_c) / gamma(1._wp+alpha_c+1._wp)
+    fall_q_s=a_s*gamma(1._wp+alpha_s+ds+b_s) / gamma(1._wp+alpha_s+ds)
+    fall_q_g=a_g*gamma(1._wp+alpha_g+dg+b_g) / gamma(1._wp+alpha_g+dg)
+    fall_q_i=a_i*gamma(1._wp+alpha_i+di+b_i) / gamma(1._wp+alpha_i+di)
 
     ! number weighted fall for r, c, s, g
-    fall_n_r=a_r*gamma(1._sp+alpha_r+b_r) / gamma(1._sp+alpha_r)
-    fall_n_c=a_c*gamma(1._sp+alpha_c+b_c) / gamma(1._sp+alpha_c)
-    fall_n_s=a_s*gamma(1._sp+alpha_s+b_s) / gamma(1._sp+alpha_s)
-    fall_n_g=a_g*gamma(1._sp+alpha_g+b_g) / gamma(1._sp+alpha_g)
-    fall_n_i=a_i*gamma(1._sp+alpha_i+b_i) / gamma(1._sp+alpha_i)
+    fall_n_r=a_r*gamma(1._wp+alpha_r+b_r) / gamma(1._wp+alpha_r)
+    fall_n_c=a_c*gamma(1._wp+alpha_c+b_c) / gamma(1._wp+alpha_c)
+    fall_n_s=a_s*gamma(1._wp+alpha_s+b_s) / gamma(1._wp+alpha_s)
+    fall_n_g=a_g*gamma(1._wp+alpha_g+b_g) / gamma(1._wp+alpha_g)
+    fall_n_i=a_i*gamma(1._wp+alpha_i+b_i) / gamma(1._wp+alpha_i)
     
     ! sweep out of rain
-    phi_r=pi*a_r*gamma(3._sp+b_r+alpha_r) / 4._sp
+    phi_r=pi*a_r*gamma(3._wp+b_r+alpha_r) / 4._wp
     
     ! ice accreting rain
-    mass_iacr=pi*eri*a_r*cr*gamma(3._sp+b_r+dr+alpha_r)/4._sp
-    num_iacr =pi*eri*a_r*gamma(3._sp+b_r+alpha_r)/4._sp
+    mass_iacr=pi*eri*a_r*cr*gamma(3._wp+b_r+dr+alpha_r)/4._wp
+    num_iacr =pi*eri*a_r*gamma(3._wp+b_r+alpha_r)/4._wp
 
 	! collection of cloud by snow and ice
-	mass_sacw_i=pi*a_s*gamma(3._sp+b_s+alpha_s)/4._sp
-	mass_iacw=pi*a_i*gamma(3._sp+b_i+alpha_i)/4._sp
+	mass_sacw_i=pi*a_s*gamma(3._wp+b_s+alpha_s)/4._wp
+	mass_iacw=pi*a_i*gamma(3._wp+b_i+alpha_i)/4._wp
 	
 	! collisions between precipitating particles of different species
 	! rain-snow
-	mass_raci1=gamma(1._sp+alpha_r)*gamma(3._sp+alpha_i+di)
-	mass_raci2=2._sp*gamma(2._sp+alpha_r)*gamma(2._sp+alpha_i+di)
-	mass_raci3=gamma(3._sp+alpha_r)*gamma(1._sp+alpha_i+di)
+	mass_raci1=gamma(1._wp+alpha_r)*gamma(3._wp+alpha_i+di)
+	mass_raci2=2._wp*gamma(2._wp+alpha_r)*gamma(2._wp+alpha_i+di)
+	mass_raci3=gamma(3._wp+alpha_r)*gamma(1._wp+alpha_i+di)
 	
-	num_raci1=gamma(1._sp+alpha_r)*gamma(3._sp+alpha_i)
-	num_raci2=2._sp*gamma(2._sp+alpha_r)*gamma(2._sp+alpha_i)
-	num_raci3=gamma(3._sp+alpha_r)*gamma(1._sp+alpha_i)
+	num_raci1=gamma(1._wp+alpha_r)*gamma(3._wp+alpha_i)
+	num_raci2=2._wp*gamma(2._wp+alpha_r)*gamma(2._wp+alpha_i)
+	num_raci3=gamma(3._wp+alpha_r)*gamma(1._wp+alpha_i)
     ! rain-graupel
-	mass_racg1=gamma(1._sp+alpha_r)*gamma(3._sp+alpha_g+dg)
-	mass_racg2=2._sp*gamma(2._sp+alpha_r)*gamma(2._sp+alpha_g+dg)
-	mass_racg3=gamma(3._sp+alpha_r)*gamma(1._sp+alpha_g+dg)
+	mass_racg1=gamma(1._wp+alpha_r)*gamma(3._wp+alpha_g+dg)
+	mass_racg2=2._wp*gamma(2._wp+alpha_r)*gamma(2._wp+alpha_g+dg)
+	mass_racg3=gamma(3._wp+alpha_r)*gamma(1._wp+alpha_g+dg)
 
-	num_racg1=gamma(1._sp+alpha_r)*gamma(3._sp+alpha_g)
-	num_racg2=2._sp*gamma(2._sp+alpha_r)*gamma(2._sp+alpha_g)
-	num_racg3=gamma(3._sp+alpha_r)*gamma(1._sp+alpha_g)
+	num_racg1=gamma(1._wp+alpha_r)*gamma(3._wp+alpha_g)
+	num_racg2=2._wp*gamma(2._wp+alpha_r)*gamma(2._wp+alpha_g)
+	num_racg3=gamma(3._wp+alpha_r)*gamma(1._wp+alpha_g)
     ! snow-rain
-	mass_iacr1=gamma(1._sp+alpha_i)*gamma(3._sp+alpha_r+dr)
-	mass_iacr2=2._sp*gamma(2._sp+alpha_i)*gamma(2._sp+alpha_r+dr)
-	mass_iacr3=gamma(3._sp+alpha_i)*gamma(1._sp+alpha_r+dr)
+	mass_iacr1=gamma(1._wp+alpha_i)*gamma(3._wp+alpha_r+dr)
+	mass_iacr2=2._wp*gamma(2._wp+alpha_i)*gamma(2._wp+alpha_r+dr)
+	mass_iacr3=gamma(3._wp+alpha_i)*gamma(1._wp+alpha_r+dr)
     ! snow-graupel
-	mass_sacg1=gamma(1._sp+alpha_s)*gamma(3._sp+alpha_g+dg)
-	mass_sacg2=2._sp*gamma(2._sp+alpha_s)*gamma(2._sp+alpha_g+dg)
-	mass_sacg3=gamma(3._sp+alpha_s)*gamma(1._sp+alpha_g+dg)
+	mass_sacg1=gamma(1._wp+alpha_s)*gamma(3._wp+alpha_g+dg)
+	mass_sacg2=2._wp*gamma(2._wp+alpha_s)*gamma(2._wp+alpha_g+dg)
+	mass_sacg3=gamma(3._wp+alpha_s)*gamma(1._wp+alpha_g+dg)
 
-	num_sacg1=gamma(1._sp+alpha_s)*gamma(3._sp+alpha_g)
-	num_sacg2=2._sp*gamma(2._sp+alpha_s)*gamma(2._sp+alpha_g)
-	num_sacg3=gamma(3._sp+alpha_s)*gamma(1._sp+alpha_g)
+	num_sacg1=gamma(1._wp+alpha_s)*gamma(3._wp+alpha_g)
+	num_sacg2=2._wp*gamma(2._wp+alpha_s)*gamma(2._wp+alpha_g)
+	num_sacg3=gamma(3._wp+alpha_s)*gamma(1._wp+alpha_g)
     ! graupel-rain
-	mass_gacr1=gamma(1._sp+alpha_g)*gamma(3._sp+alpha_r+dr)
-	mass_gacr2=2._sp*gamma(2._sp+alpha_g)*gamma(2._sp+alpha_r+dr)
-	mass_gacr3=gamma(3._sp+alpha_g)*gamma(1._sp+alpha_r+dr)
+	mass_gacr1=gamma(1._wp+alpha_g)*gamma(3._wp+alpha_r+dr)
+	mass_gacr2=2._wp*gamma(2._wp+alpha_g)*gamma(2._wp+alpha_r+dr)
+	mass_gacr3=gamma(3._wp+alpha_g)*gamma(1._wp+alpha_r+dr)
     ! graupel-snow
-	mass_gacs1=gamma(1._sp+alpha_g)*gamma(3._sp+alpha_s+ds)
-	mass_gacs2=2._sp*gamma(2._sp+alpha_g)*gamma(2._sp+alpha_s+ds)
-	mass_gacs3=gamma(3._sp+alpha_g)*gamma(1._sp+alpha_s+ds)
+	mass_gacs1=gamma(1._wp+alpha_g)*gamma(3._wp+alpha_s+ds)
+	mass_gacs2=2._wp*gamma(2._wp+alpha_g)*gamma(2._wp+alpha_s+ds)
+	mass_gacs3=gamma(3._wp+alpha_g)*gamma(1._wp+alpha_s+ds)
 	
 	
 	! accretion and riming by graupel
-	mass_gacw=pi*egw*a_g*gamma(3._sp+b_g+alpha_g)/4._sp
-	mass_gaci=pi*a_g*gamma(3._sp+b_g+alpha_g)/4._sp
+	mass_gacw=pi*egw*a_g*gamma(3._wp+b_g+alpha_g)/4._wp
+	mass_gaci=pi*a_g*gamma(3._wp+b_g+alpha_g)/4._wp
     
     ! gauss hypergeometric equations aggregation of ice with ice (and snow with snow)
     ! See Ferrier (1994, JAS part 1, equation B.21)
     ! snow:
-    a=1._sp
-    b=4._sp+2._sp*alpha_s+b_s
-    isnow=0._sp
+    a=1._wp
+    b=4._wp+2._wp*alpha_s+b_s
+    isnow=0._wp
     do k=1,3
-	    call hygfx(a, b, real(k,sp)+alpha_s+1.0_sp,0.5_sp,f1)
-	    call hygfx(a, b, real(k,sp)+alpha_s+b_s+1.0_sp, 0.5_sp,f2)
-	    isnow=isnow+c(k)*(f1/(real(k,sp)+alpha_s)-f2/(real(k,sp)+alpha_s+b_s))
+	    call hygfx(a, b, real(k,wp)+alpha_s+1.0_wp,0.5_wp,f1)
+	    call hygfx(a, b, real(k,wp)+alpha_s+b_s+1.0_wp, 0.5_wp,f2)
+	    isnow=isnow+c(k)*(f1/(real(k,wp)+alpha_s)-f2/(real(k,wp)+alpha_s+b_s))
 	enddo
-	isnow=a_s*pi*gamma(b)/(2._sp**(6._sp+2._sp*alpha_s+b_s)) * isnow
+	isnow=a_s*pi*gamma(b)/(2._wp**(6._wp+2._wp*alpha_s+b_s)) * isnow
 	
     ! ice:
-    a=1._sp
-    b=4._sp+2._sp*alpha_i+b_i
-    iice=0._sp
+    a=1._wp
+    b=4._wp+2._wp*alpha_i+b_i
+    iice=0._wp
     do k=1,3
-	    call hygfx(a, b, real(k,sp)+alpha_i+1.0_sp,0.5_sp,f1)
-	    call hygfx(a, b, real(k,sp)+alpha_i+b_i+1.0_sp, 0.5_sp,f2)
-	    iice=iice+c(k)*(f1/(real(k,sp)+alpha_i)-f2/(real(k,sp)+alpha_i+b_i))
+	    call hygfx(a, b, real(k,wp)+alpha_i+1.0_wp,0.5_wp,f1)
+	    call hygfx(a, b, real(k,wp)+alpha_i+b_i+1.0_wp, 0.5_wp,f2)
+	    iice=iice+c(k)*(f1/(real(k,wp)+alpha_i)-f2/(real(k,wp)+alpha_i+b_i))
 	enddo
-	iice=a_i*pi*gamma(b)/(2._sp**(6._sp+2._sp*alpha_i+b_i)) * iice
+	iice=a_i*pi*gamma(b)/(2._wp**(6._wp+2._wp*alpha_i+b_i)) * iice
 	
     ! ice for Heymsfield and Westbrook (2010):
-    a=1._sp
-    b=3._sp+2._sp*alpha_i+di
-    iice2=0._sp
+    a=1._wp
+    b=3._wp+2._wp*alpha_i+di
+    iice2=0._wp
     do k=1,3
-	    call hygfx(a, b, real(k,sp)+alpha_i+1.0_sp,0.5_sp,f1)
-	    call hygfx(a, b, real(k,sp)+alpha_i+di, 0.5_sp,f2)
-	    iice2=iice2+c(k)*(f1/(real(k,sp)+alpha_i)-f2/(real(k,sp)+alpha_i+di-1._sp))
+	    call hygfx(a, b, real(k,wp)+alpha_i+1.0_wp,0.5_wp,f1)
+	    call hygfx(a, b, real(k,wp)+alpha_i+di, 0.5_wp,f2)
+	    iice2=iice2+c(k)*(f1/(real(k,wp)+alpha_i)-f2/(real(k,wp)+alpha_i+di-1._wp))
 	enddo
-	iice2=pi*gamma(b)/(2._sp**(5._sp+2._sp*alpha_i+di)) * iice2
+	iice2=pi*gamma(b)/(2._wp**(5._wp+2._wp*alpha_i+di)) * iice2
 		
 	! ventilation
 	! rain:
-	nu_r1=0.78_sp*gamma(2._sp+alpha_r)
-	nu_r2=gamma(0.5_sp*b_r+alpha_r+2.5)
+	nu_r1=0.78_wp*gamma(2._wp+alpha_r)
+	nu_r2=gamma(0.5_wp*b_r+alpha_r+2.5)
 	! ice:
-	nu_i1=0.78_sp*gamma(2._sp+alpha_i)
-	nu_i2=0.31_sp*gamma(0.5_sp*b_i+alpha_i+2.5)
+	nu_i1=0.78_wp*gamma(2._wp+alpha_i)
+	nu_i2=0.31_wp*gamma(0.5_wp*b_i+alpha_i+2.5)
 	! snow:
-	nu_s1=0.78_sp*gamma(2._sp+alpha_s)
-	nu_s2=0.31_sp*gamma(0.5_sp*b_s+alpha_s+2.5)
+	nu_s1=0.78_wp*gamma(2._wp+alpha_s)
+	nu_s2=0.31_wp*gamma(0.5_wp*b_s+alpha_s+2.5)
 	! graupel:
-	nu_g1=0.78_sp*gamma(2._sp+alpha_g)
-	nu_g2=0.31_sp*gamma(0.5_sp*b_g+alpha_g+2.5)
+	nu_g1=0.78_wp*gamma(2._wp+alpha_g)
+	nu_g2=0.31_wp*gamma(0.5_wp*b_g+alpha_g+2.5)
 	
 	! immersion freezing by bigg
-	mass_imm=gamma(4._sp+dr+alpha_r)*pi*cr*bbigg/6._sp
-	num_imm=gamma(4._sp+alpha_r)*pi*bbigg/6._sp
+	mass_imm=gamma(4._wp+dr+alpha_r)*pi*cr*bbigg/6._wp
+	num_imm=gamma(4._wp+alpha_r)*pi*bbigg/6._wp
 	
 	
 	! precipitation
-	chi_rain=gamma(1._sp+alpha_r+b_r+dr)
-	chi_cloud=gamma(1._sp+alpha_c+b_c+1._sp)
-	chi_ice=gamma(1._sp+alpha_i+b_i+di)
-	chi_num_ice=gamma(1._sp+alpha_i+b_i)
-	chi_snow=gamma(1._sp+alpha_s+b_s+ds)
-	chi_graupel=gamma(1._sp+alpha_g+b_g+dg)
+	chi_rain=gamma(1._wp+alpha_r+b_r+dr)
+	chi_cloud=gamma(1._wp+alpha_c+b_c+1._wp)
+	chi_ice=gamma(1._wp+alpha_i+b_i+di)
+	chi_num_ice=gamma(1._wp+alpha_i+b_i)
+	chi_snow=gamma(1._wp+alpha_s+b_s+ds)
+	chi_graupel=gamma(1._wp+alpha_g+b_g+dg)
 	
-	chi_rain1=gamma(1._sp+alpha_r+dr)
-	chi_cloud1=gamma(1._sp+alpha_c+1._sp)
-	chi_ice1=gamma(1._sp+alpha_i+di)
-	chi_num_ice1=gamma(1._sp+alpha_i)
-	chi_snow1=gamma(1._sp+alpha_s+ds)
-	chi_graupel1=gamma(1._sp+alpha_g+dg)
+	chi_rain1=gamma(1._wp+alpha_r+dr)
+	chi_cloud1=gamma(1._wp+alpha_c+1._wp)
+	chi_ice1=gamma(1._wp+alpha_i+di)
+	chi_num_ice1=gamma(1._wp+alpha_i)
+	chi_snow1=gamma(1._wp+alpha_s+ds)
+	chi_graupel1=gamma(1._wp+alpha_g+dg)
 	
 
     ! Seifert and Beheng autoconversion:
-    kc=9.44e9_sp ! m3 kg-2 s-1
-    kr=5.78e0_sp ! m3 kg-2 s-1
-    xstar=2.6e-10_sp ! kg
+    kc=9.44e9_wp ! m3 kg-2 s-1
+    kr=5.78e0_wp ! m3 kg-2 s-1
+    xstar=2.6e-10_wp ! kg
     
     
     ! mode 2 multiplication - specify the limit of integration for gamma distribution
-    pthreshr=invgammainc(probthresh,alpha_r+1.0_sp)
-    pthreshi=invgammainc(probthresh,alpha_i+1.0_sp)
+    pthreshr=invgammainc(probthresh,alpha_r+1.0_wp)
+    pthreshi=invgammainc(probthresh,alpha_i+1.0_wp)
     
     
     ! for radiation - converting number-mass to number-diameter
-    gam1cr=gamma(alpha_c+1._sp+1._sp/dc)
-    gam2cr=gamma(alpha_c+1._sp+2._sp/dc)
+    gam1cr=gamma(alpha_c+1._wp+1._wp/dc)
+    gam2cr=gamma(alpha_c+1._wp+2._wp/dc)
     end subroutine initialise_microphysics_vars
     
     
@@ -1147,26 +1146,26 @@
         cat_am,&
         cat_c, cat_r,cat_i,l_h,r_h
     integer(i4b), dimension(ncat), intent(in) :: cst,cen
-    real(sp), dimension(-l_h+1:kp+r_h,-l_h+1:jp+r_h,-l_h+1:ip+r_h,nq), intent(inout) :: q
+    real(wp), dimension(-l_h+1:kp+r_h,-l_h+1:jp+r_h,-l_h+1:ip+r_h,nq), intent(inout) :: q
 
-    real(sp), dimension(-l_h+1:kp+r_h), intent(in) :: rhoan
+    real(wp), dimension(-l_h+1:kp+r_h), intent(in) :: rhoan
     logical, intent(in) :: ice_flag
     
     integer(i4b), intent(in) :: nrad
-	real(sp), intent(inout), dimension(-l_h+1:kp+r_h,-l_h+1:jp+r_h,-l_h+1:ip+r_h,nrad) :: ngs,lamgs,mugs
+	real(wp), intent(inout), dimension(-l_h+1:kp+r_h,-l_h+1:jp+r_h,-l_h+1:ip+r_h,nrad) :: ngs,lamgs,mugs
 
 	! locals
 	integer(i4b) :: i,j,k
-	real(sp) :: p
-	real(sp), dimension(-l_h+1:kp+r_h,-l_h+1:jp+r_h,-l_h+1:ip+r_h,4) :: moms
+	real(wp) :: p
+	real(wp), dimension(-l_h+1:kp+r_h,-l_h+1:jp+r_h,-l_h+1:ip+r_h,4) :: moms
 
     ! RAIN
     do i=1-l_h,ip+r_h
         do j=1-l_h,jp+r_h
             do k=1-l_h,kp+r_h
                 ! rain n0, lambda
-                lamgs(k,j,i,2)=(max(q(k,j,i,cst(cat_r)),1._sp)*cr*gam2r / &
-                        (max(q(k,j,i,cst(cat_r)+1),1.e-10_sp)*gam1r))**(1._sp/dr)
+                lamgs(k,j,i,2)=(max(q(k,j,i,cst(cat_r)),1._wp)*cr*gam2r / &
+                        (max(q(k,j,i,cst(cat_r)+1),1.e-10_wp)*gam1r))**(1._wp/dr)
             enddo
         enddo
     enddo
@@ -1175,8 +1174,8 @@
             do k=1-l_h,kp+r_h
                 ! rain n0, lambda
                 ngs(k,j,i,2)=rhoan(k)* &
-                    max(q(k,j,i,cst(cat_r)),0._sp)*&
-                    lamgs(k,j,i,2)**(1._sp+alpha_r) / gam1r
+                    max(q(k,j,i,cst(cat_r)),0._wp)*&
+                    lamgs(k,j,i,2)**(1._wp+alpha_r) / gam1r
             enddo
         enddo
     enddo
@@ -1198,8 +1197,8 @@
         do j=1-l_h,jp+r_h
             do k=1-l_h,kp+r_h
                 ! cloud n0, lambda    
-                lamgs(k,j,i,1)=(max(q(k,j,i,inc),1._sp)*gam2c / &
-                    (max(q(k,j,i,iqc),1.e-10_sp)*gam1c))**(1._sp/1._sp)
+                lamgs(k,j,i,1)=(max(q(k,j,i,inc),1._wp)*gam2c / &
+                    (max(q(k,j,i,iqc),1.e-10_wp)*gam1c))**(1._wp/1._wp)
             enddo
         enddo
     enddo
@@ -1208,28 +1207,28 @@
         do j=1-l_h,jp+r_h
             do k=1-l_h,kp+r_h
                 ! cloud n0, lambda    
-                ngs(k,j,i,1)=rhoan(k)*max(q(k,j,i,inc),0._sp)*&
-                    lamgs(k,j,i,1)**(1._sp+alpha_c) / gam1c
+                ngs(k,j,i,1)=rhoan(k)*max(q(k,j,i,inc),0._wp)*&
+                    lamgs(k,j,i,1)**(1._wp+alpha_c) / gam1c
             enddo
         enddo
     enddo
     ! cloud moments
     ! see https://journals.ametsoc.org/view/journals/atsc/68/7/2011jas3645.1.xml
     ! equation 17 - modified gamma distribution
-    moms=0._sp
+    moms=0._wp
     do i=1-l_h,ip+r_h
         do j=1-l_h,jp+r_h
             do k=1-l_h,kp+r_h
                 ! zeroth - number
-                if (q(k,j,i,inc).lt.1._sp) cycle
-                if (q(k,j,i,iqc).lt.1.e-20_sp) cycle
+                if (q(k,j,i,inc).lt.1._wp) cycle
+                if (q(k,j,i,iqc).lt.1.e-20_wp) cycle
                 moms(k,j,i,1)=rhoan(k)*q(k,j,i,inc)
                 ! first 
                 moms(k,j,i,2)=ngs(k,j,i,1)*gam1cr / &
-                    (cc**(1._sp/dc)*lamgs(k,j,i,1)**(alpha_c+1._sp+1._sp/dc))
+                    (cc**(1._wp/dc)*lamgs(k,j,i,1)**(alpha_c+1._wp+1._wp/dc))
                 ! second  
                 moms(k,j,i,3)=ngs(k,j,i,1)*gam2cr / &
-                    (cc**(2._sp/dc)*lamgs(k,j,i,1)**(alpha_c+1._sp+2._sp/dc))
+                    (cc**(2._wp/dc)*lamgs(k,j,i,1)**(alpha_c+1._wp+2._wp/dc))
                 ! third 
                 moms(k,j,i,4)=rhoan(k)*q(k,j,i,iqc)/cc
             enddo
@@ -1244,14 +1243,14 @@
                     moms(k,j,i,3)/moms(k,j,i,4)
                 ! p=(alpha + 1) / (alpha+3)
                 ! mu    
-                mugs(k,j,i,1)=(1._sp-3._sp*p) / (p-1._sp)
+                mugs(k,j,i,1)=(1._wp-3._wp*p) / (p-1._wp)
                 ! now calculate ratio of m0 : m1
                 p=moms(k,j,i,1) / moms(k,j,i,2)
                 ! lambda from this ratio
-                lamgs(k,j,i,1)=p*(mugs(k,j,i,1)+1._sp)
+                lamgs(k,j,i,1)=p*(mugs(k,j,i,1)+1._wp)
                 ! n0
-                ngs(k,j,i,1)=lamgs(k,j,i,1)**(mugs(k,j,i,1)+1._sp)*moms(k,j,i,1) / &
-                    gamma(mugs(k,j,i,1)+1._sp)
+                ngs(k,j,i,1)=lamgs(k,j,i,1)**(mugs(k,j,i,1)+1._wp)*moms(k,j,i,1) / &
+                    gamma(mugs(k,j,i,1)+1._wp)
             enddo
         enddo
     enddo
@@ -1263,8 +1262,8 @@
             do j=1-l_h,jp+r_h
                 do k=1-l_h,kp+r_h
                     ! ice n0, lambda
-                    lamgs(k,j,i,3)=(max(q(k,j,i,ini),1._sp)*ci*gam2i / &
-                        (max(q(k,j,i,iqi),1.e-10_sp)*gam1i))**(1._sp/di)
+                    lamgs(k,j,i,3)=(max(q(k,j,i,ini),1._wp)*ci*gam2i / &
+                        (max(q(k,j,i,iqi),1.e-10_wp)*gam1i))**(1._wp/di)
                 enddo
             enddo
         enddo
@@ -1272,8 +1271,8 @@
             do j=1-l_h,jp+r_h
                 do k=1-l_h,kp+r_h
                     ! ice n0, lambda
-                    ngs(k,j,i,3)=rhoan(k)*max(q(k,j,i,ini),0._sp)*&
-                        lamgs(k,j,i,3)**(1._sp+alpha_i) / gam1i
+                    ngs(k,j,i,3)=rhoan(k)*max(q(k,j,i,ini),0._wp)*&
+                        lamgs(k,j,i,3)**(1._wp+alpha_i) / gam1i
                 enddo
             enddo
         enddo
@@ -1395,41 +1394,41 @@
         cat_am,&
         cat_c, cat_r,cat_i,l_h,r_h, nprec
     integer(i4b), dimension(ncat), intent(in) :: cst,cen
-    real(sp), intent(in) :: dt
-    real(sp), dimension(-l_h+1:kp+r_h,-l_h+1:jp+r_h,-l_h+1:ip+r_h,nq), intent(inout) :: q
-    real(sp), dimension(1:kp,1-l_h:jp+r_h,1-l_h:ip+r_h,nprec), intent(inout) :: precip
-    real(sp), dimension(-l_h+1:kp+r_h,-l_h+1:jp+r_h,-l_h+1:ip+r_h), intent(inout) :: &
+    real(wp), intent(in) :: dt
+    real(wp), dimension(-l_h+1:kp+r_h,-l_h+1:jp+r_h,-l_h+1:ip+r_h,nq), intent(inout) :: q
+    real(wp), dimension(1:kp,1-l_h:jp+r_h,1-l_h:ip+r_h,nprec), intent(inout) :: precip
+    real(wp), dimension(-l_h+1:kp+r_h,-l_h+1:jp+r_h,-l_h+1:ip+r_h), intent(inout) :: &
     					th
-    real(sp), dimension(-l_h+1:kp+r_h), intent(in) :: z, dz, dzn, rhoa,rhoan, thetan, &
+    real(wp), dimension(-l_h+1:kp+r_h), intent(in) :: z, dz, dzn, rhoa,rhoan, thetan, &
         prefn
-    real(sp), dimension(-l_h+1:kp+r_h,-l_h+1:jp+r_h,-l_h+1:ip+r_h), intent(in) :: w
+    real(wp), dimension(-l_h+1:kp+r_h,-l_h+1:jp+r_h,-l_h+1:ip+r_h), intent(in) :: w
     logical, intent(in) :: ice_flag, hm_flag, wr_flag, theta_flag, calc_params, &
         heyms_west, lawson, recycle
     integer(i4b), intent(in) :: ice_nuc_flag, mode1_ice_flag, mode2_ice_flag, &
                                 coll_breakup_flag1
     logical , intent(inout) :: micro_init
-    real(sp), intent(in) :: mass_ice, j_stochastic
+    real(wp), intent(in) :: mass_ice, j_stochastic
     
     integer(i4b), intent(in) :: nrad
-	real(sp), intent(inout), &
+	real(wp), intent(inout), &
 	    dimension(-l_h+1:kp+r_h,-l_h+1:jp+r_h,-l_h+1:ip+r_h,nrad) :: ngs,lamgs,mugs
 
 	! locals
 	integer(i4b) :: i,j,k,n, error,n1
 #if MPI_PAMM == 1
-	real(sp), dimension(-l_h+1:kp+r_h,-l_h+1:jp+r_h,-l_h+1:ip+r_h) :: & 
+	real(wp), dimension(-l_h+1:kp+r_h,-l_h+1:jp+r_h,-l_h+1:ip+r_h) :: & 
 	                vqr, vqc, vqi, vni
 	integer(i4b), dimension(3) :: n_step,n_step_o,n_step_g
     integer(i4b), intent(in) :: id, comm,comm_vert
     integer(i4b), dimension(3), intent(in) :: coords, dims
-    real(sp), dimension(nq) :: lbc,ubc
+    real(wp), dimension(nq) :: lbc,ubc
     logical, dimension(3) :: adv_lg, adv_l=[.false.,.false.,.false.], &
                     adv_l_o=[.false.,.false.,.false.], adv_lgg
 
     n_step=1
     n_step_o=1
-    lbc=0._sp
-    ubc=0._sp
+    lbc=0._wp
+    ubc=0._wp
 #endif
 	
 	do i=1,ip
@@ -1484,7 +1483,7 @@
     ! full exchange needed                                                               !
     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     call exchange_full(comm, id, kp, jp, ip, r_h,r_h,r_h,r_h,r_h,r_h, &
-                            th,0._sp,0._sp,dims,coords)
+                            th,0._wp,0._wp,dims,coords)
     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -1499,9 +1498,9 @@
     ! Vert communications
     if(adv_lg(1)) then
         call exchange_along_z(comm_vert, id, kp, jp, ip, r_h,r_h,r_h,r_h,r_h,r_h, &
-                                vqc(:,:,:),0._sp,0._sp,dims,coords)
+                                vqc(:,:,:),0._wp,0._wp,dims,coords)
         do n=1,n_step_g(1)
-            call mpdata_vec_vert_3d(dt/real(n_step_g(1),sp),dz,dzn,&
+            call mpdata_vec_vert_3d(dt/real(n_step_g(1),wp),dz,dzn,&
                     rhoa,rhoan, &
                     ip,jp,kp,cen(cat_c)-cst(cat_c)+1,l_h,r_h,&
                     vqc,q(:,:,:,cst(cat_c):cen(cat_c)),&
@@ -1512,10 +1511,10 @@
     endif       
     if(adv_lg(2)) then
         call exchange_along_z(comm_vert, id, kp, jp, ip, r_h,r_h,r_h,r_h,r_h,r_h, &
-                                vqr(:,:,:),0._sp,0._sp,dims,coords)
+                                vqr(:,:,:),0._wp,0._wp,dims,coords)
         do n=1,n_step_g(2)
 
-            call mpdata_vec_vert_3d(dt/real(n_step_g(2),sp),dz,dzn,&
+            call mpdata_vec_vert_3d(dt/real(n_step_g(2),wp),dz,dzn,&
                     rhoa,rhoan, &
                     ip,jp,kp,cen(cat_r)-cst(cat_r)+1,l_h,r_h,&
                     vqr,q(:,:,:,cst(cat_r):cen(cat_r)),&
@@ -1527,10 +1526,10 @@
     endif       
     if(adv_lg(3)) then
         call exchange_along_z(comm_vert, id, kp, jp, ip, r_h,r_h,r_h,r_h,r_h,r_h, &
-                                vqi(:,:,:),0._sp,0._sp,dims,coords)
+                                vqi(:,:,:),0._wp,0._wp,dims,coords)
         do n=1,n_step_g(3)
 
-            call mpdata_vec_vert_3d(dt/real(n_step_g(3),sp),dz,dzn,&
+            call mpdata_vec_vert_3d(dt/real(n_step_g(3),wp),dz,dzn,&
                     rhoa,rhoan, &
                     ip,jp,kp,cen(cat_i)-cst(cat_i)+1,l_h,r_h,&
                     vqi,q(:,:,:,cst(cat_i):cen(cat_i)),&
@@ -1643,26 +1642,26 @@
         ini,iqi,iai, &
         cat_am,cat_c, cat_r, cat_i,nprec
     integer(i4b), dimension(ncat), intent(in) :: cst,cen
-    real(sp), intent(in) :: dt
-    real(sp), dimension(-o_halo+1:kp+o_halo,-o_halo+1:ip+o_halo,nq), intent(inout) :: q
-    real(sp), dimension(1:kp,1:ip,1:nprec), intent(inout) :: precip
-    real(sp), dimension(-o_halo+1:kp+o_halo,-o_halo+1:ip+o_halo), intent(inout) :: &
+    real(wp), intent(in) :: dt
+    real(wp), dimension(-o_halo+1:kp+o_halo,-o_halo+1:ip+o_halo,nq), intent(inout) :: q
+    real(wp), dimension(1:kp,1:ip,1:nprec), intent(inout) :: precip
+    real(wp), dimension(-o_halo+1:kp+o_halo,-o_halo+1:ip+o_halo), intent(inout) :: &
     					theta, p,rho
-    real(sp), dimension(-o_halo+1:kp+o_halo), intent(in) :: z, dz, dzn, &
+    real(wp), dimension(-o_halo+1:kp+o_halo), intent(in) :: z, dz, dzn, &
                     rhon, theta_ref
-    real(sp), dimension(-o_halo+1:kp+o_halo,-o_halo+1:ip+o_halo), intent(in) :: w
+    real(wp), dimension(-o_halo+1:kp+o_halo,-o_halo+1:ip+o_halo), intent(in) :: w
     logical, intent(in) :: hm_flag, ice_flag, wr_flag, rm_flag, theta_flag, heyms_west, &
                         lawson, recycle
     integer(i4b), intent(in) :: ice_nuc_flag, mode1_ice_flag, &
                                 mode2_ice_flag, coll_breakup_flag1
     logical , intent(inout) :: micro_init
-    real(sp), intent(in) :: mass_ice, j_stochastic
+    real(wp), intent(in) :: mass_ice, j_stochastic
 
 
 	! locals
 	integer(i4b) :: i
 #if MPI_PAMM == 1
-    real(sp), dimension(-o_halo+1:kp+o_halo,-o_halo+1:ip+o_halo) :: vqc,vqr, vqi, vni
+    real(wp), dimension(-o_halo+1:kp+o_halo,-o_halo+1:ip+o_halo) :: vqc,vqr, vqi, vni
     integer(i4b), dimension(3) :: n_step, n_step_o
     logical, dimension(3) :: adv_l=[.false.,.false.,.false.]
     integer(i4b), dimension(3) :: coords
@@ -1797,7 +1796,7 @@
 #endif
 
 	use advection_1d
-	use nr, only : dfridr
+	use numerics, only : dfsid1
 	use advection_s_1d, only : mpdata_vec_1d
     implicit none
     ! arguments:
@@ -1805,19 +1804,19 @@
                              ini,iqi,iai, &
                             cat_am,cat_c, cat_r, cat_i,nprec
     integer(i4b), dimension(ncat), intent(in) :: cst,cen
-    real(sp), intent(in) :: dt
-    real(sp), dimension(-o_halo+1:kp+o_halo,nq), intent(inout) :: q
-    real(sp), dimension(1:kp,nprec), intent(inout) :: precip
-    real(sp), dimension(-o_halo+1:kp+o_halo), intent(inout) :: th
-    real(sp), dimension(-o_halo+1:kp+o_halo), intent(in) :: dz, z, dzn, rhoa, &
+    real(wp), intent(in) :: dt
+    real(wp), dimension(-o_halo+1:kp+o_halo,nq), intent(inout) :: q
+    real(wp), dimension(1:kp,nprec), intent(inout) :: precip
+    real(wp), dimension(-o_halo+1:kp+o_halo), intent(inout) :: th
+    real(wp), dimension(-o_halo+1:kp+o_halo), intent(in) :: dz, z, dzn, rhoa, &
                                                     rhon, theta,p
-    real(sp), dimension(-o_halo+1:kp+o_halo), intent(in) :: u
+    real(wp), dimension(-o_halo+1:kp+o_halo), intent(in) :: u
     logical, intent(in) :: hm_flag, ice_flag, wr_flag, rm_flag, theta_flag, heyms_west, &
                             lawson, recycle
     integer(i4b), intent(in) :: ice_nuc_flag, mode1_ice_flag, mode2_ice_flag, &
                              coll_breakup_flag1
     logical , intent(inout) :: micro_init
-    real(sp), intent(in) :: mass_ice, j_stochastic
+    real(wp), intent(in) :: mass_ice, j_stochastic
     ! locals:
     integer(i4b) :: k,k1,iter, i
 #if MPI_PAMM == 1
@@ -1828,14 +1827,14 @@
     integer(i4b), dimension(3) :: n_step
 	logical, dimension(3) :: adv_l
 #endif
-    real(sp) :: temp, qtot,qaut, a, b, ab_ice, ab_liq, ice_dep,snow_dep,graup_dep, &
+    real(wp) :: temp, qtot,qaut, a, b, ab_ice, ab_liq, ice_dep,snow_dep,graup_dep, &
     			nu_ice, nu_snow, nu_graup, diff1, ktherm1, tc, nu_vis, sc, nu_rain, rain_evap, &
     			sb_aut, sb_acr, sb_cwaut, sb_cwacr, sb_raut, sb_rsel, sb_cwsel
     
-    real(sp), dimension(-o_halo+1:kp+o_halo) :: rho
-    real(sp), dimension(kp) :: smr, smr_i
+    real(wp), dimension(-o_halo+1:kp+o_halo) :: rho
+    real(wp), dimension(kp) :: smr, smr_i
     
-    real(sp), dimension(kp) :: &
+    real(wp), dimension(kp) :: &
     			pgaci,  & ! accretion of cloud ice by graupel
 				pgacr, & ! riming of graupel by rain
 				pgacs,rgacs, & ! accretion of snow by graupel
@@ -1882,28 +1881,28 @@
     			piacr, & ! ice accreting rain - mass
     			riacr  ! ice accreting rain - number
     				    
-    real(sp) :: pgwet ! amount of liquid that graupel can freeze without shedding
+    real(wp) :: pgwet ! amount of liquid that graupel can freeze without shedding
     								
 
-    real(sp), dimension(1-o_halo:kp+o_halo) :: n_r, lam_r, n_i, lam_i, n_s, &
+    real(wp), dimension(1-o_halo:kp+o_halo) :: n_r, lam_r, n_i, lam_i, n_s, &
                                                  lam_s, n_g, lam_g, lam_c, n_c, &
                                                  lam_i_star
-    real(sp), dimension(1-o_halo:kp+o_halo) :: rho_fac
-	real(sp), dimension(1-o_halo:kp+o_halo) :: vnr, vnc
+    real(wp), dimension(1-o_halo:kp+o_halo) :: rho_fac
+	real(wp), dimension(1-o_halo:kp+o_halo) :: vnr, vnc
 #if MPI_PAMM == 0
-	real(sp), dimension(1-o_halo:kp+o_halo) :: vqr, vqs, vqg, vqi, vns, vng, vni, &
+	real(wp), dimension(1-o_halo:kp+o_halo) :: vqr, vqs, vqg, vqi, vns, vng, vni, &
 	                                        vqc
 #else
-	real(sp), intent(inout), dimension(1-o_halo:kp+o_halo) :: vqr, vqc, vqi, vni
+	real(wp), intent(inout), dimension(1-o_halo:kp+o_halo) :: vqr, vqc, vqi, vni
 #endif
-	real(sp), dimension(1-o_halo:kp+o_halo) :: t, a_hw,a_hw1,pre_hw
+	real(wp), dimension(1-o_halo:kp+o_halo) :: t, a_hw,a_hw1,pre_hw
 	! coalescence efficiencies
-	real(sp), dimension(kp) :: egi_dry, egs_dry, esi, eii, ess
-	real(sp) :: qold,des_dt,dqs_dt,err,cond,temp1, dummy1,dummy2, dummy3,&
+	real(wp), dimension(kp) :: egi_dry, egs_dry, esi, eii, ess
+	real(wp) :: qold,des_dt,dqs_dt,err,cond,temp1, dummy1,dummy2, dummy3,&
 	            n_mix,s_mix,m_mix, nin_c, din_c,nin_r,din_r, n_tot, s_tot, m_tot
 	
-	real(sp), dimension(1-o_halo:kp+o_halo) :: gamma_t,dep_density, qold1
-	real(sp) :: phi,vol, nfrag=0._sp
+	real(wp), dimension(1-o_halo:kp+o_halo) :: gamma_t,dep_density, qold1
+	real(wp) :: phi,vol, nfrag=0._wp
 	
     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     ! initialise some variables that do not depend on prognostics                        !
@@ -1918,81 +1917,81 @@
     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     ! zero arrays                                                                        !
     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    vqr=0._sp
-    vqc=0._sp
-	pgaci=0._sp
-	pgacr=0._sp
-	pgacs=0._sp
-	rgacs=0._sp
-	pgacw=0._sp
-	pgaut=0._sp
-	pgdep=0._sp
-	pgfr=0._sp
-	rgfr=0._sp
-	pgmlt=0._sp
-	pgshd=0._sp
-	pgsub=0._sp
-	riaci=0._sp
-	piacr_g=0._sp
-	riacr_g=0._sp
-	piacr_s=0._sp
-	riacr_s=0._sp
-	piacw=0._sp
-	picnt=0._sp
-	pidep=0._sp
-	piprm=0._sp
-	pifrw=0._sp
-	pihal=0._sp
-	pimlt=0._sp
-	pisub=0._sp
-	praci_g=0._sp
-	praci_s=0._sp
-	pracs=0._sp
-	pracw=0._sp
-	praut=0._sp
-	prevp=0._sp
-	psacr=0._sp
-	rsacr=0._sp
-	psaci=0._sp
-	rsacs=0._sp
-	psacw=0._sp
-	psaut=0._sp
-	rsaut=0._sp
-	rsbrk=0._sp
-	psdep=0._sp
-	psmlt=0._sp
-	pssub=0._sp
-	rcwaut=0._sp
-    rcwacr=0._sp
-    rraut=0._sp
-    rrsel=0._sp
-    rcwsel=0._sp
-    praci=0._sp
-    rraci=0._sp
-    piacr=0._sp
-    riacr=0._sp
+    vqr=0._wp
+    vqc=0._wp
+	pgaci=0._wp
+	pgacr=0._wp
+	pgacs=0._wp
+	rgacs=0._wp
+	pgacw=0._wp
+	pgaut=0._wp
+	pgdep=0._wp
+	pgfr=0._wp
+	rgfr=0._wp
+	pgmlt=0._wp
+	pgshd=0._wp
+	pgsub=0._wp
+	riaci=0._wp
+	piacr_g=0._wp
+	riacr_g=0._wp
+	piacr_s=0._wp
+	riacr_s=0._wp
+	piacw=0._wp
+	picnt=0._wp
+	pidep=0._wp
+	piprm=0._wp
+	pifrw=0._wp
+	pihal=0._wp
+	pimlt=0._wp
+	pisub=0._wp
+	praci_g=0._wp
+	praci_s=0._wp
+	pracs=0._wp
+	pracw=0._wp
+	praut=0._wp
+	prevp=0._wp
+	psacr=0._wp
+	rsacr=0._wp
+	psaci=0._wp
+	rsacs=0._wp
+	psacw=0._wp
+	psaut=0._wp
+	rsaut=0._wp
+	rsbrk=0._wp
+	psdep=0._wp
+	psmlt=0._wp
+	pssub=0._wp
+	rcwaut=0._wp
+    rcwacr=0._wp
+    rraut=0._wp
+    rrsel=0._wp
+    rcwsel=0._wp
+    praci=0._wp
+    rraci=0._wp
+    piacr=0._wp
+    riacr=0._wp
     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     
     
     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     ! some commonly used variables that depend on prognostics                            !
     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    t=(theta+th)*(p/1.e5_sp)**(ra/cp) ! temperature
+    t=(theta+th)*(p/1.e5_wp)**(ra/cp) ! temperature
     rho=rhon !p / (ra*t) ! air density    
-    rho_fac=(rho0/rho(:))**0.5_sp
+    rho_fac=(rho0/rho(:))**0.5_wp
     ! rain n0, lambda
-    lam_r=(max(q(:,cst(cat_r)),1._sp)*cr*gam2r / &
-            (max(q(:,cst(cat_r)+1),1.e-10_sp)*gam1r))**(1._sp/dr)
-    n_r=rho(:)*max(q(:,cst(cat_r)),1._sp)*lam_r**(1._sp+alpha_r) / gam1r
+    lam_r=(max(q(:,cst(cat_r)),1._wp)*cr*gam2r / &
+            (max(q(:,cst(cat_r)+1),1.e-10_wp)*gam1r))**(1._wp/dr)
+    n_r=rho(:)*max(q(:,cst(cat_r)),1._wp)*lam_r**(1._wp+alpha_r) / gam1r
     ! cloud n0, lambda    
-    lam_c=(max(q(:,inc),1._sp)*gam2c / (max(q(:,iqc),1.e-10_sp)*gam1c))**(1._sp/1._sp)
-    n_c=rho(:)*max(q(:,inc),0._sp)*lam_c**(1._sp+alpha_c) / gam1c
+    lam_c=(max(q(:,inc),1._wp)*gam2c / (max(q(:,iqc),1.e-10_wp)*gam1c))**(1._wp/1._wp)
+    n_c=rho(:)*max(q(:,inc),0._wp)*lam_c**(1._wp+alpha_c) / gam1c
     
     if(ice_flag) then
                                             
         ! ice n0, lambda
-        lam_i=(max(q(:,ini),1._sp)*ci*gam2i / (max(q(:,iqi),1.e-10_sp)*gam1i))**(1._sp/di)
-        n_i=rho(:)*max(q(:,ini),0._sp)*lam_i**(1._sp+alpha_i) / gam1i
+        lam_i=(max(q(:,ini),1._wp)*ci*gam2i / (max(q(:,iqi),1.e-10_wp)*gam1i))**(1._wp/di)
+        n_i=rho(:)*max(q(:,ini),0._wp)*lam_i**(1._wp+alpha_i) / gam1i
 
         if(heyms_west) then
             ! HEYMSFIELD AND WESTBROOK (2010) FALL-SPEEDS !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -2006,35 +2005,35 @@
             ! this calculates a, which is needed to implement the Magic Function.
             ! assumes Ar=1
             a_hw = heymsfield_and_westbrook_fall_parameters1(q(:,ini),q(:,iqi+2),&
-                q(:,iqi),1._sp, 1._sp,q(:,iqi+4),t,rho)
+                q(:,iqi),1._wp, 1._wp,q(:,iqi+4),t,rho)
             a_hw1 = a_hw
-            a_hw = 1._sp/(a_hw**(2._sp/di))
+            a_hw = 1._wp/(a_hw**(2._wp/di))
                                         
             ! lambda star - Magic function.
             lam_i_star = lam_i*a_hw
         
             ! calculate fall-speeds
             vni(:)=max(fall_n_i_hw*pre_hw*lam_i* &
-                (1._sp/(gam3ai*lam_i_star**(di/2._sp)+gam3bi*lam_i_star**(di) )),0._sp)
+                (1._wp/(gam3ai*lam_i_star**(di/2._wp)+gam3bi*lam_i_star**(di) )),0._wp)
             vqi(:)=max(fall_q_i_hw*pre_hw*lam_i* &
-                (1._sp/(gam4ai*lam_i_star**(di/2._sp)+gam4bi*lam_i_star**(di) )),0._sp)
+                (1._wp/(gam4ai*lam_i_star**(di/2._wp)+gam4bi*lam_i_star**(di) )),0._wp)
                 
             ! precipitation - this one is actually number flux
             ! the Magic Function - standard, but with n0
             precip(1:kp,2)=n_i(1:kp)*pre_hw(1:kp)*lam_i(1:kp)**(-alpha_i)/rho(1:kp)* &
-             (1._sp/(gam3ai*lam_i_star(1:kp)**(di/2._sp)+gam3bi*lam_i_star(1:kp)**(di) ))
+             (1._wp/(gam3ai*lam_i_star(1:kp)**(di/2._wp)+gam3bi*lam_i_star(1:kp)**(di) ))
         
             !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         else  
             ! ice
-            vqi(:)=min(max(fall_q_i*rho_fac * lam_i**(1._sp+alpha_i+di) / &
-                (lam_i+f_i)**(1._sp+alpha_i+di+b_i), 0._sp), 10._sp)
-            vni(:)=max(fall_n_i*rho_fac * lam_i**(1._sp+alpha_i) / &
-                (lam_i+f_i)**(1._sp+alpha_i+b_i), 0._sp)
+            vqi(:)=min(max(fall_q_i*rho_fac * lam_i**(1._wp+alpha_i+di) / &
+                (lam_i+f_i)**(1._wp+alpha_i+di+b_i), 0._wp), 10._wp)
+            vni(:)=max(fall_n_i*rho_fac * lam_i**(1._wp+alpha_i) / &
+                (lam_i+f_i)**(1._wp+alpha_i+b_i), 0._wp)
 
             ! precipitation
-            precip(1:kp,2)=n_i(1:kp)*(a_i*chi_num_ice/(lam_i(1:kp)**(alpha_i+b_i+1._sp)) - &
-                            u(1:kp)*chi_num_ice1/(lam_i(1:kp)**(alpha_i+1._sp))) &
+            precip(1:kp,2)=n_i(1:kp)*(a_i*chi_num_ice/(lam_i(1:kp)**(alpha_i+b_i+1._wp)) - &
+                            u(1:kp)*chi_num_ice1/(lam_i(1:kp)**(alpha_i+1._wp))) &
                             /rho(1:kp)
                         
         endif
@@ -2043,30 +2042,30 @@
     endif
     
     ! precipitation
-	precip(1:kp,1)=cr*n_r(1:kp)*(a_r*chi_rain/(lam_r(1:kp)**(alpha_r+b_r+dr+1._sp)) - &
-					u(1:kp)*chi_rain1/(lam_r(1:kp)**(alpha_r+dr+1._sp))) &
-					/rho(1:kp) *3600._sp
+	precip(1:kp,1)=cr*n_r(1:kp)*(a_r*chi_rain/(lam_r(1:kp)**(alpha_r+b_r+dr+1._wp)) - &
+					u(1:kp)*chi_rain1/(lam_r(1:kp)**(alpha_r+dr+1._wp))) &
+					/rho(1:kp) *3600._wp
     
     ! fall speeds
     ! rain
-    vqr(:)=min(max(fall_q_r*rho_fac * lam_r**(1._sp+alpha_r+dr) / &
-    	(lam_r+f_r)**(1._sp+alpha_r+dr+b_r), 0._sp),10._sp)
+    vqr(:)=min(max(fall_q_r*rho_fac * lam_r**(1._wp+alpha_r+dr) / &
+    	(lam_r+f_r)**(1._wp+alpha_r+dr+b_r), 0._wp),10._wp)
     
-    vnr(:)=max(fall_n_r*rho_fac * lam_r**(1._sp+alpha_r) / &
-    	(lam_r+f_r)**(1._sp+alpha_r+b_r), 0._sp)
+    vnr(:)=max(fall_n_r*rho_fac * lam_r**(1._wp+alpha_r) / &
+    	(lam_r+f_r)**(1._wp+alpha_r+b_r), 0._wp)
     
     ! cloud
-    vqc(:)=min(max(fall_q_c*rho_fac * lam_c**(1._sp+alpha_c+1._sp) / &
-    	(lam_c+f_c)**(1._sp+alpha_c+1._sp+b_c), 1.e-3_sp), 10._sp)
+    vqc(:)=min(max(fall_q_c*rho_fac * lam_c**(1._wp+alpha_c+1._wp) / &
+    	(lam_c+f_c)**(1._wp+alpha_c+1._wp+b_c), 1.e-3_wp), 10._wp)
     
-    vnc(:)=max(fall_n_c*rho_fac * lam_c**(1._sp+alpha_c) / &
-    	(lam_c+f_c)**(1._sp+alpha_c+b_c), 1.e-3_sp)
+    vnc(:)=max(fall_n_c*rho_fac * lam_c**(1._wp+alpha_c) / &
+    	(lam_c+f_c)**(1._wp+alpha_c+b_c), 1.e-3_wp)
     ! coalescence efficiencies
-    egi_dry=0.2_sp*exp(0.08*(t(1:kp)-ttr))
-    egs_dry=0.2_sp*exp(0.08*(t(1:kp)-ttr))
-    esi=0.2_sp*exp(0.08*(t(1:kp)-ttr))
-    eii=0.2_sp*exp(0.08*(t(1:kp)-ttr))
-    ess=0.2_sp*exp(0.08*(t(1:kp)-ttr))
+    egi_dry=0.2_wp*exp(0.08*(t(1:kp)-ttr))
+    egs_dry=0.2_wp*exp(0.08*(t(1:kp)-ttr))
+    esi=0.2_wp*exp(0.08*(t(1:kp)-ttr))
+    eii=0.2_wp*exp(0.08*(t(1:kp)-ttr))
+    ess=0.2_wp*exp(0.08*(t(1:kp)-ttr))
     
     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     
@@ -2084,15 +2083,15 @@
 		q0sat=eps1*svp_liq(ttr)/(p(k)-svp_liq(ttr))
     	smr(k)=eps1*svp_liq(t(k))/(p(k)-svp_liq(t(k))) ! saturation mixing ratio
         
-        des_dt=dfridr(svp_liq,t(k),1.e0_sp,err)
+        des_dt=dfsid1(svp_liq,t(k),1.e0_wp,1.e-8_wp,err)
         dqs_dt=eps1*p(k)*des_dt/(p(k)-svp_liq(t(k)))**2
         qold=q(k,iqc)
         qtot=q(k,1)+q(k,iqc)
 
 		
         q(k,iqc)=q(k,1)+q(k,iqc)-smr(k)
-        if (theta_flag) q(k,iqc)=(q(k,iqc)+(lv/cp*qold)*dqs_dt) / (1._sp+lv/cp*dqs_dt)
-        q(k,iqc)=max(q(k,iqc),0._sp)
+        if (theta_flag) q(k,iqc)=(q(k,iqc)+(lv/cp*qold)*dqs_dt) / (1._wp+lv/cp*dqs_dt)
+        q(k,iqc)=max(q(k,iqc),0._wp)
         t(k)=t(k)
         if(theta_flag) t(k)=t(k)+lv/cp*(q(k,iqc)-qold)
 		
@@ -2126,7 +2125,7 @@
     do k=1,kp      
         ! inhomogeneous mixing -https://journals.ametsoc.org/doi/pdf/10.1175/2007JAS2374.1
  !        if(q(2,k)<qold) then
-!             q(4,k)=q(4,k)*(q(2,k)/qold)**1._sp
+!             q(4,k)=q(4,k)*(q(2,k)/qold)**1._wp
 !         endif
         
         
@@ -2145,7 +2144,7 @@
 #else
         k1=max(k-1,1)
 #endif
-	    if((q(k1,iqc) .lt. qsmall) .and. (q(k,iqc) .gt. qsmall).and.(u(k)>0._sp)) then
+	    if((q(k1,iqc) .lt. qsmall) .and. (q(k,iqc) .gt. qsmall).and.(u(k)>0._wp)) then
 	    
             !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
             ! Calculate the lognormal parameters                                         !
@@ -2171,7 +2170,7 @@
                 sig_aer1(n_mode),d_aer1(n_mode),n_mix,s_mix,m_mix)
             !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
             
-!                 n_aer1=max(n_aer1,0.1_sp)
+!                 n_aer1=max(n_aer1,0.1_wp)
 
             !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
             ! Bulk Aerosol Activation - number of drops
@@ -2179,7 +2178,7 @@
             ! calculate aerosol PSD parameters
             p_test=p(k)
             t_test=t(k)
-            w_test=max(u(k),0.001_sp)
+            w_test=max(u(k),0.001_wp)
             call initialise_arrays(n_mode,n_sv,p_test,t_test,w_test, &
                         max(n_aer1,0.1e6),d_aer1,sig_aer1, molw_org1,density_core1)
 
@@ -2192,16 +2191,16 @@
                         act_frac1,smax1,dcrit2)
             !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-            act_frac1=max(act_frac1,0._sp)
+            act_frac1=max(act_frac1,0._wp)
             temp1=sum(n_aer1*act_frac1)
             ! put in-cloud aerosol into aerosol - i.e. remove it first
             do i=1,n_mode-1
                 q(k,cst(i+1))=  q(k,cst(i+1))+q(k,cst(cat_c)+(i-1)*3+2)
                 q(k,cst(i+1)+1)=q(k,cst(i+1)+1)+q(k,cst(cat_c)+(i-1)*3+3)
                 q(k,cst(i+1)+2)=q(k,cst(i+1)+2)+q(k,cst(cat_c)+(i-1)*3+4)
-                q(k,cst(cat_c)+(i-1)*3+2)=0._sp
-                q(k,cst(cat_c)+(i-1)*3+3)=0._sp
-                q(k,cst(cat_c)+(i-1)*3+4)=0._sp
+                q(k,cst(cat_c)+(i-1)*3+2)=0._wp
+                q(k,cst(cat_c)+(i-1)*3+3)=0._wp
+                q(k,cst(cat_c)+(i-1)*3+4)=0._wp
             enddo
             ! cloud droplet number
             q(k  ,inc)=temp1
@@ -2220,7 +2219,7 @@
                 q(k,cst(i+1)+1)=q(k,cst(i+1)+1)- dummy2 
                     
                 ! mass in aerosol modes
-                dummy3=pi/6._sp*density_core1(i)* &
+                dummy3=pi/6._wp*density_core1(i)* &
                     ln_part_mom(3,dcrit2(i),q(k,cst(i+1)), sig_aer1(i),d_aer1(i))
                 q(k,cst(i+1)+2)=q(k,cst(i+1)+2)- dummy3
                 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -2253,11 +2252,11 @@
             dummy2=pi*ln_part_mom(2,dcrit2(n_mode),n_mix, &
                             sig_aer1(n_mode),d_aer1(n_mode))
             ! mass in aerosol modes
-            dummy3=pi/6._sp*density_core1(n_mode)* &
+            dummy3=pi/6._wp*density_core1(n_mode)* &
                 ln_part_mom(3,dcrit2(n_mode),n_mix, &
                             sig_aer1(n_mode),d_aer1(n_mode))
                             
-            q(k,cst(cat_am))=q(k,cst(cat_am))*(1._sp-min(dummy1/n_mix,1._sp))
+            q(k,cst(cat_am))=q(k,cst(cat_am))*(1._wp-min(dummy1/n_mix,1._wp))
             do i=1,n_mode-1 ! deplete aerosol
                 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
                 ! add to aerosol particles in cloud water                                !
@@ -2265,28 +2264,28 @@
                 ! number in aerosol modes
                 ! qv, n_mode aerosol + 1
                 q(k,cst(cat_c)+(i-1)*3+2)=q(k,cst(cat_c)+(i-1)*3+2)+ &
-                    max(dummy1/(n_mix)*q(k,cst(cat_am)+3*(i-1)+1),0._sp)
+                    max(dummy1/(n_mix)*q(k,cst(cat_am)+3*(i-1)+1),0._wp)
                 
                 ! surface area in aerosol modes
                 q(k,cst(cat_c)+(i-1)*3+3)=q(k,cst(cat_c)+(i-1)*3+3)+ &
-                    max(dummy2/(s_mix)*q(k,cst(cat_am)+3*(i-1)+2),0._sp)
+                    max(dummy2/(s_mix)*q(k,cst(cat_am)+3*(i-1)+2),0._wp)
                 
                 ! mass in aerosol modes
                 q(k,cst(cat_c)+(i-1)*3+4)=q(k,cst(cat_c)+(i-1)*3+4)+ &
-                    max(dummy3/(m_mix)*q(k,cst(cat_am)+3*(i-1)+3),0._sp)
+                    max(dummy3/(m_mix)*q(k,cst(cat_am)+3*(i-1)+3),0._wp)
                 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 
                 ! number - remove aerosol particles
                 q(k,cst(cat_am)+3*(i-1)+1)=q(k,cst(cat_am)+3*(i-1)+1) * &
-                        (1._sp-max(dummy1/(n_mix),0._sp))
+                        (1._wp-max(dummy1/(n_mix),0._wp))
                 
                 ! surface area
                 q(k,cst(cat_am)+3*(i-1)+2)=q(k,cst(cat_am)+3*(i-1)+2)* &
-                        (1._sp-max(dummy2/(s_mix),0._sp) )
+                        (1._wp-max(dummy2/(s_mix),0._wp) )
                 ! mass
                 q(k,cst(cat_am)+3*(i-1)+3)=q(k,cst(cat_am)+3*(i-1)+3)* &
-                        (1._sp-max(dummy3/(m_mix),0._sp) )
+                        (1._wp-max(dummy3/(m_mix),0._wp) )
 
 
             enddo 
@@ -2304,29 +2303,29 @@
 		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 		! collisions between precipitating particles of different species                !
 		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-		if(ice_flag.and.(t(k).lt.268._sp)) then
-			praci(k)=max(n_r(k)*n_i(k)*pi/(4._sp*rho(k))*eri*ci*max((vqi(k)+vqr(k))/8._sp,abs(vqi(k)-vqr(k))) * &
+		if(ice_flag.and.(t(k).lt.268._wp)) then
+			praci(k)=max(n_r(k)*n_i(k)*pi/(4._wp*rho(k))*eri*ci*max((vqi(k)+vqr(k))/8._wp,abs(vqi(k)-vqr(k))) * &
 					( &
-					mass_raci1/(lam_r(k)**(1._sp+alpha_r) *lam_i(k)**(3._sp+alpha_i+di)) + &
-					mass_raci2/(lam_r(k)**(2._sp+alpha_r) *lam_i(k)**(2._sp+alpha_i+di)) + &
-					mass_raci3/(lam_r(k)**(3._sp+alpha_r) *lam_i(k)**(1._sp+alpha_i+di))  &
-					) , 0._sp)  
+					mass_raci1/(lam_r(k)**(1._wp+alpha_r) *lam_i(k)**(3._wp+alpha_i+di)) + &
+					mass_raci2/(lam_r(k)**(2._wp+alpha_r) *lam_i(k)**(2._wp+alpha_i+di)) + &
+					mass_raci3/(lam_r(k)**(3._wp+alpha_r) *lam_i(k)**(1._wp+alpha_i+di))  &
+					) , 0._wp)  
 			praci(k)=min(praci(k),q(k,iqi)/dt)
 			
-			rraci(k)=max(n_i(k)*n_r(k)*pi/(4._sp*rho(k))*eri*max((vnr(k)+vni(k))/8._sp,abs(vnr(k)-vni(k))) * &
+			rraci(k)=max(n_i(k)*n_r(k)*pi/(4._wp*rho(k))*eri*max((vnr(k)+vni(k))/8._wp,abs(vnr(k)-vni(k))) * &
 					( &
-					num_raci1/(lam_i(k)**(1._sp+alpha_i) *lam_r(k)**(3._sp+alpha_r)) + &
-					num_raci2/(lam_i(k)**(2._sp+alpha_i) *lam_r(k)**(2._sp+alpha_r)) + &
-					num_raci3/(lam_i(k)**(3._sp+alpha_i) *lam_r(k)**(1._sp+alpha_r))  &
-					)    , 0._sp)    
+					num_raci1/(lam_i(k)**(1._wp+alpha_i) *lam_r(k)**(3._wp+alpha_r)) + &
+					num_raci2/(lam_i(k)**(2._wp+alpha_i) *lam_r(k)**(2._wp+alpha_r)) + &
+					num_raci3/(lam_i(k)**(3._wp+alpha_i) *lam_r(k)**(1._wp+alpha_r))  &
+					)    , 0._wp)    
 			rraci(k)=min(rraci(k),q(k,ini)/dt)
 
-			piacr(k)=max(n_i(k)*n_r(k)*pi/(4._sp*rho(k))*eri*cr*max((vqr(k)+vqi(k))/8._sp,abs(vqr(k)-vqi(k))) * &
+			piacr(k)=max(n_i(k)*n_r(k)*pi/(4._wp*rho(k))*eri*cr*max((vqr(k)+vqi(k))/8._wp,abs(vqr(k)-vqi(k))) * &
 					( &
-					mass_iacr1/(lam_i(k)**(1._sp+alpha_i) *lam_r(k)**(3._sp+alpha_r+dr)) + &
-					mass_iacr2/(lam_i(k)**(2._sp+alpha_i) *lam_r(k)**(2._sp+alpha_r+dr)) + &
-					mass_iacr3/(lam_i(k)**(3._sp+alpha_i) *lam_r(k)**(1._sp+alpha_r+dr))  &
-					)    , 0._sp)    
+					mass_iacr1/(lam_i(k)**(1._wp+alpha_i) *lam_r(k)**(3._wp+alpha_r+dr)) + &
+					mass_iacr2/(lam_i(k)**(2._wp+alpha_i) *lam_r(k)**(2._wp+alpha_r+dr)) + &
+					mass_iacr3/(lam_i(k)**(3._wp+alpha_i) *lam_r(k)**(1._wp+alpha_r+dr))  &
+					)    , 0._wp)    
 			piacr(k)=min(piacr(k),q(k,iqr)/dt)   		
 			riacr(k)=rraci(k)
 			
@@ -2384,7 +2383,7 @@
                 ! calculate the number of fragments
                 lambda0r=lam_r(k)
                 lambda0i=lam_i(k)
-                mrthresh=cr*1.e-6_sp**dr
+                mrthresh=cr*1.e-6_wp**dr
                 mrupper=cr*(pthreshr/lambda0r)**dr
                 miupper=ci*(pthreshi/lambda0i)**di
                 mrupper=min(mrupper,miupper)
@@ -2397,8 +2396,8 @@
                     n0i=n_i(k)
 
                     if(heyms_west) then
-                        ci_new=pi/6._sp*min(910._sp, &
-                            q(k,iqi)/(q(k,iqi+2)+q(k,iqi+4)/920._sp))
+                        ci_new=pi/6._wp*min(910._wp, &
+                            q(k,iqi)/(q(k,iqi+2)+q(k,iqi+4)/920._wp))
                         a_hw_new=a_hw1(k)
                         pre_hw_new=pre_hw(k)
                         call quad2d_qgaus(dintegral_mode1_hw, &
@@ -2427,7 +2426,7 @@
                 ! calculate the number of fragments
                 lambda0r=lam_r(k)
                 lambda0i=lam_i(k)
-                mrthresh=cr*150.e-6_sp**dr
+                mrthresh=cr*150.e-6_wp**dr
                 mrupper=cr*(pthreshr/lambda0r)**dr
                 miupper=ci*(pthreshi/lambda0i)**di
                 mrupper=min(mrupper,miupper)
@@ -2436,13 +2435,13 @@
                 if((mrupper.gt.mrthresh).and.(q(k,iqr).gt.qsmall) &
                     .and.(q(k,iqi).gt.qsmall)) then
 
-                    f_mode2=min(-cw*(t(k)-ttr)/lf,1.0_sp)
+                    f_mode2=min(-cw*(t(k)-ttr)/lf,1.0_wp)
                     n0r=n_r(k)
                     n0i=n_i(k)
 
                     if(heyms_west) then
-                        ci_new=pi/6._sp*min(910._sp, &
-                            q(k,iqi)/(q(k,iqi+2)+q(k,iqi+4)/920._sp))
+                        ci_new=pi/6._wp*min(910._wp, &
+                            q(k,iqi)/(q(k,iqi+2)+q(k,iqi+4)/920._wp))
                         a_hw_new=a_hw1(k)
                         pre_hw_new=pre_hw(k)
                         call quad2d_qgaus(dintegral_mode2_hw, &
@@ -2453,7 +2452,7 @@
                     endif
                     ! multiplication according to new lab results...
                     nfrag=dummy3*dt
-        !            nfrag=piacr(k)*dt*5._sp /(pi/6._sp*1000._sp*2.e-3_sp**3)
+        !            nfrag=piacr(k)*dt*5._wp /(pi/6._wp*1000._wp*2.e-3_wp**3)
                     ! increase ice crystal number
                     q(k  ,ini)=q(k  ,ini)+nfrag
                     ! increase ice crystal shape factor
@@ -2481,7 +2480,7 @@
             !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
             ! ice nucleation from cloud water                                            !
             !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-            if(q(k,cst(cat_c)) > 0._sp) then
+            if(q(k,cst(cat_c)) > 0._wp) then
                 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
                 ! ice nucleation via immersion                                           !
                 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -2515,15 +2514,15 @@
                 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
                 ! drop fragmentation                                                     !
                 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-                nfrag=0._sp
+                nfrag=0._wp
                 dummy1=nin_c/(q(k  ,inc)+qsmall)*q(k, iqc) ! mass of cloud water frozen
-                if(t(k).lt.268._sp .and. (dummy1.gt.qsmall)) then
+                if(t(k).lt.268._wp .and. (dummy1.gt.qsmall)) then
                     lam_freeze=(nin_c/dummy1*gam2c/gam1c)
                     n0_freeze = nin_c/gam1c*lam_freeze**(alpha_c+1)
                     ! lawson et al
                     if (lawson) then
-                        nfrag = 2.5e13_sp*n0_freeze/(cc**(4._sp/dc))* &
-                             gam3c/(lam_freeze**(4._sp/dc+1._sp+alpha_c))
+                        nfrag = 2.5e13_wp*n0_freeze/(cc**(4._wp/dc))* &
+                             gam3c/(lam_freeze**(4._wp/dc+1._wp+alpha_c))
                     endif
                 endif
                 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -2569,7 +2568,7 @@
                     q(k,cst(cat_c)+(i-1)*3+3)=q(k,cst(cat_c)+(i-1)*3+3)- dummy2 
                     
                     ! mass in aerosol modes
-                    dummy3=pi/6._sp*density_core1(n_mode)* &
+                    dummy3=pi/6._wp*density_core1(n_mode)* &
                         ln_part_mom(3,din_c,n_mix, sig_aer1(n_mode),d_aer1(n_mode)) * &
                         q(k,cst(cat_c)+(i-1)*3+4)/m_tot
                     q(k,cst(cat_c)+(i-1)*3+4)=q(k,cst(cat_c)+(i-1)*3+4)- dummy3
@@ -2598,7 +2597,7 @@
             !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
             ! ice nucleation from rain water                                             !
             !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-            if(q(k,cst(cat_r)) > 1._sp) then
+            if(q(k,cst(cat_r)) > 1._wp) then
                 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
                 ! ice nucleation via immersion                                           !
                 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -2630,19 +2629,19 @@
                 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
                 ! drop fragmentation                                                     !
                 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-                nfrag=0._sp
+                nfrag=0._wp
                 dummy1=nin_r/(q(k  ,inr)+qsmall)*q(k, iqr) ! mass of rain water frozen
-                if(t(k).lt.268._sp .and. (dummy1.gt.qsmall)) then
-                    lam_freeze=(nin_r/dummy1*cr*gam2r/gam1r)**(1._sp/dr)
+                if(t(k).lt.268._wp .and. (dummy1.gt.qsmall)) then
+                    lam_freeze=(nin_r/dummy1*cr*gam2r/gam1r)**(1._wp/dr)
                     n0_freeze = nin_r/gam1r*lam_freeze**(alpha_r+1)
                     ! lawson et al
                     if(lawson) then
-                        nfrag = 2.5e13_sp*n0_freeze* &
-                             gam3r/(lam_freeze**(5._sp+alpha_r))
+                        nfrag = 2.5e13_wp*n0_freeze* &
+                             gam3r/(lam_freeze**(5._wp+alpha_r))
                     endif
                     ! mode-1 fragmentation
                     if(mode1_ice_flag.eq.1) then
-                        mrthresh=cr*1.e-6_sp**dr
+                        mrthresh=cr*1.e-6_wp**dr
                         mrupper=cr*(pthreshr/lam_freeze)**dr
                         t_send=t(k)
                         ! only call integral if mrupper gt mrthresh
@@ -2702,7 +2701,7 @@
                     q(k,cst(cat_r)+(i-1)*3+3)=q(k,cst(cat_r)+(i-1)*3+3)- dummy2 
                     
                     ! mass in aerosol modes
-                    dummy3=pi/6._sp*density_core1(n_mode)* &
+                    dummy3=pi/6._wp*density_core1(n_mode)* &
                         ln_part_mom(3,din_r,n_mix, sig_aer1(n_mode),d_aer1(n_mode)) *&
                         q(k,cst(cat_r)+(i-1)*3+4)/m_tot
                     q(k,cst(cat_r)+(i-1)*3+4)=q(k,cst(cat_r)+(i-1)*3+4)- dummy3
@@ -2745,21 +2744,21 @@
 		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 		diff1=dd(t(k),p(k))
 		ktherm1=ka(t(k))
-		ab_liq=lv**2 / (ktherm1*rv*t(k)**2) + 1._sp/(rho(k)*smr(k)*diff1)
+		ab_liq=lv**2 / (ktherm1*rv*t(k)**2) + 1._wp/(rho(k)*smr(k)*diff1)
 		nu_vis=viscosity_air(t(k)) / rho(k)
 		sc=nu_vis / diff1
-		nu_rain=2._sp*pi*n_r(k) / rho(k) * &
-				(nu_r1 / lam_r(k)**(2._sp+alpha_r) + &
-				(a_r/nu_vis)**0.5_sp*sc**(1._sp/3._sp)* &
-				(rho(k)*rho0)**0.25_sp*nu_r2 / &
-				(lam_r(k)+0.5_sp*f_r)**(0.5_sp*b_r+alpha_r+2.5_sp))
+		nu_rain=2._wp*pi*n_r(k) / rho(k) * &
+				(nu_r1 / lam_r(k)**(2._wp+alpha_r) + &
+				(a_r/nu_vis)**0.5_wp*sc**(1._wp/3._wp)* &
+				(rho(k)*rho0)**0.25_wp*nu_r2 / &
+				(lam_r(k)+0.5_wp*f_r)**(0.5_wp*b_r+alpha_r+2.5_wp))
 
 	
-		rain_evap=(q(k,1)/smr(k)-1._sp) / (rho(k)*ab_liq)*nu_rain
+		rain_evap=(q(k,1)/smr(k)-1._wp) / (rho(k)*ab_liq)*nu_rain
 		if(q(k,1).gt.smr(k)) then
-			prevp(k)=0._sp
+			prevp(k)=0._wp
 		else
-			prevp(k)=-min(rain_evap,0._sp)
+			prevp(k)=-min(rain_evap,0._wp)
 		endif
 		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 		! end evaporation of rain                                                        !
@@ -2779,46 +2778,46 @@
 		if ((t(k).le.ttr) .and. ice_flag) then
 		    if(q(k,iqi).gt.qsmall) then
 		        if(heyms_west) then
-                    nu_ice=2._sp*pi*n_i(k) / rho(k) * &
-                            (nu_i1 / lam_i(k)**(2._sp+alpha_i) + &
-                            sqrt(pre_hw(k))*0.31_sp*sc**(1._sp/3._sp)* &
-                            (rho(k)/nu_vis)**0.5_sp* &
-                            lam_i(k)**(-1.5_sp-alpha_i)/ &
-                            (lam_i_star(k)**(0.25_sp*di)*gam5ai+&
-                            lam_i_star(k)**(0.5_sp*di)*gam5bi) )
+                    nu_ice=2._wp*pi*n_i(k) / rho(k) * &
+                            (nu_i1 / lam_i(k)**(2._wp+alpha_i) + &
+                            sqrt(pre_hw(k))*0.31_wp*sc**(1._wp/3._wp)* &
+                            (rho(k)/nu_vis)**0.5_wp* &
+                            lam_i(k)**(-1.5_wp-alpha_i)/ &
+                            (lam_i_star(k)**(0.25_wp*di)*gam5ai+&
+                            lam_i_star(k)**(0.5_wp*di)*gam5bi) )
                 else
-                    nu_ice=2._sp*pi*n_i(k) / rho(k) * &
-                            (nu_i1 / lam_i(k)**(2._sp+alpha_i) + &
-                            (a_i/nu_vis)**0.5_sp*sc**(1._sp/3._sp)* &
-                            (rho(k)*rho0)**0.25_sp*nu_i2 / &
-                            (lam_i(k)+0.5_sp*f_i)**(0.5_sp*b_i+alpha_i+2.5_sp))                
+                    nu_ice=2._wp*pi*n_i(k) / rho(k) * &
+                            (nu_i1 / lam_i(k)**(2._wp+alpha_i) + &
+                            (a_i/nu_vis)**0.5_wp*sc**(1._wp/3._wp)* &
+                            (rho(k)*rho0)**0.25_wp*nu_i2 / &
+                            (lam_i(k)+0.5_wp*f_i)**(0.5_wp*b_i+alpha_i+2.5_wp))                
                 endif
-                ab_ice=ls**2 / (ktherm1*rv*t(k)**2) + 1._sp/(rho(k)*smr_i(k)*diff1)
+                ab_ice=ls**2 / (ktherm1*rv*t(k)**2) + 1._wp/(rho(k)*smr_i(k)*diff1)
 
                 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
                 ! chen and lamb                                                          !
                 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
                 vol=q(k,iqi+2)
-                if(vol.gt.0._sp) then
-                    phi=min(max(q(k,iqi+1) / (q(k,ini)+qsmall),1.e-5_sp),100._sp)
+                if(vol.gt.0._wp) then
+                    phi=min(max(q(k,iqi+1) / (q(k,ini)+qsmall),1.e-5_wp),100._wp)
                     nu_ice=nu_ice*chen_and_lamb_cap_fac(phi)
             
                     ! non chen and lamb bit        
-                    ice_dep=(q(k,1)/smr_i(k)-1._sp) / (rho(k)*ab_ice)*nu_ice
+                    ice_dep=(q(k,1)/smr_i(k)-1._wp) / (rho(k)*ab_ice)*nu_ice
             
                     if(q(k,1).gt.smr_i(k)) then
-                        pisub(k)=0._sp
-                        pidep(k)=min(max(ice_dep,0._sp),(q(k,1)-smr_i(k))/dt)
+                        pisub(k)=0._wp
+                        pidep(k)=min(max(ice_dep,0._wp),(q(k,1)-smr_i(k))/dt)
                     else
-                        pidep(k)=0._sp
-                        pisub(k)=min(-min(ice_dep,0._sp),-(q(k,1)-smr_i(k))/dt)
+                        pidep(k)=0._wp
+                        pisub(k)=min(-min(ice_dep,0._wp),-(q(k,1)-smr_i(k))/dt)
                     endif
                     !!!
                 
                         
                     call chen_and_lamb_prop((pidep(k)-pisub(k))*dt,gamma_t(k), &
                         vol,phi, dep_density(k))
-                    vol=min(max(vol,(q(k,iqi)-q(k,iqi+4))/rhoi),(q(k,iqi)-q(k,iqi+4))/10._sp)
+                    vol=min(max(vol,(q(k,iqi)-q(k,iqi+4))/rhoi),(q(k,iqi)-q(k,iqi+4))/10._wp)
                     q(k,iqi+2)=vol
                     q(k,iqi+1)=phi*q(k,ini)
                 endif
@@ -2859,17 +2858,17 @@
 		if ((t(k).le.ttr).and.ice_flag) then
 		    if((q(k,iqc).gt.qsmall) .and. (q(k,iqi).gt.qsmall)) then
 		        if(heyms_west) then
-                    piacw(k)=0.25_sp*pi*n_i(k)*pre_hw(k)*&
-                        lam_i(k)**(-2._sp-alpha_i) * eiw * q(k,iqc)*&
-                     1._sp/(gam3ai*lam_i_star(k)**(di/2._sp)+gam3bi*lam_i_star(k)**(di))		        
+                    piacw(k)=0.25_wp*pi*n_i(k)*pre_hw(k)*&
+                        lam_i(k)**(-2._wp-alpha_i) * eiw * q(k,iqc)*&
+                     1._wp/(gam3ai*lam_i_star(k)**(di/2._wp)+gam3bi*lam_i_star(k)**(di))		        
 		        else
                     piacw(k)=max(mass_iacw * n_i(k)* eiw *q(k,iqc)*rho_fac(k) / &
-                            (lam_i(k)+f_i)**(3._sp+b_i+alpha_i),0._sp)
+                            (lam_i(k)+f_i)**(3._wp+b_i+alpha_i),0._wp)
                 endif
                                 
                 dummy1=q(k,iqi) ! total mass of particle
                 
-                piacw(k)=max(min(piacw(k),q(k,iqc)/dt),0._sp)
+                piacw(k)=max(min(piacw(k),q(k,iqc)/dt),0._wp)
                 
             endif
 		endif
@@ -2887,7 +2886,7 @@
                 ! calculate the number of fragments
                 lambda0r=lam_i(k)
                 lambda0i=lam_i(k)
-                mrthresh=0._sp
+                mrthresh=0._wp
                 mrupper=ci*(pthreshi/lambda0r)**di
                 miupper=ci*(pthreshi/lambda0i)**di
                 mrupper=min(mrupper,miupper)
@@ -2895,13 +2894,13 @@
                 ! only call integral if mrupper gt mrthresh
                 if((mrupper.gt.mrthresh).and.(q(k,iqi).gt.qsmall)) then
 
-                    f_mode2=1._sp !eii(k) ! only need to consider collision, not sticking
+                    f_mode2=1._wp !eii(k) ! only need to consider collision, not sticking
                     n0r=n_i(k)
                     n0i=n_i(k)
                     
                     if(heyms_west) then
-                        ci_new=pi/6._sp*min(910._sp, &
-                            q(k,iqi)/(q(k,iqi+2)+q(k,iqi+4)/920._sp))
+                        ci_new=pi/6._wp*min(910._wp, &
+                            q(k,iqi)/(q(k,iqi+2)+q(k,iqi+4)/920._wp))
                         a_hw_new=a_hw1(k)
                         pre_hw_new=pre_hw(k)
                         call quad2d_qgaus(dintegral_collisional_breakup_hw, &
@@ -2924,7 +2923,7 @@
                 ! calculate the number of fragments
                 lambda0r=lam_i(k)
                 lambda0i=lam_i(k)
-                mrthresh=0._sp
+                mrthresh=0._wp
                 mrupper=ci*(pthreshi/lambda0r)**di
                 miupper=ci*(pthreshi/lambda0i)**di
                 mrupper=min(mrupper,miupper)
@@ -2944,14 +2943,14 @@
                     phillips_br_workspace(5)=q(k,ini)
 
 
-                    f_mode2=1._sp !eii(k) ! only need to consider collision, not sticking
+                    f_mode2=1._wp !eii(k) ! only need to consider collision, not sticking
                     n0r=n_i(k)
                     n0i=n_i(k)
                     
                     if(n0i>0) then
                     
-                        ci_new=pi/6._sp*min(910._sp, &
-                            q(k,iqi)/(q(k,iqi+2)+q(k,iqi+4)/920._sp))
+                        ci_new=pi/6._wp*min(910._wp, &
+                            q(k,iqi)/(q(k,iqi+2)+q(k,iqi+4)/920._wp))
                         a_hw_new=a_hw1(k)
                         pre_hw_new=pre_hw(k)
                         call quad2d_qgaus(dintegral_collisional_breakup2_hw, &
@@ -2973,15 +2972,15 @@
             !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
             ! ice aggregation see Ferrier (1994)                                         !
             !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-            if(lam_i(k).lt.1.e5_sp) then
+            if(lam_i(k).lt.1.e5_wp) then
                 if(heyms_west) then
                     ! collisions
                     dummy1=max(a_hw1(k)*a_hw1(k)*pre_hw(k)*iice2*n_i(k)*n_i(k) / &
-                            lam_i(k)**(3._sp+2.*sp*alpha_i+di),0._sp)
+                            lam_i(k)**(3._wp+2.*wp*alpha_i+di),0._wp)
                 else
                     ! collisions
-                    dummy1=max(iice*n_i(k)**2._sp*rho_fac(k) / &
-                            lam_i(k)**(4._sp+2.*sp*alpha_i+b_i),0._sp)
+                    dummy1=max(iice*n_i(k)**2._wp*rho_fac(k) / &
+                            lam_i(k)**(4._wp+2.*wp*alpha_i+b_i),0._wp)
                 endif                                    
             
                 ! aggregation rate
@@ -3026,13 +3025,13 @@
         
         ! add the aerosol in ice into the mixed-mode aerosol
         do k=1,kp
-            dummy2 = min(max((q(k,ini)-(riaci(k))*dt)/ (q(k,ini)+qsmall), 0._sp),1._sp)
+            dummy2 = min(max((q(k,ini)-(riaci(k))*dt)/ (q(k,ini)+qsmall), 0._wp),1._wp)
             q(k,ini)=q(k,ini)-(riaci(k))*dt
             q(k,ini+1) = q(k,ini+1)*dummy2 ! shape factor
             if(q(k,iqi)<qsmall) then
                 dummy2=q(k,ini)
-                q(k,ini)=0._sp
-                q(k,ini+2:ini+5)=0._sp ! all properties, except aerosol
+                q(k,ini)=0._wp
+                q(k,ini+2:ini+5)=0._wp ! all properties, except aerosol
             
             
             
@@ -3062,11 +3061,11 @@
                     endif
                 
                     ! aerosol in ice
-                    q(k,cst(cat_i)+(i-1)*3+6)=0._sp
+                    q(k,cst(cat_i)+(i-1)*3+6)=0._wp
                     
-                    q(k,cst(cat_i)+(i-1)*3+7)=0._sp
+                    q(k,cst(cat_i)+(i-1)*3+7)=0._wp
                     
-                    q(k,cst(cat_i)+(i-1)*3+8)=0._sp
+                    q(k,cst(cat_i)+(i-1)*3+8)=0._wp
                     
                 enddo
                 
@@ -3085,7 +3084,7 @@
 
     ! rain number
     q(1:kp,cst(cat_r))=q(1:kp,cst(cat_r))+ &
-        (rraut+rrsel-pgfr*q(1:kp,cst(cat_r))/(q(1:kp,cst(cat_r)+1)+1.e-20_sp))*dt
+        (rraut+rrsel-pgfr*q(1:kp,cst(cat_r))/(q(1:kp,cst(cat_r)+1)+1.e-20_wp))*dt
 
     ! rain mass
     q(1:kp,cst(cat_r)+1)=q(1:kp,cst(cat_r)+1)+(pgmlt+praut+pgshd+pracw+psmlt+pimlt- &
@@ -3100,7 +3099,7 @@
     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     do k=1,kp
         q(k,cst(cat_r)+2:cen(cat_r))=q(k,cst(cat_r)+2:cen(cat_r))+ &
-           min(max(-(rcwaut(k)+rcwacr(k)+rcwsel(k))*dt / (q(k,cst(cat_c))+qsmall),0._sp),1._sp) * &
+           min(max(-(rcwaut(k)+rcwacr(k)+rcwsel(k))*dt / (q(k,cst(cat_c))+qsmall),0._wp),1._wp) * &
                 q(k,cst(cat_c)+2:cen(cat_c))
     enddo
     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -3110,16 +3109,16 @@
     ! liquid aerosol
     do k=1,kp
         q(k,cst(cat_c)+2:cen(cat_c))=q(k,cst(cat_c)+2:cen(cat_c))- &
-         min(max(-(rcwaut(k)+rcwacr(k)+rcwsel(k))*dt / (q(k,cst(cat_c))+qsmall),0._sp),1._sp) * &
+         min(max(-(rcwaut(k)+rcwacr(k)+rcwsel(k))*dt / (q(k,cst(cat_c))+qsmall),0._wp),1._wp) * &
                 q(k,cst(cat_c)+2:cen(cat_c))
     enddo
     ! liquid number
     q(1:kp,inc)=q(1:kp,inc)- &
-        min(max(-(rcwaut+rcwacr+rcwsel)*dt/(q(1:kp,inc)+qsmall),0._sp),1._sp)* &
+        min(max(-(rcwaut+rcwacr+rcwsel)*dt/(q(1:kp,inc)+qsmall),0._wp),1._wp)* &
                             q(1:kp,inc)
         
         
-    rho=1._sp ! fudge for advection conservation
+    rho=1._wp ! fudge for advection conservation
     if(recycle) then
         do k=-o_halo+1,kp+o_halo
             if(q(k,iqc) .lt. qsmall) then ! if evaporated
@@ -3128,22 +3127,22 @@
                     q(k,cst(i+1))      =q(k,cst(i+1))   +q(k,cst(cat_c)+(i-1)*3+2)
                     q(k,cst(i+1)+1)    =q(k,cst(i+1)+1) +q(k,cst(cat_c)+(i-1)*3+3)
                     q(k,cst(i+1)+2)    =q(k,cst(i+1)+2) +q(k,cst(cat_c)+(i-1)*3+4)
-                    q(k,cst(cat_c)+(i-1)*3+2)=0._sp
-                    q(k,cst(cat_c)+(i-1)*3+3)=0._sp
-                    q(k,cst(cat_c)+(i-1)*3+4)=0._sp
+                    q(k,cst(cat_c)+(i-1)*3+2)=0._wp
+                    q(k,cst(cat_c)+(i-1)*3+3)=0._wp
+                    q(k,cst(cat_c)+(i-1)*3+4)=0._wp
                 enddo
-                q(k,inc) = 0.0_sp
+                q(k,inc) = 0.0_wp
             endif
         enddo
     else
         do k=-o_halo+1,kp+o_halo
             if(q(k,iqc) .lt. qsmall) then ! if evaporated
                 do i=1,n_mode-1
-                    q(k,cst(cat_c)+(i-1)*3+2)=0._sp
-                    q(k,cst(cat_c)+(i-1)*3+3)=0._sp
-                    q(k,cst(cat_c)+(i-1)*3+4)=0._sp
+                    q(k,cst(cat_c)+(i-1)*3+2)=0._wp
+                    q(k,cst(cat_c)+(i-1)*3+3)=0._wp
+                    q(k,cst(cat_c)+(i-1)*3+4)=0._wp
                 enddo
-                q(k,inc) = 0.0_sp
+                q(k,inc) = 0.0_wp
             endif
         enddo    
     endif
@@ -3152,15 +3151,15 @@
 
 
     do k=1,kp
-        if((prevp(k) .gt. 0._sp)) then
+        if((prevp(k) .gt. 0._wp)) then
             !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
             ! add up the total number of aerosol in rain - all modes
             !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-            dummy1=0._sp
+            dummy1=0._wp
             do i=1,n_mode-1
                 dummy1=dummy1+q(k,cst(cat_r)+(i-1)*3+2)
             enddo
-            !dummy1=max(dummy1,q(k,cst(cat_r)),1._sp)
+            !dummy1=max(dummy1,q(k,cst(cat_r)),1._wp)
             !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 
@@ -3199,33 +3198,33 @@
                     q(k,cst(cat_am)+(i-1)*3+1)      = &
                         q(k,cst(cat_am)+(i-1)*3+1)   + &
                         q(k,cst(cat_r)+(i-1)*3+2) * &
-                        min(dummy2/(q(k,cst(cat_r))+qsmall),1._sp)
+                        min(dummy2/(q(k,cst(cat_r))+qsmall),1._wp)
                     
                     ! this is surface area going into aerosol
                     q(k,cst(cat_am)+(i-1)*3+2)    = &
                         q(k,cst(cat_am)+(i-1)*3+2) +&
                         q(k,cst(cat_r)+(i-1)*3+3) * &
-                        min(dummy2/(q(k,cst(cat_r))+qsmall),1._sp)
+                        min(dummy2/(q(k,cst(cat_r))+qsmall),1._wp)
                     ! this is mass going into aerosol
                     q(k,cst(cat_am)+(i-1)*3+3)    = &
                         q(k,cst(cat_am)+(i-1)*3+3) +&
                         q(k,cst(cat_r)+(i-1)*3+4) * &
-                        min(dummy2/(q(k,cst(cat_r))+qsmall),1._sp)
+                        min(dummy2/(q(k,cst(cat_r))+qsmall),1._wp)
                 endif                
                 ! aerosol in rain
                 q(k,cst(cat_r)+(i-1)*3+2)=q(k,cst(cat_r)+(i-1)*3+2)* &
-                    (1._sp - min(dummy2/(q(k,cst(cat_r))+qsmall),1._sp))
+                    (1._wp - min(dummy2/(q(k,cst(cat_r))+qsmall),1._wp))
                     
                 q(k,cst(cat_r)+(i-1)*3+3)=q(k,cst(cat_r)+(i-1)*3+3)* &
-                    (1._sp - min(dummy2/(q(k,cst(cat_r))+qsmall),1._sp))
+                    (1._wp - min(dummy2/(q(k,cst(cat_r))+qsmall),1._wp))
                     
                 q(k,cst(cat_r)+(i-1)*3+4)=q(k,cst(cat_r)+(i-1)*3+4)* &
-                    (1._sp - min(dummy2/(q(k,cst(cat_r))+qsmall),1._sp))
+                    (1._wp - min(dummy2/(q(k,cst(cat_r))+qsmall),1._wp))
                     
             enddo
             ! rain number
             q(k,cst(cat_r)) = q(k,cst(cat_r)) * &
-                (1._sp - min(dummy2/(q(k,cst(cat_r))+qsmall),1._sp ))
+                (1._wp - min(dummy2/(q(k,cst(cat_r))+qsmall),1._wp ))
             !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
         endif
@@ -3235,11 +3234,11 @@
 
     ! metling ice!
     do k=1,kp
-        if((pimlt(k) .gt. 0._sp)) then
+        if((pimlt(k) .gt. 0._wp)) then
             !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
             ! add up the total number of aerosol in ice - all modes
             !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-            dummy1=0._sp
+            dummy1=0._wp
             do i=1,n_mode-1
                 dummy1=dummy1+q(k,iai+(i-1)*3)
             enddo
@@ -3275,28 +3274,28 @@
                     q(k,cst(cat_r)+(i-1)*3+2)      = &
                         q(k,cst(cat_r)+(i-1)*3+2)   + &
                         q(k,iai+(i-1)*3) * &
-                        min(dummy2/(q(k,cst(cat_i))+qsmall),1._sp)
+                        min(dummy2/(q(k,cst(cat_i))+qsmall),1._wp)
                     
                     ! this is surface area going into rain aerosol
                     q(k,cst(cat_r)+(i-1)*3+3)    = &
                         q(k,cst(cat_r)+(i-1)*3+3) +&
                         q(k,iai+(i-1)*3+1) * &
-                        min(dummy2/(q(k,cst(cat_i))+qsmall),1._sp)
+                        min(dummy2/(q(k,cst(cat_i))+qsmall),1._wp)
                     ! this is mass going into rain aerosol
                     q(k,cst(cat_r)+(i-1)*3+4)    = &
                         q(k,cst(cat_r)+(i-1)*3+4) +&
                         q(k,iai+(i-1)*3+2) * &
-                        min(dummy2/(q(k,cst(cat_i))+qsmall),1._sp)
+                        min(dummy2/(q(k,cst(cat_i))+qsmall),1._wp)
                 endif                
                 ! aerosol in ice
 !                 q(k,iai+(i-1)*3)=q(k,iai+(i-1)*3)* &
-!                     (1._sp - min(dummy2/(q(k,cst(cat_i))+qsmall),1._sp))
+!                     (1._wp - min(dummy2/(q(k,cst(cat_i))+qsmall),1._wp))
 !                     
 !                 q(k,iai+(i-1)*3+1)=q(k,iai+(i-1)*3+1)* &
-!                     (1._sp - min(dummy2/(q(k,cst(cat_i))+qsmall),1._sp))
+!                     (1._wp - min(dummy2/(q(k,cst(cat_i))+qsmall),1._wp))
 !                     
 !                 q(k,iai+(i-1)*3+2)=q(k,iai+(i-1)*3+2)* &
-!                     (1._sp - min(dummy2/(q(k,cst(cat_i))+qsmall),1._sp))
+!                     (1._wp - min(dummy2/(q(k,cst(cat_i))+qsmall),1._wp))
                     
             enddo
             ! add the number of ice and mass to the rain
@@ -3305,9 +3304,9 @@
 !             q(k,cst(cat_r)+1)=q(k,cst(cat_r)+1)+pimlt(k)*dt
             ! ice properties
             q(k,cst(cat_i):cen(cat_i)) = q(k,cst(cat_i):cen(cat_i)) * &
-                (1._sp - min(dummy2/(q(k,cst(cat_i))+qsmall),1._sp ))
+                (1._wp - min(dummy2/(q(k,cst(cat_i))+qsmall),1._wp ))
             !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-            if(t(k) > ttr) q(k,cst(cat_i):cen(cat_i))=0._sp
+            if(t(k) > ttr) q(k,cst(cat_i):cen(cat_i))=0._wp
         endif
         
     enddo
@@ -3334,7 +3333,7 @@
             
             ! limit riming so 0.1 times liquid water or to a temperature 
             ! that will not raise above the melting point
-            piacw(k)=max(min(piacw(k),dummy1/dt*0.1_sp,(ttr-t(k))*cp/lf)/dt*0.5_sp,0._sp)
+            piacw(k)=max(min(piacw(k),dummy1/dt*0.1_wp,(ttr-t(k))*cp/lf)/dt*0.5_wp,0._wp)
             ! riming
             q(k,iqi)=q(k,iqi)+piacw(k)*dt
             q(k,iqi+4)=q(k,iqi+4)+piacw(k)*dt
@@ -3345,17 +3344,17 @@
                 q(k,cst(cat_c)+2:cen(cat_c))*piacw(k)*dt/dummy1
             ! reduce cloud props
             q(k,cst(cat_c):cen(cat_c))=q(k,cst(cat_c):cen(cat_c))* &
-                max(1._sp- piacw(k)*dt/dummy1,0._sp)
+                max(1._wp- piacw(k)*dt/dummy1,0._wp)
                 
                 
             
             !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
             ! h-m process                                                                !
             !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-            if((t(k).gt.(ttr-2.0_sp)).or.(t(k).lt.(ttr-9.0_sp))) cycle
+            if((t(k).gt.(ttr-2.0_wp)).or.(t(k).lt.(ttr-9.0_wp))) cycle
 
             if(hm_flag) then
-                dummy1=max(hm_rate*piacw(k)*hm_func(t(k)),0._sp)*dt
+                dummy1=max(hm_rate*piacw(k)*hm_func(t(k)),0._wp)*dt
                 ! increase ice number
                 q(k,ini) = q(k,ini) + dummy1
                 ! increase phi
@@ -3380,11 +3379,11 @@
     
     q(1:kp,1)=q(1:kp,1)+(prevp)*dt
 
-    q=max(q,0._sp)	
+    q=max(q,0._wp)	
 
 
      
-    if (theta_flag) th=t*(1.e5_sp/p)**(ra/cp)-theta
+    if (theta_flag) th=t*(1.e5_wp/p)**(ra/cp)-theta
 
 
 
@@ -3395,14 +3394,14 @@
     if(sum(q(1:kp,cst(cat_c)+1)).gt.qsmall) then
         adv_l(1)=.true.
 		where(isnan(vqc))
-			vqc=0._sp
+			vqc=0._wp
 		end where
 		vqc(kp+1:kp+o_halo)=vqc(kp+o_halo)
-		n_step(1)=max(ceiling(maxval(vqc(-o_halo+1:kp+o_halo)*dt/dz*2._sp)),1)
+		n_step(1)=max(ceiling(maxval(vqc(-o_halo+1:kp+o_halo)*dt/dz*2._wp)),1)
 		vqc(1-o_halo:kp+o_halo-1)=-vqc(-o_halo+2:kp+o_halo)
 #if MPI_PAMM == 0
 		do iter=1,n_step(1)
-            call mpdata_vec_1d(dt/real(n_step(1),sp),dz,dzn,&
+            call mpdata_vec_1d(dt/real(n_step(1),wp),dz,dzn,&
                             rho,rhon,kp,cen(cat_c)-cst(cat_c)+1,o_halo,o_halo,&
                             vqc(-o_halo+1:kp+o_halo),&
                             q(:,cst(cat_c):cen(cat_c)),1,.false.,0)		
@@ -3410,18 +3409,18 @@
 #endif	
 	endif
     ! rain 
-    !vqr=0._sp
+    !vqr=0._wp
     if(sum(q(1:kp,cst(cat_r)+1)).gt.qsmall) then
         adv_l(2)=.true.
 		where(isnan(vqr))
-			vqr=0._sp
+			vqr=0._wp
 		end where
 		vqr(kp+1:kp+o_halo)=vqr(kp+o_halo)
-		n_step(2)=max(ceiling(maxval(vqr(-o_halo+1:kp+o_halo)*dt/dz*2._sp)),1)
+		n_step(2)=max(ceiling(maxval(vqr(-o_halo+1:kp+o_halo)*dt/dz*2._wp)),1)
 		vqr(1-o_halo:kp+o_halo-1)=-vqr(-o_halo+2:kp+o_halo)
 #if MPI_PAMM == 0
 		do iter=1,n_step(2)
-            call mpdata_vec_1d(dt/real(n_step(2),sp),dz,dzn,&
+            call mpdata_vec_1d(dt/real(n_step(2),wp),dz,dzn,&
                             rho,rhon,kp,cen(cat_r)-cst(cat_r)+1,o_halo,o_halo,&
                             vqr(-o_halo+1:kp+o_halo),&
                             q(:,cst(cat_r):cen(cat_r)),1,.false.,0)		
@@ -3433,14 +3432,14 @@
         if(sum(q(1:kp,cst(cat_i)+1)).gt.qsmall) then
             adv_l(3)=.true.
             where(isnan(vqi))
-                vqi=0._sp
+                vqi=0._wp
             end where
             vqi(kp+1:kp+o_halo)=vqi(kp+o_halo)
-            n_step(3)=max(ceiling(maxval(vqi(-o_halo+1:kp+o_halo)*dt/dz*2._sp)),1)
+            n_step(3)=max(ceiling(maxval(vqi(-o_halo+1:kp+o_halo)*dt/dz*2._wp)),1)
             vqi(1-o_halo:kp+o_halo-1)=-vqi(-o_halo+2:kp+o_halo)
 #if MPI_PAMM == 0
             do iter=1,n_step(3)
-                call mpdata_vec_1d(dt/real(n_step(3),sp),dz,dzn,&
+                call mpdata_vec_1d(dt/real(n_step(3),wp),dz,dzn,&
                                 rho,rhon,kp,cen(cat_i)-cst(cat_i)+1,o_halo,o_halo,&
                                 vqi(-o_halo+1:kp+o_halo),&
                                 q(:,cst(cat_i):cen(cat_i)),1,.false.,0)		
@@ -3470,54 +3469,54 @@
 	use advection_1d
     implicit none
     ! arguments:
-    real(sp), intent(inout) :: praut,pracw, rcwaut, rcwacr, rraut, &
+    real(wp), intent(inout) :: praut,pracw, rcwaut, rcwacr, rraut, &
 		                    rrsel, rcwsel
-	real(sp), intent(in) :: qc,nc,qr,nr,rho, dt
-	real(sp) :: lc, lr, nc1,nr1,xc_bar, phi_au, phi_ac, b_slope, tau, factor1, factor2, &
+	real(wp), intent(in) :: qc,nc,qr,nr,rho, dt
+	real(wp) :: lc, lr, nc1,nr1,xc_bar, phi_au, phi_ac, b_slope, tau, factor1, factor2, &
 	            test
 	
 	
 	
-	    praut=0._sp
-	    pracw=0._sp
-	    rcwaut=0._sp
-	    rcwacr=0._sp
-	    rraut=0._sp
-	    rrsel=0._sp
-	    rcwsel=0._sp
+	    praut=0._wp
+	    pracw=0._wp
+	    rcwaut=0._wp
+	    rcwacr=0._wp
+	    rraut=0._wp
+	    rrsel=0._wp
+	    rcwsel=0._wp
 	    
 	    lc=qc*rho
 	    lr=qr*rho
 	    
 	    nc1=max(nc*rho,lc/xstar)
-	    nr1=max(nr*rho,1._sp)
+	    nr1=max(nr*rho,1._wp)
 	    
-		b_slope=((nc1+1.e-20_sp)/(lc+1.e-20_sp))*(gam2c+1.e-20_sp)/(gam1c +1.e-20_sp)
-		xc_bar=gam2c/(gam1c*b_slope+1.e-20_sp)
+		b_slope=((nc1+1.e-20_wp)/(lc+1.e-20_wp))*(gam2c+1.e-20_wp)/(gam1c +1.e-20_wp)
+		xc_bar=gam2c/(gam1c*b_slope+1.e-20_wp)
 		
-		tau=1._sp-lc/(lc+lr+1.e-20_sp)
-		tau=max(tau,1.e-6_sp)
-		phi_au=600._sp*tau**0.68*(1._sp-tau**0.68)**3
-		phi_ac=(tau/(tau+5.e-4_sp))**4
+		tau=1._wp-lc/(lc+lr+1.e-20_wp)
+		tau=max(tau,1.e-6_wp)
+		phi_au=600._wp*tau**0.68*(1._wp-tau**0.68)**3
+		phi_ac=(tau/(tau+5.e-4_wp))**4
 
 		if (lc .gt. qsmall) then
             ! autoconversion: equation a1 in Seifert and Beheng (2001, atmos res)
-            praut = kc/(20._sp*xstar)*(alpha_c+2._sp)*(alpha_c+4._sp)/(alpha_c+1._sp)**2 * &
-                    (lc*xc_bar)**2*(1._sp+phi_au/(1._sp-tau+1.e-20_sp)**2)
+            praut = kc/(20._wp*xstar)*(alpha_c+2._wp)*(alpha_c+4._wp)/(alpha_c+1._wp)**2 * &
+                    (lc*xc_bar)**2*(1._wp+phi_au/(1._wp-tau+1.e-20_wp)**2)
             
             ! accretion: equation a2 in Seifert and Beheng (2001, atmos res)
             pracw=kr*lc*lr*phi_ac
         
             ! cloud number autoconversion: equation a5 in Seifert and Beheng (2001, atmos res)
-            rcwaut=-2._sp/xstar*praut
+            rcwaut=-2._wp/xstar*praut
             ! cloud num accretion: equation a6 in Seifert and Beheng (2001, atmos res)
-            rcwacr=-1._sp/xc_bar*pracw
+            rcwacr=-1._wp/xc_bar*pracw
             ! rain num autoconversion: equation a7 in Seifert and Beheng (2001, atmos res)
-            rraut=-1._sp/2._sp*rcwaut
+            rraut=-1._wp/2._wp*rcwaut
             ! rain num self collection: equation a8 in Seifert and Beheng (2001, atmos res)
             rrsel=-kr*nr*lr
             ! cloud num self collection: equation a9 in Seifert and Beheng (2001, atmos res)
-            rcwsel=-kr*(alpha_c+2._sp)/(alpha_c+1._sp)*lc**2-rcwaut
+            rcwsel=-kr*(alpha_c+2._wp)/(alpha_c+1._wp)*lc**2-rcwaut
 
             factor1=min(lc/dt,praut+pracw)/(praut+pracw)
             factor2=min(nc1/dt,-(rcwaut+rcwacr+rcwsel))/(-(rcwaut+rcwacr+rcwsel))
@@ -3554,13 +3553,13 @@
 	!>@param[in] t: temperature
 	!>@return svp_liq: saturation vapour pressure over liquid water
 	function svp_liq(t)
-		use nrtype
+		use numerics_type
 		implicit none
-		real(sp), intent(in) :: t
-		real(sp) :: svp_liq
-		svp_liq = 100._sp*6.1121_sp* &
-			  exp((18.678_sp - (t-ttr)/ 234.5_sp)* &
-			  (t-ttr)/(257.14_sp + (t-ttr)))
+		real(wp), intent(in) :: t
+		real(wp) :: svp_liq
+		svp_liq = 100._wp*6.1121_wp* &
+			  exp((18.678_wp - (t-ttr)/ 234.5_wp)* &
+			  (t-ttr)/(257.14_wp + (t-ttr)))
 	end function svp_liq
 	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
@@ -3575,13 +3574,13 @@
 	!>@param[in] t: temperature
 	!>@return svp_ice: saturation vapour pressure over ice water
 	function svp_ice(t)
-		use nrtype
+		use numerics_type
 		implicit none
-		real(sp), intent(in) :: t
-		real(sp) :: svp_ice
-		svp_ice = 100._sp*6.1115_sp* &
-			  exp((23.036_sp - (t-ttr)/ 333.7_sp)* &
-			  (t-ttr)/(279.82_sp + (t-ttr)))
+		real(wp), intent(in) :: t
+		real(wp) :: svp_ice
+		svp_ice = 100._wp*6.1115_wp* &
+			  exp((23.036_wp - (t-ttr)/ 333.7_wp)* &
+			  (t-ttr)/(279.82_wp + (t-ttr)))
 	end function svp_ice
 	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
@@ -3597,19 +3596,19 @@
 	!>@param[in] t: temperature
 	!>@return viscosity_air: viscosity of air
 	elemental function viscosity_air(t)
-		use nrtype
+		use numerics_type
 		implicit none
-		real(sp), intent(in) :: t
-		real(sp) :: viscosity_air
-		real(sp) :: tc
+		real(wp), intent(in) :: t
+		real(wp) :: viscosity_air
+		real(wp) :: tc
 
 		tc = t-ttr
-		tc = max(tc,-200._sp)
+		tc = max(tc,-200._wp)
 
-		if( tc.ge.0._sp) then
-			viscosity_air = (1.718_sp+0.0049_sp*tc) * 1E-5_sp ! the 1d-5 converts from poise to si units
+		if( tc.ge.0._wp) then
+			viscosity_air = (1.718_wp+0.0049_wp*tc) * 1E-5_wp ! the 1d-5 converts from poise to si units
 		else
-			viscosity_air = (1.718_sp+0.0049_sp*tc-1.2e-5_sp*tc**2) * 1e-5_sp
+			viscosity_air = (1.718_wp+0.0049_wp*tc-1.2e-5_wp*tc**2) * 1e-5_wp
 		end if
 	end function viscosity_air
 	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -3626,12 +3625,12 @@
 	!>@param[in] p: pressure
 	!>@return dd: diffusivity of water vapour in air
 	function dd(t,p)
-	  use nrtype
+	  use numerics_type
 	  implicit none
-	  real(sp), intent(in) :: t, p
-	  real(sp) :: dd, t1
-	  t1=max(t,200._sp)
-	  dd=2.11e-5_sp*(t1/ttr)**1.94_sp*(101325_sp/p)
+	  real(wp), intent(in) :: t, p
+	  real(wp) :: dd, t1
+	  t1=max(t,200._wp)
+	  dd=2.11e-5_wp*(t1/ttr)**1.94_wp*(101325_wp/p)
 	end function dd
 	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
@@ -3645,12 +3644,12 @@
 	!>@param[in] t: temperature
 	!>@return ka: thermal conductivity of air
 	function ka(t)
-	  use nrtype
+	  use numerics_type
 	  implicit none
-	  real(sp), intent(in) :: t
-	  real(sp) :: ka, t1
-	  t1=max(t,200._sp)
-	  ka=(5.69_sp+0.017_sp*(t1-ttr))*1e-3_sp*joules_in_a_cal
+	  real(wp), intent(in) :: t
+	  real(wp) :: ka, t1
+	  t1=max(t,200._wp)
+	  ka=(5.69_wp+0.017_wp*(t1-ttr))*1e-3_wp*joules_in_a_cal
 	end function ka
 	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
@@ -3665,12 +3664,12 @@
 	!>@param[in] t: temperature
 	!>@return hm_func: factor to multiple hm by
 	function hm_func(t)
-		use nrtype
+		use numerics_type
 		implicit none
-		real(sp), intent(in) :: t
-		real(sp) :: hm_func
-		hm_func=(min(max((t-265.65) / 2.5_sp,0._sp),1._sp) + &
-		        min(max((270.65-t) / 2.5_sp,0._sp),1._sp)) -1.0_sp
+		real(wp), intent(in) :: t
+		real(wp) :: hm_func
+		hm_func=(min(max((t-265.65) / 2.5_wp,0._wp),1._wp) + &
+		        min(max((270.65-t) / 2.5_wp,0._wp),1._wp)) -1.0_wp
 	end function hm_func
 	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
@@ -3687,17 +3686,17 @@
 	!>@param[in] t, naer05: temperature, number concentration of aerosols > 0.5 um
 	!>@return demott_2010: number concentration of INPs
 	function demott_2010(t,naer05)
-		use nrtype
+		use numerics_type
 		implicit none
-		real(sp), intent(in) :: t,naer05
-		real(sp) :: demott_2010
-		real(sp) :: tc
+		real(wp), intent(in) :: t,naer05
+		real(wp) :: demott_2010
+		real(wp) :: tc
 		tc=ttr-t
 		! equation 1 from
 		! https://www.pnas.org/content/107/25/11217
 		! number per std m^3
-		demott_2010=min(0.0594_sp*(tc)**3.33_sp * &
-		    (naer05/1.e6_sp)**(0.0264_sp*tc+0.0033_sp),naer05)
+		demott_2010=min(0.0594_wp*(tc)**3.33_wp * &
+		    (naer05/1.e6_wp)**(0.0264_wp*tc+0.0033_wp),naer05)
 		
 	end function demott_2010
 	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -3717,24 +3716,24 @@
                 sig_aer, &  ! sigma 
                 d_aer, t ,icen, &
                 j_stochastic, dt,ice_nuc_flag)     ! d
-    use nrtype
+    use numerics_type
     implicit none
     integer(i4b), intent(in) :: ice_nuc_flag
-    real(sp), intent(inout) :: nin, din
-    real(sp), intent(in) :: n_aer,sig_aer,d_aer, t,icen, &
+    real(wp), intent(inout) :: nin, din
+    real(wp), intent(in) :: n_aer,sig_aer,d_aer, t,icen, &
                         j_stochastic,dt
 
-    real(sp) :: naer05, x, arg
+    real(wp) :: naer05, x, arg
 
     if(ice_nuc_flag.eq.1) then
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         ! DeMott 2010 nucleation                         !
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-        naer05=ln_part_mom(0,0.5e-6_sp,n_aer,sig_aer,d_aer)
+        naer05=ln_part_mom(0,0.5e-6_wp,n_aer,sig_aer,d_aer)
         ! source function
         nin=demott_2010(t,naer05)
         ! limit nucleation
-        nin=max(nin-icen,0._sp)
+        nin=max(nin-icen,0._wp)
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     elseif(ice_nuc_flag.eq.2) then
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -3749,19 +3748,19 @@
 
     ! deplete aerosol up to this diameter - using erfinv
     ! limit the argument so that it is not equal to -1 or +1
-    arg=max(min(((1._sp-nin/n_aer)*2._sp-1._sp),1._sp-small_number),-1._sp+small_number)
+    arg=max(min(((1._wp-nin/n_aer)*2._wp-1._wp),1._wp-small_number),-1._wp+small_number)
 
     ! re-calculate nin based on limited value of arg
-    nin=(1._sp-(1._sp+arg)/2._sp)*n_aer
+    nin=(1._wp-(1._wp+arg)/2._wp)*n_aer
     
     ! inverse erf
     call erfinv(arg,x)
     
 
     ! but x is equal to log(d/dm)/(sig_aer*sqrt(2))
-    din=exp(x*sig_aer*sqrt(2._sp)+log(d_aer))
+    din=exp(x*sig_aer*sqrt(2._wp)+log(d_aer))
     
-    if((din<0.5e-6_sp) .and. (ice_nuc_flag.eq.1)) din=0.5e-6_sp
+    if((din<0.5e-6_wp) .and. (ice_nuc_flag.eq.1)) din=0.5e-6_wp
     
     end subroutine ice_nucleation_aerosol
 	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -3777,12 +3776,12 @@
 	!>@param[in] t,qv, qvsat,rhoa,dm,gamma_t,dep_density
 	!>@param[inout] v,phi
     subroutine chen_and_lamb_prop(dm,gamma_t,v,phi, dep_density)
-        use nrtype
+        use numerics_type
         implicit none
-        real(sp), intent(in) :: dm, gamma_t,dep_density
-        real(sp), intent(inout) :: v, phi
+        real(wp), intent(in) :: dm, gamma_t,dep_density
+        real(wp), intent(inout) :: v, phi
 
-        real(sp) :: deltaV,v_old,rgamma_tp2,ln_vn_vo
+        real(wp) :: deltaV,v_old,rgamma_tp2,ln_vn_vo
         integer(i4b) :: i
         
         
@@ -3798,9 +3797,9 @@
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         ! solving equations 43 and 43 over dV
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-        rgamma_tp2=1._sp/(gamma_t+2._sp)
+        rgamma_tp2=1._wp/(gamma_t+2._wp)
         ln_vn_vo=log(v/v_old)
-        phi=phi*exp((gamma_t-1._sp)*rgamma_tp2*ln_vn_vo)       
+        phi=phi*exp((gamma_t-1._wp)*rgamma_tp2*ln_vn_vo)       
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
        
     end subroutine chen_and_lamb_prop
@@ -3816,30 +3815,30 @@
 	!>@param[in] t,qv, qvsat,rhoa
 	!>@param[inout] v,phi,gamma_t,dep_density
     subroutine chen_and_lamb_anc(t,qv,qvsat,rhoa,gamma_t, dep_density)
-        use nrtype
+        use numerics_type
         implicit none
-        real(sp), intent(in) :: t,qv,qvsat,rhoa
-        real(sp), intent(inout) :: gamma_t,dep_density
+        real(wp), intent(in) :: t,qv,qvsat,rhoa
+        real(wp), intent(inout) :: gamma_t,dep_density
 
-        real(sp) :: delta_rho,t1
+        real(wp) :: delta_rho,t1
         integer(i4b) :: i
         
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         ! calculate the inherent growth ratio - this is from a 17th order polynomial
-        gamma_t=0._sp
+        gamma_t=0._wp
         t1=min(max(t,243.15),273.15) ! range of fit
         do i=1,n_cl
             gamma_t=gamma_t+((t1-gam_mu_cl(1))/gam_mu_cl(2))**(n_cl-i)*gam_cl(i)
         enddo
-        gamma_t=10._sp**gamma_t
+        gamma_t=10._wp**gamma_t
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         
         
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         ! equation 42 from Chen and Lamb (1994, JAS: The Theoretical Basis for 
         !   Parameterisation of Ice Crystal Habits)
-        delta_rho=(qv-qvsat)*rhoa*1000._sp ! g/m^3
-        dep_density=rhoi*exp(-3._sp*max(delta_rho-0.05_sp,0._sp)/gamma_t)
+        delta_rho=(qv-qvsat)*rhoa*1000._wp ! g/m^3
+        dep_density=rhoi*exp(-3._wp*max(delta_rho-0.05_wp,0._wp)/gamma_t)
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     end subroutine chen_and_lamb_anc
 	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -3854,28 +3853,28 @@
 	!>@param[in] phi
 	!>@return cap_fac
     function chen_and_lamb_cap_fac(phi)
-        use nrtype
+        use numerics_type
         implicit none
-        real(sp), intent(in) :: phi
-        real(sp) :: chen_and_lamb_cap_fac
-        real(sp) :: fac1,fac2,ecc
+        real(wp), intent(in) :: phi
+        real(wp) :: chen_and_lamb_cap_fac
+        real(wp) :: fac1,fac2,ecc
 
         
         ! factor to convert between R and a - derived from equating volume of sphere to 
         ! volume of spheroid and taking the ratio of a / r
-        fac1=(1._sp/(phi))**(1/3)
+        fac1=(1._wp/(phi))**(1/3)
         
         ! factor to convert between a and capacitance
-        if(phi<0.99_sp) then
+        if(phi<0.99_wp) then
             ! see equation 39 of Chen and Lamb (1994)
-            ecc=sqrt(1._sp-phi**2)
+            ecc=sqrt(1._wp-phi**2)
             fac2=ecc/asin(ecc)
-        elseif(phi>1.01_sp) then
+        elseif(phi>1.01_wp) then
             ! see equation 40 of Chen and Lamb (1994)
-            ecc=sqrt(1._sp-(1._sp/phi)**2)
-            fac2=(ecc)/log((1._sp+ecc)*phi)*phi/fac1
+            ecc=sqrt(1._wp-(1._wp/phi)**2)
+            fac2=(ecc)/log((1._wp+ecc)*phi)*phi/fac1
         else
-            fac2=1._sp
+            fac2=1._wp
         endif
         
         ! total factor
@@ -4039,7 +4038,7 @@
         ! fall-speeds
         vr=a_r*diamr**b_r
 !         vi=a_i*diami**b_i
-        vi=pre_hw_new*(diami**-1)*((1._sp+a_hw_new*diami**(0.5_sp*di))**0.5_sp-1._sp)**2
+        vi=pre_hw_new*(diami**-1)*((1._wp+a_hw_new*diami**(0.5_wp*di))**0.5_wp-1._wp)**2
         delv=abs(vr-vi)
         !delv=max((vx+vy)/8.0,abs(vx-vy))
         ! last bit is to convert to integral over m
@@ -4125,7 +4124,7 @@
         ! fall-speeds
         vr=a_r*diamr**b_r
 !         vi=a_i*diami**b_i
-        vi=pre_hw_new*(diami**-1)*((1._sp+a_hw_new*diami**(0.5_sp*di))**0.5_sp-1._sp)**2
+        vi=pre_hw_new*(diami**-1)*((1._wp+a_hw_new*diami**(0.5_wp*di))**0.5_wp-1._wp)**2
         delv=abs(vr-vi)
         !delv=max((vx+vy)/8.0,abs(vx-vy))
         ! last bit is to convert to integral over m
@@ -4180,7 +4179,7 @@
         implicit none
         real(wp), intent(in) :: x
         real(wp) :: limit1_collisional
-        limit1_collisional=0._sp
+        limit1_collisional=0._wp
     end function limit1_collisional
 !
     function limit2_mode2(x)
@@ -4224,7 +4223,7 @@
         ! calculate the change in momentum - equation 7
         ! assume a coefficient of restitution of 0.5?
         ! units are g cm s-1
-        delm = 0.25_sp*pi*mr*mi/(mr+mi)*(1._sp+0.5_sp)*abs(vr-vi)*1.e5_sp 
+        delm = 0.25_wp*pi*mr*mi/(mr+mi)*(1._wp+0.5_wp)*abs(vr-vi)*1.e5_wp 
         nfrag = vard02(1)*(log(delm)**2)+vard02(2)*log(delm)+vard02(3)
         
         dintegral_collisional_breakup = dintegral_collisional_breakup * nfrag
@@ -4252,8 +4251,8 @@
         diamr=(mr/ci_new)**(1.0_wp/di)
         diami=(mi/ci_new)**(1.0_wp/di)
         ! fall-speeds
-        vr=pre_hw_new*(diamr**-1)*((1._sp+a_hw_new*diamr**(0.5_sp*di))**0.5_sp-1._sp)**2
-        vi=pre_hw_new*(diami**-1)*((1._sp+a_hw_new*diami**(0.5_sp*di))**0.5_sp-1._sp)**2
+        vr=pre_hw_new*(diamr**-1)*((1._wp+a_hw_new*diamr**(0.5_wp*di))**0.5_wp-1._wp)**2
+        vi=pre_hw_new*(diami**-1)*((1._wp+a_hw_new*diami**(0.5_wp*di))**0.5_wp-1._wp)**2
         delv=abs(vr-vi)
 
         ! last bit is to convert to integral over m
@@ -4266,8 +4265,8 @@
         ! calculate the change in momentum - equation 7
         ! assume a coefficient of restitution of 0.5?
         ! units are g cm s-1
-        delm = 0.125_sp*pi*mr*mi/(mr+mi)*(1._sp+0.5_sp)*delv*1.e5_sp 
-        delm = min(max(delm,exp(-vard02(2)/(2*vard02(1)))),1._sp)
+        delm = 0.125_wp*pi*mr*mi/(mr+mi)*(1._wp+0.5_wp)*delv*1.e5_wp 
+        delm = min(max(delm,exp(-vard02(2)/(2*vard02(1)))),1._wp)
         
         nfrag = vard02(1)*(log(delm)**2)+vard02(2)*log(delm)+vard02(3)
         
@@ -4304,8 +4303,8 @@
         diamr=(mr/ci_new)**(1.0_wp/di)
         diami=(mi/ci_new)**(1.0_wp/di)
         ! fall-speeds
-        vr=pre_hw_new*(diamr**-1)*((1._sp+a_hw_new*diamr**(0.5_sp*di))**0.5_sp-1._sp)**2
-        vi=pre_hw_new*(diami**-1)*((1._sp+a_hw_new*diami**(0.5_sp*di))**0.5_sp-1._sp)**2
+        vr=pre_hw_new*(diamr**-1)*((1._wp+a_hw_new*diamr**(0.5_wp*di))**0.5_wp-1._wp)**2
+        vi=pre_hw_new*(diami**-1)*((1._wp+a_hw_new*diami**(0.5_wp*di))**0.5_wp-1._wp)**2
         delv=abs(vr-vi)
 
         ! last bit is to convert to integral over m
