@@ -3,7 +3,7 @@
 	!>@brief
 	!>drivers for the radiative transfer model
     module drivers
-    use nrtype
+    use numerics_type
     !use variables
     private
     public :: lsm_driver
@@ -38,7 +38,7 @@
 				coords, &
 				new_file,outputfile, output_interval, &
 				dims,id, world_process, rank, ring_comm,sub_comm)
-		use nrtype
+		use numerics_type
 		use mpi_module, only : exchange_full, exchange_along_dim, exchange_d_fluxes, &
 		                        exchange_u_fluxes, exchange_full_wo
 		use lsm, only : soil_solver
@@ -52,25 +52,25 @@
 		integer(i4b), intent(in) :: id, world_process, ring_comm, sub_comm,rank
 		integer(i4b), dimension(3), intent(in) :: coords, dims
 		character (len=*), intent(in) :: outputfile
-		real(sp), intent(in) :: output_interval, dt
-		real(sp), dimension(1-l_h:ipp+r_h), intent(in) :: x,dx, dxn
-		real(sp), dimension(1-l_h:jpp+r_h), intent(in) :: y,dy,dyn
-		real(sp), dimension(1-l_h:kpp+r_h), intent(in) :: z,dz,dzn
-		real(sp), dimension(1-l_h:skp+r_h), intent(in) :: sz,szn, dsz, dszn, pscs, &
+		real(wp), intent(in) :: output_interval, dt
+		real(wp), dimension(1-l_h:ipp+r_h), intent(in) :: x,dx, dxn
+		real(wp), dimension(1-l_h:jpp+r_h), intent(in) :: y,dy,dyn
+		real(wp), dimension(1-l_h:kpp+r_h), intent(in) :: z,dz,dzn
+		real(wp), dimension(1-l_h:skp+r_h), intent(in) :: sz,szn, dsz, dszn, pscs, &
 		                                                b1,wgs,wfc,phi_ps,kgs
 
-        real(sp), dimension(1-l_h:skp+r_h,1-l_h:jpp+r_h,1-l_h:ipp+r_h), & 
+        real(wp), dimension(1-l_h:skp+r_h,1-l_h:jpp+r_h,1-l_h:ipp+r_h), & 
             intent(inout) :: t,wg
-        real(sp), dimension(1-l_h:jpp+r_h,1-l_h:ipp+r_h), & 
+        real(wp), dimension(1-l_h:jpp+r_h,1-l_h:ipp+r_h), & 
             intent(inout) :: tsurf
-        real(sp), dimension(tdend), intent(inout) :: b,r,u
-        real(sp), dimension(tdend-1), intent(inout) :: a,c
+        real(wp), dimension(tdend), intent(inout) :: b,r,u
+        real(wp), dimension(tdend-1), intent(inout) :: a,c
         
         
 		! locals:		
 		integer(i4b) :: n,n2, cur=1, i,j,k, error, rank2
-		real(sp) :: time, time_last_output, output_time
-        real(sp), dimension(1-l_h:jpp+r_h,1-l_h:ipp+r_h) :: flux2d_1, flux2d_2
+		real(wp) :: time, time_last_output, output_time
+        real(wp), dimension(1-l_h:jpp+r_h,1-l_h:ipp+r_h) :: flux2d_1, flux2d_2
 		
         if(id>=dims(1)*dims(2)*dims(3)) return 
         
@@ -80,13 +80,13 @@
 		output_time=output_interval
 		rank2=dims(1)*dims(2)*dims(3)
 		
-		flux2d_1=0._sp
-		flux2d_2=0._sp
+		flux2d_1=0._wp
+		flux2d_2=0._wp
 		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 		! time-loop                                                                      !
 		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 		do n=1,ntim	
-			time=real(n-1,sp)*dt
+			time=real(n-1,wp)*dt
 
 
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -209,17 +209,17 @@
 		character (len=*), intent(in) :: outputfile
 		integer(i4b), intent(in) :: n, ip, ipp, ipstart, jp, jpp, jpstart, &
 									kp, kpp, kpstart, l_h,r_h,nbands
-		real(sp), intent(in) :: time
-		real(sp), dimension(1-l_h:ipp+r_h), intent(in) :: x
-		real(sp), dimension(1-l_h:jpp+r_h), intent(in) :: y
-		real(sp), dimension(1-l_h:kpp+r_h), intent(in) :: z,rhoa, thetan, trefn
-		real(sp), &
+		real(wp), intent(in) :: time
+		real(wp), dimension(1-l_h:ipp+r_h), intent(in) :: x
+		real(wp), dimension(1-l_h:jpp+r_h), intent(in) :: y
+		real(wp), dimension(1-l_h:kpp+r_h), intent(in) :: z,rhoa, thetan, trefn
+		real(wp), &
 			dimension(1-r_h:kpp+r_h,1-r_h:jpp+r_h,1-r_h:ipp+r_h,1:nbands), &
 			intent(in) :: flux_u, flux_d
-		real(sp), &
+		real(wp), &
 			dimension(1-r_h:kpp+r_h,1-r_h:jpp+r_h,1-r_h:ipp+r_h), &
 			intent(in) :: rad_power
-		real(sp), dimension(nbands) :: lambda_low,lambda_high,lambda, sflux_l
+		real(wp), dimension(nbands) :: lambda_low,lambda_high,lambda, sflux_l
 		
 		integer(i4b), intent(in) :: id ,world_process, rank, ring_comm
 	
@@ -568,7 +568,7 @@
 	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 	subroutine check(status)
 		use netcdf
-		use nrtype
+		use numerics_type
 		integer(i4b), intent ( in) :: status
 
 		if(status /= nf90_noerr) then

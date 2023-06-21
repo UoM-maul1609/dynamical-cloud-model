@@ -1,5 +1,8 @@
-.PHONY: cleanall
-CLEANDIRS =  ./
+OSNF_DIR = osnf
+
+.PHONY: osnf cleanall
+CLEANDIRS = $(OSNF_DIR) ./
+
 
 
 DEBUG = -fbounds-check -g 
@@ -26,66 +29,44 @@ OBJ = o
 FFLAGS = $(OPT)  $(DEBUG) -w -o 
 FFLAGSOMP = -fopenmp-simd $(FFLAGS)
 FFLAGS2 =  $(DEBUG) -w -O3 -o 
+VAR_TYPE = 1 # 0 single, 1 double
 
 
 main.exe	:  main.$(OBJ) variables.$(OBJ)  mpi_module.$(OBJ) \
-			 initialisation.$(OBJ) driver_code.$(OBJ) lsm_lib.a 
+			 initialisation.$(OBJ) driver_code.$(OBJ) osnf_code lsm_lib.a 
 	$(FOR2) $(FFLAGSOMP)main.exe main.$(OBJ) variables.$(OBJ)  land_surface.$(OBJ) \
 			 mpi_module.$(OBJ) \
 			 initialisation.$(OBJ) driver_code.$(OBJ) \
-			 -lm lsm_lib.a \
+			 -lm lsm_lib.a  -I$(OSNF_DIR) \
 		 ${NETCDFLIB} -I ${NETCDFMOD} ${NETCDF_LIB} $(DEBUG)
-lsm_lib.a	:   land_surface.$(OBJ) \
-                nrtype.$(OBJ) nr.$(OBJ) nrutil.$(OBJ) locate.$(OBJ) polint.$(OBJ) \
-				trapzd.$(OBJ) qromb.$(OBJ) \
-				tridag.$(OBJ) rkqs.$(OBJ) rkck.$(OBJ) odeint.$(OBJ) zbrent.$(OBJ) \
-				random.$(OBJ) 
+lsm_lib.a	:   land_surface.$(OBJ) osnf_code 
 	$(AR) rc lsm_lib.a land_surface.$(OBJ) \
-	            nrutil.$(OBJ) locate.$(OBJ) polint.$(OBJ) trapzd.$(OBJ) qromb.$(OBJ) \
-	            tridag.$(OBJ) \
-				rkqs.$(OBJ) rkck.$(OBJ) odeint.$(OBJ) zbrent.$(OBJ) \
-				random.$(OBJ) 
-locate.$(OBJ)	: locate.f90
-	$(FOR) locate.f90 $(FFLAGS)locate.$(OBJ)
-polint.$(OBJ)	: polint.f90 nrutil.$(OBJ)
-	$(FOR) polint.f90 $(FFLAGS)polint.$(OBJ)
-trapzd.$(OBJ)	: trapzd.f90
-	$(FOR) trapzd.f90 $(FFLAGS)trapzd.$(OBJ)
-qromb.$(OBJ)	: qromb.f90
-	$(FOR) qromb.f90 $(FFLAGS)qromb.$(OBJ)
-tridag.$(OBJ)	: tridag.f90
-	$(FOR) tridag.f90 $(FFLAGS)tridag.$(OBJ)
-nrtype.$(OBJ)	: nrtype.f90
-	$(FOR) nrtype.f90 $(FFLAGS)nrtype.$(OBJ)
-nr.$(OBJ)	: nr.f90 
-	$(FOR) nr.f90 $(FFLAGS)nr.$(OBJ)
-nrutil.$(OBJ)	: nrutil.f90
-	$(FOR) nrutil.f90 $(FFLAGS)nrutil.$(OBJ)
-rkqs.$(OBJ)	: rkqs.f90
-	$(FOR) rkqs.f90 $(FFLAGS)rkqs.$(OBJ)	
-rkck.$(OBJ)	: rkck.f90
-	$(FOR) rkck.f90 $(FFLAGS)rkck.$(OBJ)	
-odeint.$(OBJ)	: odeint.f90
-	$(FOR) odeint.f90 $(FFLAGS)odeint.$(OBJ)	
-zbrent.$(OBJ)	: zbrent.f90
-	$(FOR) zbrent.f90 $(FFLAGS2)zbrent.$(OBJ)	
-random.$(OBJ) : random.f90 
-	$(FOR) random.f90 $(FFLAGS)random.$(OBJ) 
-variables.$(OBJ) : variables.f90 nrtype.$(OBJ)
-	$(FOR) variables.f90 $(FFLAGS)variables.$(OBJ)
-initialisation.$(OBJ) : initialisation.f90 random.$(OBJ) nr.$(OBJ) nrtype.$(OBJ)
-	$(FOR) initialisation.f90 -I ${NETCDFMOD}  $(FFLAGS)initialisation.$(OBJ)
-driver_code.$(OBJ) : driver_code.f90 nrtype.$(OBJ) land_surface.$(OBJ) 
-	$(FOR) driver_code.f90 -I ${NETCDFMOD}  $(FFLAGS)driver_code.$(OBJ)
+				$(OSNF_DIR)/numerics.$(OBJ) $(OSNF_DIR)/zeroin.$(OBJ) $(OSNF_DIR)/sfmin.$(OBJ) \
+                $(OSNF_DIR)/fmin.$(OBJ) $(OSNF_DIR)/r1mach.$(OBJ) \
+                $(OSNF_DIR)/d1mach.$(OBJ) $(OSNF_DIR)/dfsid1.$(OBJ) \
+                $(OSNF_DIR)/poly_int.$(OBJ) $(OSNF_DIR)/find_pos.$(OBJ) \
+                $(OSNF_DIR)/svode.$(OBJ) \
+                $(OSNF_DIR)/slinpk.$(OBJ) $(OSNF_DIR)/vode.$(OBJ) \
+                $(OSNF_DIR)/dlinpk.$(OBJ) $(OSNF_DIR)/vode_integrate.$(OBJ) \
+                $(OSNF_DIR)/erfinv.$(OBJ) $(OSNF_DIR)/tridiagonal.$(OBJ) \
+                $(OSNF_DIR)/hygfx.$(OBJ) $(OSNF_DIR)/random.$(OBJ)				
+variables.$(OBJ) : variables.f90 osnf_code
+	$(FOR) variables.f90 $(FFLAGS)variables.$(OBJ) -I$(OSNF_DIR)
+initialisation.$(OBJ) : initialisation.f90 osnf_code
+	$(FOR) initialisation.f90 -I ${NETCDFMOD}  $(FFLAGS)initialisation.$(OBJ) -I$(OSNF_DIR)
+driver_code.$(OBJ) : driver_code.f90 land_surface.$(OBJ) osnf_code
+	$(FOR) driver_code.f90 -I ${NETCDFMOD}  -I$(OSNF_DIR) $(FFLAGS)driver_code.$(OBJ)
 mpi_module.$(OBJ) : mpi_module.f90 
-	$(FOR) mpi_module.f90 $(FFLAGS)mpi_module.$(OBJ)
-land_surface.$(OBJ) : land_surface.f90 nrtype.$(OBJ) nr.$(OBJ) mpi_module.$(OBJ) \
-					initialisation.$(OBJ) locate.$(OBJ) polint.$(OBJ) \
-					trapzd.$(OBJ) qromb.$(OBJ) 
-	$(FOR) land_surface.f90 $(FFLAGSOMP)land_surface.$(OBJ) 
-main.$(OBJ)   : main.f90 variables.$(OBJ) nrtype.$(OBJ)  mpi_module.$(OBJ) \
+	$(FOR) mpi_module.f90  -cpp -DVAR_TYPE=$(VAR_TYPE) $(FFLAGS)mpi_module.$(OBJ) -I$(OSNF_DIR)
+land_surface.$(OBJ) : land_surface.f90 mpi_module.$(OBJ) \
+					initialisation.$(OBJ) osnf_code
+	$(FOR) land_surface.f90  -I$(OSNF_DIR) $(FFLAGSOMP)land_surface.$(OBJ)
+main.$(OBJ)   : main.f90 variables.$(OBJ)  osnf_code mpi_module.$(OBJ) \
 			initialisation.$(OBJ) land_surface.$(OBJ) driver_code.$(OBJ) 
-	$(FOR)  main.f90 -I ${NETCDFMOD} $(FFLAGS)main.$(OBJ) 
+	$(FOR)  main.f90 -I ${NETCDFMOD} -I$(OSNF_DIR) $(FFLAGS)main.$(OBJ) 
+
+osnf_code:
+	$(MAKE) -C $(OSNF_DIR)
 
 clean: 
 	rm *.exe  *.o *.mod *~ \
