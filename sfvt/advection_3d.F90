@@ -4,6 +4,14 @@
 	!>advection code for the dynamical cloud model
     module advection_s_3d
     use numerics_type
+    use mpi
+    implicit none
+#if VAR_TYPE==0
+		integer(i4b), parameter :: MPIREAL=MPI_REAL4
+#endif
+#if VAR_TYPE==1
+		integer(i4b), parameter :: MPIREAL=MPI_REAL8
+#endif
     
     private
     public :: mpdata_3d, mpdata_vec_3d, first_order_upstream_3d, adv_ref_state, &
@@ -267,14 +275,14 @@
 
 	! has to be positive definite
 	minlocal=min(minval(psi_in(:,:,:)),lbc,ubc)
-	call mpi_allreduce(minlocal,minglobal,1,MPI_REAL8,MPI_MIN, comm3d,error)
+	call mpi_allreduce(minlocal,minglobal,1,MPIREAL,MPI_MIN, comm3d,error)
 
 	psi_in=psi_in-minglobal
 	lbc=lbc-minglobal
 	ubc=ubc-minglobal
 	
 	psi_local_sum=sum(psi_in(1:kp,1:jp,1:ip))
-	call MPI_Allreduce(psi_local_sum, psi_sum, 1, MPI_REAL8, MPI_SUM, comm3d, error)
+	call MPI_Allreduce(psi_local_sum, psi_sum, 1, MPIREAL, MPI_SUM, comm3d, error)
  	if(psi_sum.lt.small) then
  	    psi_in(:,:,:)=psi_in(:,:,:)+minglobal
  	    lbc=lbc+minglobal
@@ -834,14 +842,14 @@
 
 	! has to be positive definite
 	minlocal=min(minval(psi_in(:,:,:)),lbc,ubc)
-	call mpi_allreduce(minlocal,minglobal,1,MPI_REAL8,MPI_MIN, comm3d,error)
+	call mpi_allreduce(minlocal,minglobal,1,MPIREAL,MPI_MIN, comm3d,error)
 
 	psi_in=psi_in-minglobal
 	lbc=lbc-minglobal
 	ubc=ubc-minglobal
 	
 	psi_local_sum=sum(psi_in(1:kp,1:jp,1:ip))
-	call MPI_Allreduce(psi_local_sum, psi_sum, 1, MPI_REAL8, MPI_SUM, comm3d, error)
+	call MPI_Allreduce(psi_local_sum, psi_sum, 1, MPIREAL, MPI_SUM, comm3d, error)
  	if(psi_sum.lt.small) then
  	    psi_in(:,:,:)=psi_in(:,:,:)+minglobal
  	    lbc=lbc+minglobal
@@ -1254,14 +1262,14 @@
 	! has to be positive definite
 	do n=1,nq
         minlocal=min(minval(psi_in(1:kp,1:jp,1:ip,n)),lbc(n),ubc(n))
-        call mpi_allreduce(minlocal,minglobal(n),1,MPI_REAL8,MPI_MIN, comm3d,error)
+        call mpi_allreduce(minlocal,minglobal(n),1,MPIREAL,MPI_MIN, comm3d,error)
         psi_in(:,:,:,n)=psi_in(:,:,:,n)-minglobal(n)
         lbc(n)=lbc(n)-minglobal(n)
         ubc(n)=ubc(n)-minglobal(n)
 	enddo
 	
 	psi_local_sum=sum(psi_in(1:kp,1:jp,1:ip,1))
-	call MPI_Allreduce(psi_local_sum, psi_sum, 1, MPI_REAL8, MPI_SUM, comm3d, error)
+	call MPI_Allreduce(psi_local_sum, psi_sum, 1, MPIREAL, MPI_SUM, comm3d, error)
  	if(psi_sum.lt.small) then 
  	    do n=1,nq
  	        psi_in(:,:,:,n)=psi_in(:,:,:,n)+minglobal(n)
@@ -1753,14 +1761,14 @@
 	! has to be positive definite
 	do n=1,nq
         minlocal=min(minval(psi_in(1:kp,1:jp,1:ip,n)),lbc(n),ubc(n))
-        call mpi_allreduce(minlocal,minglobal(n),1,MPI_REAL8,MPI_MIN, comm3d,error)
+        call mpi_allreduce(minlocal,minglobal(n),1,MPIREAL,MPI_MIN, comm3d,error)
         psi_in(:,:,:,n)=psi_in(:,:,:,n)-minglobal(n)
         lbc(n)=lbc(n)-minglobal(n)
         ubc(n)=ubc(n)-minglobal(n)
 	enddo
 	
 	psi_local_sum=sum(psi_in(1:kp,1:jp,1:ip,1))
-	call MPI_Allreduce(psi_local_sum, psi_sum, 1, MPI_REAL8, MPI_SUM, comm3d, error)
+	call MPI_Allreduce(psi_local_sum, psi_sum, 1, MPIREAL, MPI_SUM, comm3d, error)
  	if(psi_sum.lt.small) then 
  	    do n=1,nq
  	        psi_in(:,:,:,n)=psi_in(:,:,:,n)+minglobal(n)

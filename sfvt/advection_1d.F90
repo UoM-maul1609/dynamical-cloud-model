@@ -4,7 +4,15 @@
 	!>advection code 
     module advection_s_1d
     use numerics_type
-    
+    use mpi
+    implicit none
+#if VAR_TYPE==0
+		integer(i4b), parameter :: MPIREAL=MPI_REAL4
+#endif
+#if VAR_TYPE==1
+		integer(i4b), parameter :: MPIREAL=MPI_REAL8
+#endif
+
     private
     public :: mpdata_1d, mpdata_vec_1d, first_order_upstream_1d
     real(wp), parameter :: small=1e-60_wp
@@ -142,7 +150,7 @@
 	! has to be positive definite
 	minlocal=minval(psi_in(1:kp))
 #ifdef MPI	
-	call mpi_allreduce(minlocal,minglobal,1,MPI_REAL8,MPI_MIN, comm3d,error)
+	call mpi_allreduce(minlocal,minglobal,1,MPIREAL,MPI_MIN, comm3d,error)
 #else
     minglobal=minlocal
 #endif
@@ -150,7 +158,7 @@
 	
 	psi_local_sum=sum(psi_in(1:kp))
 #ifdef MPI
-	call MPI_Allreduce(psi_local_sum, psi_sum, 1, MPI_REAL8, MPI_SUM, comm3d, error)
+	call MPI_Allreduce(psi_local_sum, psi_sum, 1, MPIREAL, MPI_SUM, comm3d, error)
 #else
     psi_sum=psi_local_sum
 #endif
@@ -481,7 +489,7 @@
 	do n=1,nq
         minlocal=minval(psi_in(1:kp,n),1)
 #ifdef MPI
-        call mpi_allreduce(minlocal,minglobal(n),1,MPI_REAL8,MPI_MIN, comm3d,error)
+        call mpi_allreduce(minlocal,minglobal(n),1,MPIREAL,MPI_MIN, comm3d,error)
 #else
         minglobal(n)=minlocal
 #endif
@@ -490,7 +498,7 @@
 	
 	psi_local_sum=sum(psi_in(1:kp,1))
 #ifdef MPI
-	call MPI_Allreduce(psi_local_sum, psi_sum, 1, MPI_REAL8, MPI_SUM, comm3d, error)
+	call MPI_Allreduce(psi_local_sum, psi_sum, 1, MPIREAL, MPI_SUM, comm3d, error)
 #else
     psi_sum=psi_local_sum
 #endif
