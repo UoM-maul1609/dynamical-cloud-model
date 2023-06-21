@@ -44,7 +44,6 @@
         use pts
         
         implicit none
-        real(sp) :: var
         
         character (len=200) :: nmlfile = ' '
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
