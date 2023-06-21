@@ -3,7 +3,7 @@
 	!>@brief
 	!>drivers for the sub-grid scale model
     module drivers
-    use nrtype
+    use numerics_type
     !use variables
     private
     public :: model_driver
@@ -57,7 +57,7 @@
 				viscous, &
 				subgrid_scheme, kord, monotone, &
 				dims,id, world_process, rank, ring_comm)
-		use nrtype
+		use numerics_type
 		use mpi_module, only : exchange_full, exchange_along_dim
 		use subgrid_3d, only : calculate_subgrid_3d, advance_fields_3d
 
@@ -70,45 +70,45 @@
 		integer(i4b), intent(in) :: id, world_process, ring_comm, rank
 		integer(i4b), dimension(3), intent(in) :: coords, dims
 		character (len=*), intent(in) :: outputfile
-		real(sp), intent(in) :: output_interval, dt, z0,z0th
-		real(sp), dimension(1-l_h:ipp+r_h), intent(in) :: x,xn,dx, dxn
-		real(sp), dimension(1-l_h:jpp+r_h), intent(in) :: y,yn,dy,dyn
-		real(sp), dimension(1-l_h:kpp+r_h), intent(in) :: z,zn,dz,dzn,&
+		real(wp), intent(in) :: output_interval, dt, z0,z0th
+		real(wp), dimension(1-l_h:ipp+r_h), intent(in) :: x,xn,dx, dxn
+		real(wp), dimension(1-l_h:jpp+r_h), intent(in) :: y,yn,dy,dyn
+		real(wp), dimension(1-l_h:kpp+r_h), intent(in) :: z,zn,dz,dzn,&
 		                                rhoa, rhoan,theta,thetan,lamsq, lamsqn
 			
 		
-		real(sp), &
+		real(wp), &
 			dimension(1-r_h:kpp+r_h,1-r_h:jpp+r_h,1-l_h:ipp+r_h), target, &
 			intent(inout) :: ut, zut, tut
-		real(sp), &
+		real(wp), &
 			dimension(1-r_h:kpp+r_h,1-l_h:jpp+r_h,1-r_h:ipp+r_h), target, &
 			intent(inout) :: vt, zvt, tvt
-		real(sp), &
+		real(wp), &
 			dimension(1-l_h:kpp+r_h,1-r_h:jpp+r_h,1-r_h:ipp+r_h), target, &
 			intent(inout) :: wt, zwt, twt
-		real(sp), &
+		real(wp), &
 			dimension(1-l_h:kpp+r_h,1-r_h:jpp+r_h,1-r_h:ipp+r_h,1:nq), target, &
 			intent(inout) :: q
 					
 
-    	real(sp), &
+    	real(wp), &
 			dimension(1-l_h:kpp+r_h,1-r_h:jpp+r_h,1-r_h:ipp+r_h), &
 			intent(inout) :: vism,vist,tau11,tau22,tau33,tau12,tau13,tau23,&
     			strain,su,sv,sw,sth,th
     	
-		real(sp), &
+		real(wp), &
 			dimension(1-l_h:kpp+r_h,1-r_h:jpp+r_h,1-r_h:ipp+r_h,1:nq), &
 			intent(inout) :: sq, viss
-		real(sp), dimension(nq), intent(inout) :: lbc,ubc
+		real(wp), dimension(nq), intent(inout) :: lbc,ubc
 			
 					
 		! locals:		
 		integer(i4b) :: n,n2, cur=1, i,j,k, error, rank2
-		real(sp) :: time, time_last_output, output_time, a
-		real(sp), dimension(:,:,:), pointer :: u,zu,tu
-		real(sp), dimension(:,:,:), pointer :: v,zv,tv
-		real(sp), dimension(:,:,:), pointer :: w,zw,tw
-! 		real(sp), &
+		real(wp) :: time, time_last_output, output_time, a
+		real(wp), dimension(:,:,:), pointer :: u,zu,tu
+		real(wp), dimension(:,:,:), pointer :: v,zv,tv
+		real(wp), dimension(:,:,:), pointer :: w,zw,tw
+! 		real(wp), &
 ! 			dimension(1-r_h:kpp+r_h,1-r_h:jpp+r_h,1-r_h:ipp+r_h) :: th2
 		
         if(id>=dims(1)*dims(2)*dims(3)) return 
@@ -134,7 +134,7 @@
 		tw => twt
 		
         
-!         if(coords(3) == 0) w(1-l_h:0,:,:)=0._sp
+!         if(coords(3) == 0) w(1-l_h:0,:,:)=0._wp
 
 		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 		! time-loop                                                                      !
@@ -160,11 +160,11 @@
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 			select case (subgrid_scheme)
 				case (0)
-                    su=0._sp
-                    sv=0._sp
-                    sw=0._sp
-                    sth=0._sp
-                    sq=0._sp
+                    su=0._wp
+                    sv=0._wp
+                    sw=0._wp
+                    sth=0._wp
+                    sq=0._wp
                     call calculate_subgrid_3d(dt,z,zn,dx,dy,dz,rhoa,theta,&
                         dxn,dyn,dzn,rhoan,thetan,&
                         ipp,jpp,kpp,nq,l_h,r_h,u,v,w,&
@@ -192,7 +192,7 @@
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 			! write netcdf variables                                                     !
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-			time=real(n-1,sp)*dt
+			time=real(n-1,wp)*dt
 			if (time-time_last_output >= output_interval) then
 			
 			
@@ -219,7 +219,7 @@
 			endif
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-			if(coords(3) == 0) w(1-l_h:0,:,:)=0._sp
+			if(coords(3) == 0) w(1-l_h:0,:,:)=0._wp
 			
 						
 						
@@ -282,13 +282,13 @@
 			! set halos																	 !
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!		
 			call exchange_full(ring_comm, id, kpp, jpp, ipp, r_h,r_h,r_h,r_h,l_h,r_h,u,&
-								0._sp,0._sp,dims,coords)
+								0._wp,0._wp,dims,coords)
 			call exchange_full(ring_comm, id, kpp, jpp, ipp, r_h,r_h,l_h,r_h,r_h,r_h,v,&
-								0._sp,0._sp,dims,coords)
+								0._wp,0._wp,dims,coords)
 			call exchange_full(ring_comm, id, kpp, jpp, ipp, l_h,r_h,r_h,r_h,r_h,r_h,w,&
-								0._sp,0._sp,dims,coords)
+								0._wp,0._wp,dims,coords)
 			call exchange_full(ring_comm, id, kpp, jpp, ipp, l_h,r_h,r_h,r_h,r_h,r_h,th,&
-								0._sp,0._sp,dims,coords)
+								0._wp,0._wp,dims,coords)
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 		enddo
@@ -363,20 +363,20 @@
 		character (len=*), intent(in) :: outputfile
 		integer(i4b), intent(in) :: n, nq,ip, ipp, ipstart, jp, jpp, jpstart, &
 									kp, kpp, kpstart, l_h,r_h
-		real(sp), intent(in) :: time
-		real(sp), dimension(1-l_h:ipp+r_h), intent(in) :: x
-		real(sp), dimension(1-l_h:jpp+r_h), intent(in) :: y
-		real(sp), dimension(1-l_h:kpp+r_h), intent(in) :: z,rhoa
-		real(sp), &
+		real(wp), intent(in) :: time
+		real(wp), dimension(1-l_h:ipp+r_h), intent(in) :: x
+		real(wp), dimension(1-l_h:jpp+r_h), intent(in) :: y
+		real(wp), dimension(1-l_h:kpp+r_h), intent(in) :: z,rhoa
+		real(wp), &
 			dimension(1-r_h:kpp+r_h,1-r_h:jpp+r_h,1-r_h:ipp+r_h,1:nq), &
 			intent(inout) :: q
-		real(sp), &
+		real(wp), &
 			dimension(1-r_h:kpp+r_h,1-r_h:jpp+r_h,1-l_h:ipp+r_h), &
 			intent(inout) :: u
-		real(sp), &
+		real(wp), &
 			dimension(1-r_h:kpp+r_h,1-l_h:jpp+r_h,1-r_h:ipp+r_h), &
 			intent(inout) :: v
-		real(sp), &
+		real(wp), &
 			dimension(1-l_h:kpp+r_h,1-r_h:jpp+r_h,1-r_h:ipp+r_h), &
 			intent(inout) :: w, th,vism,strain
 		
@@ -709,7 +709,7 @@
 	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 	subroutine check(status)
 		use netcdf
-		use nrtype
+		use numerics_type
 		integer(i4b), intent ( in) :: status
 
 		if(status /= nf90_noerr) then

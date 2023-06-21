@@ -3,17 +3,17 @@
 	!>@brief
 	!>subgrid code for the simple cloud model
     module subgrid_1d
-    use nrtype
+    use numerics_type
     
     private
     public :: calculate_subgrid_1d,advance_fields_1d
     
     ! variables / parameters used in subgrid model
     ! note when kvon=0.4, prn should be 0.95 - see Jacobson (page 242 - from Hogstrom)
-    real(sp), parameter :: &!prn=0.7_sp, &
-                        prn=0.95_sp, suba=1._sp/prn, subb=40._sp, subc=16._sp, &
-                        subf=suba, subg=1.2_sp, subh=0._sp, subr=4._sp, ric=0.25_sp, &
-                        grav=9.81_sp, small=1.e-10_sp, kvon=0.4_sp
+    real(wp), parameter :: &!prn=0.7_wp, &
+                        prn=0.95_wp, suba=1._wp/prn, subb=40._wp, subc=16._wp, &
+                        subf=suba, subg=1.2_wp, subh=0._wp, subr=4._wp, ric=0.25_wp, &
+                        grav=9.81_wp, small=1.e-10_wp, kvon=0.4_wp
     
 	contains
 	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -41,32 +41,32 @@
 	                                tau11,tau33,&
 	                                tau13, &
 	                                su,sw,sth,sq)
-	use nrtype
+	use numerics_type
 	
 	implicit none
 
-	real(sp), intent(in) :: dt
+	real(wp), intent(in) :: dt
 	integer(i4b), intent(in) :: kp, l_h, r_h, nq
-	real(sp), dimension(-r_h+1:kp+r_h), &
+	real(wp), dimension(-r_h+1:kp+r_h), &
 		intent(in) :: u, zu
-	real(sp), dimension(-l_h+1:kp+r_h), &
+	real(wp), dimension(-l_h+1:kp+r_h), &
 		intent(inout) :: w, zw, th
-	real(sp), dimension(-r_h+1:kp+r_h,nq), &
+	real(wp), dimension(-r_h+1:kp+r_h,nq), &
 		intent(in) :: q
-	real(sp), dimension(-r_h+1:kp+r_h,nq), &
+	real(wp), dimension(-r_h+1:kp+r_h,nq), &
 		intent(inout) :: viss,sq
-	real(sp), dimension(-r_h+1:kp+r_h), &
+	real(wp), dimension(-r_h+1:kp+r_h), &
 		intent(inout) :: vism, vist, &
 		                strain, tau11, tau33, tau13, &
 		                su, sw, sth
-	real(sp), dimension(-l_h+1:kp+r_h), intent(in) :: z, zn,&
+	real(wp), dimension(-l_h+1:kp+r_h), intent(in) :: z, zn,&
 	        dz, dzn, rhoa, rhoan, theta, thetan
-    real(sp), dimension(-l_h+1:kp+r_h), intent(in) :: lamsq
-    real(sp), intent(in) :: z0,z0th
+    real(wp), dimension(-l_h+1:kp+r_h), intent(in) :: lamsq
+    real(wp), intent(in) :: z0,z0th
 	
 	! locals
 	integer(i4b) :: i,j,k,n, ktmp,ktmp1
-	real(sp), dimension(-r_h+1:kp+r_h) :: rip, fm, fh
+	real(wp), dimension(-r_h+1:kp+r_h) :: rip, fm, fh
 
     ! u is on x levels, v on y levels, w on z levels. 
     ! so distance between u(i) and u(i+1) is dx(i)
@@ -82,7 +82,7 @@
                       ((w(k+1)-w(k))/dz(k))**2 
                       
         ! 2*s13*s13 - du/dz+dw/dx - averaging over 2 points
-        strain(k)=strain(k)+ 0.5_sp * &
+        strain(k)=strain(k)+ 0.5_wp * &
            (((u(k+1)-u(k))/dzn(k))**2 + &
            ((u(k+1)-u(k))/dz(k))**2)
     enddo
@@ -109,8 +109,8 @@
     enddo
 !$omp end simd
 !     vist=vism
-    vism(kp-1:kp)=0._sp
-    vist(kp-1:kp)=0._sp
+    vism(kp-1:kp)=0._wp
+    vist(kp-1:kp)=0._wp
     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     ! surface layer - monin-obukhov similarity theory                                    !
     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -118,11 +118,11 @@
     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
     ! full exchange
-    !vism(0)=0._sp
-    vism(kp+1)=0._sp
+    !vism(0)=0._wp
+    vism(kp+1)=0._wp
 
-    !vist(0)=0._sp
-    vist(kp+1)=0._sp
+    !vist(0)=0._wp
+    vist(kp+1)=0._wp
 
 
     ! viscosity for q-fields
@@ -132,8 +132,8 @@
 
     ! calculate elements of tau on p-points (in vertical)
     do k=1,kp
-        tau11(k)=0._sp
-        tau33(k)=rhoan(k)*1._sp*(vism(k)+vism(k-1))* &
+        tau11(k)=0._wp
+        tau33(k)=rhoan(k)*1._wp*(vism(k)+vism(k-1))* &
                     (zw(k)-zw(k-1))/dz(k-1)
                     
     enddo
@@ -142,21 +142,21 @@
     ! calculate elements of tau on w-points (in vertical)
     do k=1,kp
         ! on i+1/2
-        tau13(k)=rhoa(k)*0.5_sp*(vism(k)+vism(k))* &
+        tau13(k)=rhoa(k)*0.5_wp*(vism(k)+vism(k))* &
             ( (zu(k+1)-zu(k))/dzn(k) )
             
     enddo
     
     
     ! full exchange
-    tau11(0)=0._sp
-    tau11(kp+1)=0._sp
+    tau11(0)=0._wp
+    tau11(kp+1)=0._wp
 
-    tau33(0)=0._sp
-    tau33(kp+1)=0._sp
+    tau33(0)=0._wp
+    tau33(kp+1)=0._wp
 
-    tau13(0)=0._sp
-    tau13(kp+1)=0._sp
+    tau13(0)=0._wp
+    tau13(kp+1)=0._wp
 
         
 
@@ -176,15 +176,15 @@
     enddo
     
     ! full exchange    
-    su(0)=0._sp
-    su(kp+1)=0._sp
+    su(0)=0._wp
+    su(kp+1)=0._wp
     
-    sw(0)=0._sp
-    sw(kp+1)=0._sp
+    sw(0)=0._wp
+    sw(kp+1)=0._wp
     
     ! calculate th sources due to viscosity
     ! diffusion along i calculated via i+1/2 and i-1/2 terms
-    sth=0._sp
+    sth=0._wp
     do k=1,kp
         ! note, vist has already been multiplied by rhoa
         sth(k)=sth(k)+ &
@@ -196,9 +196,9 @@
     enddo
     
     ! full exchange 
-    sth(0)=0._sp
-    sth(kp+1)=0._sp
-    sq=0._sp
+    sth(0)=0._wp
+    sth(kp+1)=0._wp
+    sq=0._wp
     ! q-fields
     do n=1,nq
         ! calculate q sources due to viscosity
@@ -214,8 +214,8 @@
         enddo
     
         ! full exchange  
-        sq(0,n)=0._sp
-        sq(kp+1,n)=0._sp
+        sq(0,n)=0._wp
+        sq(kp+1,n)=0._wp
     enddo
 
 
@@ -237,26 +237,26 @@
 	!>@param[in] z0,z0th,theta,thetan,z,zn,th,u,ip,kp,l_h,r_h
 	!>@param[inout] vism,vist
     subroutine monin_obukhov(z0,z0th,theta,thetan,z,zn,th,u,vism,vist,kp,l_h,r_h)
-	use nrtype
+	use numerics_type
     
     implicit none
     integer(i4b), intent(in) :: kp, l_h, r_h
-    real(sp), intent(in), dimension(-r_h+1:kp+r_h) :: &
+    real(wp), intent(in), dimension(-r_h+1:kp+r_h) :: &
             th, u
-    real(sp), intent(inout), dimension(-r_h+1:kp+r_h) :: &
+    real(wp), intent(inout), dimension(-r_h+1:kp+r_h) :: &
             vism,vist
-    real(sp), intent(in), dimension(-r_h+1:kp+r_h) :: thetan, zn, theta,z
-    real(sp), intent(in) :: z0, z0th
+    real(wp), intent(in), dimension(-r_h+1:kp+r_h) :: thetan, zn, theta,z
+    real(wp), intent(in) :: z0, z0th
             
     ! locals
     integer(i4b) :: i,j
-    real(sp), dimension(1) :: vmag,rib,gm,gh, &
+    real(wp), dimension(1) :: vmag,rib,gm,gh, &
                                                             ustar,thstar
     
     
     
     ! wind speed in first layer above surface
-    vmag(1)=0.5_sp*sqrt((u(1)+u(1))**2  )+small
+    vmag(1)=0.5_wp*sqrt((u(1)+u(1))**2  )+small
     
     ! bulk richardson number
     ! equation 8.39 (Jacobson pp 243)
@@ -264,14 +264,14 @@
         (theta(0)*vmag(1)**2*(z(1)-z0th)) 
     
     ! equation 8.41 (Jacobson pp 243)
-    if(rib(1) .le. 0._sp) then
-        gm(1)=1._sp-9.4_sp*rib(1)/ &
-            (1._sp+70._sp*kvon**2*sqrt(abs(rib(1)*z(1)/z0))/(log(z(1)/z0))**2)
-        gh(1)=1._sp-9.4_sp*rib(1)/ &
-            (1._sp+50._sp*kvon**2*sqrt(abs(rib(1)*z(1)/z0))/(log(z(1)/z0))**2)
+    if(rib(1) .le. 0._wp) then
+        gm(1)=1._wp-9.4_wp*rib(1)/ &
+            (1._wp+70._wp*kvon**2*sqrt(abs(rib(1)*z(1)/z0))/(log(z(1)/z0))**2)
+        gh(1)=1._wp-9.4_wp*rib(1)/ &
+            (1._wp+50._wp*kvon**2*sqrt(abs(rib(1)*z(1)/z0))/(log(z(1)/z0))**2)
     else
-        gm(1)=1._sp/(1._sp+4.7_sp*rib(1))**2
-        gh(1)=1._sp/(1._sp+4.7_sp*rib(1))**2
+        gm(1)=1._wp/(1._wp+4.7_wp*rib(1))**2
+        gh(1)=1._wp/(1._wp+4.7_wp*rib(1))**2
     endif
     
     ! equation 8.40 (Jacobson pp 243)
@@ -305,14 +305,14 @@
 	!>@param[in] strain, thetan, theta, dzn, th, ip, kp, l_h, r_h
 	!>@param[inout] rip, fm, fh
     subroutine richardson(strain,thetan,theta,dzn,th,kp,l_h,r_h,rip,fm,fh)
-	use nrtype
+	use numerics_type
     
     implicit none
     integer(i4b), intent(in) :: kp, l_h, r_h
-    real(sp), intent(in), dimension(-r_h+1:kp+r_h) :: &
+    real(wp), intent(in), dimension(-r_h+1:kp+r_h) :: &
             strain, th
-    real(sp), intent(in), dimension(-r_h+1:kp+r_h) :: thetan, theta, dzn
-    real(sp), intent(inout), dimension(-r_h+1:kp+r_h) :: &
+    real(wp), intent(in), dimension(-r_h+1:kp+r_h) :: thetan, theta, dzn
+    real(wp), intent(inout), dimension(-r_h+1:kp+r_h) :: &
             rip,fm, fh
             
     ! locals
@@ -326,15 +326,15 @@
     enddo
     ! richardson number functions
     do k=1,kp
-        if(rip(k) .lt. 0._sp) then
-            fm(k)=(1._sp-subc*rip(k))**0.5_sp
-            fh(k)=suba*(1._sp-subb*rip(k))**0.5_sp
-        elseif((rip(k).ge.0._sp).and.(rip(k).lt.ric)) then
-            fm(k)=(1._sp-rip(k)/ric)**subr*(1._sp-subh*rip(k))
-            fh(k)=subf*(1._sp-rip(k)/ric)**subr*(1._sp-subg*rip(k))
+        if(rip(k) .lt. 0._wp) then
+            fm(k)=(1._wp-subc*rip(k))**0.5_wp
+            fh(k)=suba*(1._wp-subb*rip(k))**0.5_wp
+        elseif((rip(k).ge.0._wp).and.(rip(k).lt.ric)) then
+            fm(k)=(1._wp-rip(k)/ric)**subr*(1._wp-subh*rip(k))
+            fh(k)=subf*(1._wp-rip(k)/ric)**subr*(1._wp-subg*rip(k))
         else
-            fm(k)=0._sp
-            fh(k)=0._sp
+            fm(k)=0._wp
+            fh(k)=0._wp
         endif
 
     enddo
@@ -355,29 +355,29 @@
 	!>@param[inout] q,th,u,w
     subroutine advance_fields_1d(dt,tu,tw, &
         zu,zw,su,sw,q,sq,th,sth,rhoa,rhoan,kp,nq,l_h,r_h)
-	use nrtype
+	use numerics_type
     
     implicit none
     integer(i4b), intent(in) :: kp, nq, l_h, r_h
-    real(sp), intent(in), dimension(-r_h+1:kp+r_h) :: &
+    real(wp), intent(in), dimension(-r_h+1:kp+r_h) :: &
         su,sw,sth
-    real(sp), intent(in), dimension(-r_h+1:kp+r_h) :: &
+    real(wp), intent(in), dimension(-r_h+1:kp+r_h) :: &
         rhoa,rhoan
-    real(sp), intent(inout), dimension(-r_h+1:kp+r_h) :: &
+    real(wp), intent(inout), dimension(-r_h+1:kp+r_h) :: &
         tu,tw,zu,zw,th
-    real(sp), intent(in), dimension(-r_h+1:kp+r_h,nq) :: sq
-    real(sp), intent(inout), dimension(-r_h+1:kp+r_h,nq) :: q
-    real(sp), intent(in) :: dt
+    real(wp), intent(in), dimension(-r_h+1:kp+r_h,nq) :: sq
+    real(wp), intent(inout), dimension(-r_h+1:kp+r_h,nq) :: q
+    real(wp), intent(in) :: dt
     ! locals
     integer(i4b) :: i,j,k,n
     
     do k=1-l_h,kp+r_h
-        tu(k)=zu(k)+su(k)*dt*2._sp/rhoan(k)
+        tu(k)=zu(k)+su(k)*dt*2._wp/rhoan(k)
     enddo
     
     
     do k=1-l_h,kp+r_h
-        tw(k)=zw(k)+sw(k)*dt*2._sp/rhoa(k)
+        tw(k)=zw(k)+sw(k)*dt*2._wp/rhoa(k)
     enddo
     
     do k=1-l_h,kp+r_h

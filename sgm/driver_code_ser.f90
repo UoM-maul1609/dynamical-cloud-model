@@ -3,7 +3,7 @@
 	!>@brief
 	!>drivers for the sub-grid scale model
     module drivers_ser
-    use nrtype
+    use numerics_type
     !use variables
     private
     public :: model_driver, model_driver_2d
@@ -48,7 +48,7 @@
 				new_file,outputfile, output_interval, &
 				viscous, &
 				subgrid_scheme, kord, monotone)
-		use nrtype
+		use numerics_type
 		use subgrid_2d, only : calculate_subgrid_2d, advance_fields_2d
 
 		implicit none
@@ -58,40 +58,40 @@
 						l_h,r_h, ipstart, kpstart, &
 						subgrid_scheme, kord
 		character (len=*), intent(in) :: outputfile
-		real(sp), intent(in) :: output_interval, dt, z0,z0th
-		real(sp), dimension(1-l_h:ipp+r_h), intent(in) :: x,dx, dxn,xn
-		real(sp), dimension(1-l_h:kpp+r_h), intent(in) :: z,dz,dzn,zn,&
+		real(wp), intent(in) :: output_interval, dt, z0,z0th
+		real(wp), dimension(1-l_h:ipp+r_h), intent(in) :: x,dx, dxn,xn
+		real(wp), dimension(1-l_h:kpp+r_h), intent(in) :: z,dz,dzn,zn,&
 		                                        rhoa, rhoan,theta,thetan,lamsq, lamsqn
 			
-		real(sp), &
+		real(wp), &
 			dimension(1-r_h:kpp+r_h,1-l_h:ipp+r_h), target, &
 			intent(inout) :: ut, zut, tut
-		real(sp), &
+		real(wp), &
 			dimension(1-l_h:kpp+r_h,1-r_h:ipp+r_h), target, &
 			intent(inout) :: wt, zwt, twt
-		real(sp), &
+		real(wp), &
 			dimension(1-l_h:kpp+r_h,1-r_h:ipp+r_h,1:nq), target, &
 			intent(inout) :: q
 					
 
-    	real(sp), &
+    	real(wp), &
 			dimension(1-l_h:kpp+r_h,1-r_h:ipp+r_h), &
 			intent(inout) :: vism,vist,tau11,tau33,tau13,&
     			strain,su,sw,sth,th
     	
-		real(sp), &
+		real(wp), &
 			dimension(1-l_h:kpp+r_h,1-r_h:ipp+r_h,1:nq), &
 			intent(inout) :: sq, viss
-		real(sp), dimension(nq), intent(inout) :: lbc,ubc
+		real(wp), dimension(nq), intent(inout) :: lbc,ubc
 			
 
 
 					
 		! locals:		
 		integer(i4b) :: n,n2, cur=1, i,j,k, error, rank2
-		real(sp) :: time, time_last_output, output_time, a
-		real(sp), dimension(:,:), pointer :: u,zu,tu
-		real(sp), dimension(:,:), pointer :: w,zw,tw
+		real(wp) :: time, time_last_output, output_time, a
+		real(wp), dimension(:,:), pointer :: u,zu,tu
+		real(wp), dimension(:,:), pointer :: w,zw,tw
 
 
 		
@@ -125,8 +125,8 @@
 			! set halos																	 !
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!		
 			do n2=1,nq
-                q(0,:,n2)=0._sp
-                q(kp+1,:,n2)=0._sp
+                q(0,:,n2)=0._wp
+                q(kp+1,:,n2)=0._wp
                 q(:,-l_h+1:0,n2)=q(:,ip-l_h+1:ip,n2)
                 q(:,ip+1:ip+r_h,n2)=q(:,1:r_h,n2)
             enddo
@@ -138,8 +138,8 @@
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 			select case (subgrid_scheme)
 				case (0)
-                    su=0._sp
-                    sw=0._sp
+                    su=0._wp
+                    sw=0._wp
                     call calculate_subgrid_2d(dt,z,zn,dx,dz,rhoa,theta,&
                         dxn,dzn,rhoan,thetan,&
                         ipp,kpp,nq,l_h,r_h,u,w,&
@@ -164,7 +164,7 @@
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 			! write netcdf variables                                                     !
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-			time=real(n-1,sp)*dt
+			time=real(n-1,wp)*dt
 			if (time-time_last_output >= output_interval) then
 			
 			
@@ -190,15 +190,15 @@
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 
-			w(1-l_h:0,:)=0._sp
+			w(1-l_h:0,:)=0._wp
 			
 
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 			! set halos																	 !
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!		
 			do n2=1,nq
-                q(0,:,n2)=0._sp
-                q(kp+1,:,n2)=0._sp
+                q(0,:,n2)=0._wp
+                q(kp+1,:,n2)=0._wp
                 q(:,-l_h+1:0,n2)=q(:,ip-l_h+1:ip,n2)
                 q(:,ip+1:ip+r_h,n2)=q(:,1:r_h,n2)
             enddo
@@ -241,18 +241,18 @@
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 			! set halos																	 !
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!		
-            u(0,:)    =0._sp
-            u(kp+1,:) =0._sp
+            u(0,:)    =0._wp
+            u(kp+1,:) =0._wp
             u(:,-l_h+1:0)    =u(:,ip-l_h+1:ip)
             u(:,ip+1:ip+r_h) =u(:,1:r_h)
 
-            w(0,:)    =0._sp
-            w(kp+1,:) =0._sp
+            w(0,:)    =0._wp
+            w(kp+1,:) =0._wp
             w(:,-l_h+1:0)    =w(:,ip-l_h+1:ip)
             w(:,ip+1:ip+r_h) =w(:,1:r_h)
             
-            th(0,:)    =0._sp
-            th(kp+1,:) =0._sp
+            th(0,:)    =0._wp
+            th(kp+1,:) =0._wp
             th(:,-l_h+1:0)    =th(:,ip-l_h+1:ip)
             th(:,ip+1:ip+r_h) =th(:,1:r_h)
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -325,7 +325,7 @@
 				subgrid_scheme, kord, monotone)
 				
 				
-		use nrtype
+		use numerics_type
 		use subgrid_1d, only : calculate_subgrid_1d,advance_fields_1d
 
 		implicit none
@@ -335,39 +335,39 @@
 						l_h,r_h, kpstart, &
 						subgrid_scheme, kord
 		character (len=*), intent(in) :: outputfile
-		real(sp), intent(in) :: output_interval, dt, z0,z0th
-		real(sp), dimension(1-l_h:kpp+r_h), intent(in) :: z,dz,dzn,zn,&
+		real(wp), intent(in) :: output_interval, dt, z0,z0th
+		real(wp), dimension(1-l_h:kpp+r_h), intent(in) :: z,dz,dzn,zn,&
 		                                        rhoa, rhoan,theta,thetan,lamsq, lamsqn
 			
-		real(sp), &
+		real(wp), &
 			dimension(1-r_h:kpp+r_h), target, &
 			intent(inout) :: ut, zut, tut
-		real(sp), &
+		real(wp), &
 			dimension(1-l_h:kpp+r_h), target, &
 			intent(inout) :: wt, zwt, twt
-		real(sp), &
+		real(wp), &
 			dimension(1-l_h:kpp+r_h,1:nq), target, &
 			intent(inout) :: q
 					
 
-    	real(sp), &
+    	real(wp), &
 			dimension(1-l_h:kpp+r_h), &
 			intent(inout) :: vism,vist,tau11,tau33,tau13,&
     			strain,su,sw,sth,th
     	
-		real(sp), &
+		real(wp), &
 			dimension(1-l_h:kpp+r_h,1:nq), &
 			intent(inout) :: sq, viss
-		real(sp), dimension(nq), intent(inout) :: lbc,ubc
+		real(wp), dimension(nq), intent(inout) :: lbc,ubc
 			
 
 
 					
 		! locals:		
 		integer(i4b) :: n,n2, cur=1, i,j,k, error, rank2
-		real(sp) :: time, time_last_output, output_time, a
-		real(sp), dimension(:), pointer :: u,zu,tu
-		real(sp), dimension(:), pointer :: w,zw,tw
+		real(wp) :: time, time_last_output, output_time, a
+		real(wp), dimension(:), pointer :: u,zu,tu
+		real(wp), dimension(:), pointer :: w,zw,tw
 		
 
 		time_last_output=-output_interval
@@ -397,8 +397,8 @@
 			! set halos																	 !
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!		
 			do n2=1,nq
-                q(0,n2)=0._sp
-                q(kp+1,n2)=0._sp
+                q(0,n2)=0._wp
+                q(kp+1,n2)=0._wp
             enddo
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!	
 
@@ -408,8 +408,8 @@
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 			select case (subgrid_scheme)
 				case (0)
-                    su=0._sp
-                    sw=0._sp
+                    su=0._wp
+                    sw=0._wp
                     call calculate_subgrid_1d(dt,z,zn,dz,rhoa,theta,&
                         dzn,rhoan,thetan,&
                         kpp,nq,l_h,r_h,u,w,&
@@ -434,7 +434,7 @@
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 			! write netcdf variables                                                     !
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-			time=real(n-1,sp)*dt
+			time=real(n-1,wp)*dt
 			if (time-time_last_output >= output_interval) then
 			
 			
@@ -460,15 +460,15 @@
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 
-			w(1-l_h:0)=0._sp
+			w(1-l_h:0)=0._wp
 			
 
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 			! set halos																	 !
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!		
 			do n2=1,nq
-                q(0,n2)=0._sp
-                q(kp+1,n2)=0._sp
+                q(0,n2)=0._wp
+                q(kp+1,n2)=0._wp
             enddo
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!	
 			
@@ -506,14 +506,14 @@
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 			! set halos																	 !
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!		
-            u(0)    =0._sp
-            u(kp+1) =0._sp
+            u(0)    =0._wp
+            u(kp+1) =0._wp
 
-            w(0)    =0._sp
-            w(kp+1) =0._sp
+            w(0)    =0._wp
+            w(kp+1) =0._wp
             
-            th(0)    =0._sp
-            th(kp+1) =0._sp
+            th(0)    =0._wp
+            th(kp+1) =0._wp
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 			
@@ -574,16 +574,16 @@
 		character (len=*), intent(in) :: outputfile
 		integer(i4b), intent(in) :: n, nq,ip, ipp, ipstart, &
 									kp, kpp, kpstart, l_h,r_h
-		real(sp), intent(in) :: time
-		real(sp), dimension(1-l_h:ipp+r_h), intent(in) :: x
-		real(sp), dimension(1-l_h:kpp+r_h), intent(in) :: z,rhoa
-		real(sp), &
+		real(wp), intent(in) :: time
+		real(wp), dimension(1-l_h:ipp+r_h), intent(in) :: x
+		real(wp), dimension(1-l_h:kpp+r_h), intent(in) :: z,rhoa
+		real(wp), &
 			dimension(1-r_h:kpp+r_h,1-r_h:ipp+r_h,1:nq), &
 			intent(inout) :: q
-		real(sp), &
+		real(wp), &
 			dimension(1-r_h:kpp+r_h,1-l_h:ipp+r_h), &
 			intent(inout) :: u
-		real(sp), &
+		real(wp), &
 			dimension(1-l_h:kpp+r_h,1-r_h:ipp+r_h), &
 			intent(inout) :: w,vism,strain
 		
@@ -815,12 +815,12 @@
 		logical, intent(inout) :: new_file
 		character (len=*), intent(in) :: outputfile
 		integer(i4b), intent(in) :: n, nq,kp, kpp, kpstart, l_h,r_h
-		real(sp), intent(in) :: time
-		real(sp), dimension(1-l_h:kpp+r_h), intent(in) :: z,rhoa
-		real(sp), &
+		real(wp), intent(in) :: time
+		real(wp), dimension(1-l_h:kpp+r_h), intent(in) :: z,rhoa
+		real(wp), &
 			dimension(1-r_h:kpp+r_h,1:nq), &
 			intent(inout) :: q
-		real(sp), &
+		real(wp), &
 			dimension(1-l_h:kpp+r_h), &
 			intent(inout) :: u,w,vism,strain
 		
@@ -1016,7 +1016,7 @@
 	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 	subroutine check(status)
 		use netcdf
-		use nrtype
+		use numerics_type
 		integer(i4b), intent ( in) :: status
 
 		if(status /= nf90_noerr) then
