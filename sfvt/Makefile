@@ -77,11 +77,11 @@ advection_2d.$(OBJ) advection_3d.$(OBJ) osnf_code
 mpi_module.$(OBJ) : mpi_module.f90 osnf_code
 	$(FOR) mpi_module.f90 -I$(OSNF_DIR)  -cpp -DVAR_TYPE=$(VAR_TYPE)  $(FFLAGS)mpi_module.$(OBJ)
 advection_1d.$(OBJ) : advection_1d.F90 osnf_code
-	$(FOR) advection_1d.F90 -cpp -I$(OSNF_DIR) $(FFLAGSOMP)advection_1d.$(OBJ)
+	$(FOR) advection_1d.F90  -cpp -DVAR_TYPE=$(VAR_TYPE) -I$(OSNF_DIR) $(FFLAGSOMP)advection_1d.$(OBJ)
 advection_2d.$(OBJ) : advection_2d.F90 osnf_code
-	$(FOR) advection_2d.F90 -cpp -I$(OSNF_DIR) $(FFLAGSOMP)advection_2d.$(OBJ)
+	$(FOR) advection_2d.F90  -cpp -DVAR_TYPE=$(VAR_TYPE) -I$(OSNF_DIR) $(FFLAGSOMP)advection_2d.$(OBJ)
 advection_3d.$(OBJ) : advection_3d.F90 osnf_code
-	$(FOR) advection_3d.F90 -I$(OSNF_DIR) $(FFLAGSOMP)advection_3d.$(OBJ)
+	$(FOR) advection_3d.F90 -cpp -DVAR_TYPE=$(VAR_TYPE) -I$(OSNF_DIR) $(FFLAGSOMP)advection_3d.$(OBJ)
 main.$(OBJ)   : main.f90 variables.$(OBJ) mpi_module.$(OBJ) initialisation.$(OBJ) \
 				 driver_code.$(OBJ) advection_1d.$(OBJ) advection_2d.$(OBJ) \
 				 advection_3d.$(OBJ) 
