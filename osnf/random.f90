@@ -1,3 +1,10 @@
+!>@author
+!>Netlib 2019
+!>@copyright Public Domain
+!>@brief
+!> various routines for random number generation
+!>Downloaded from Netlib, 2019, 
+!> with additions by Paul Connolly, University of Manchester
 MODULE random
 ! A module for random number generation from the following distributions:
 !
@@ -93,9 +100,10 @@ MODULE random
 !     Phone: (+61) 3 9545-8016      Fax: (+61) 3 9545-8080
 !     e-mail: amiller @ bigpond.net.au
 
+use numerics_type, only : wp
 IMPLICIT NONE
-REAL, PRIVATE      :: zero = 0.0, half = 0.5, one = 1.0, two = 2.0,   &
-                      vsmall = TINY(1.0), vlarge = HUGE(1.0)
+REAL(wp), PRIVATE      :: zero = 0.0_wp, half = 0.5_wp, one = 1.0_wp, two = 2.0_wp,   &
+                      vsmall = TINY(1.0_wp), vlarge = HUGE(1.0_wp)
 PRIVATE            :: integral
 INTEGER, PARAMETER :: dp = SELECTED_REAL_KIND(12, 60)
 
@@ -116,18 +124,18 @@ FUNCTION random_normal() RESULT(fn_val)
 !  The algorithm uses the ratio of uniforms method of A.J. Kinderman
 !  and J.F. Monahan augmented with quadratic bounding curves.
 
-REAL :: fn_val
+REAL(wp) :: fn_val
 
 !     Local variables
-REAL     :: s = 0.449871, t = -0.386595, a = 0.19600, b = 0.25472,           &
-            r1 = 0.27597, r2 = 0.27846, u, v, x, y, q
+REAL(wp)     :: s = 0.449871_wp, t = -0.386595_wp, a = 0.19600_wp, b = 0.25472_wp,           &
+            r1 = 0.27597_wp, r2 = 0.27846_wp, u, v, x, y, q
 
 !     Generate P = (u,v) uniform in rectangle enclosing acceptance region
 
 DO
   CALL RANDOM_NUMBER(u)
   CALL RANDOM_NUMBER(v)
-  v = 1.7156 * (v - half)
+  v = 1.7156_wp * (v - half)
 
 !     Evaluate the quadratic form
   x = u - s
@@ -139,7 +147,7 @@ DO
 !     Reject P if outside outer ellipse
   IF (q > r2) CYCLE
 !     Reject P if outside acceptance region
-  IF (v**2 < -4.0*LOG(u)*u**2) EXIT
+  IF (v**2 < -4.0_wp*LOG(u)*u**2) EXIT
 END DO
 
 !     Return ratio of P's coordinates as the normal deviate
@@ -163,9 +171,9 @@ FUNCTION random_gamma(s, first) RESULT(fn_val)
 
 !     S = SHAPE PARAMETER OF DISTRIBUTION (0 < REAL).
 
-REAL, INTENT(IN)    :: s
+REAL(wp), INTENT(IN)    :: s
 LOGICAL, INTENT(IN) :: first
-REAL                :: fn_val
+REAL(wp)                :: fn_val
 
 IF (s <= zero) THEN
   WRITE(*, *) 'SHAPE PARAMETER VALUE MUST BE POSITIVE'
@@ -193,17 +201,17 @@ FUNCTION random_gamma1(s, first) RESULT(fn_val)
 
 ! Generates a random gamma deviate for shape parameter s >= 1.
 
-REAL, INTENT(IN)    :: s
+REAL(wp), INTENT(IN)    :: s
 LOGICAL, INTENT(IN) :: first
-REAL                :: fn_val
+REAL(wp)                :: fn_val
 
 ! Local variables
-REAL, SAVE  :: c, d
-REAL        :: u, v, x
+REAL(wp), SAVE  :: c, d
+REAL(wp)        :: u, v, x
 
 IF (first) THEN
   d = s - one/3.
-  c = one/SQRT(9.0*d)
+  c = one/SQRT(9.0_wp*d)
 END IF
 
 ! Start of main loop
@@ -220,7 +228,7 @@ DO
 ! Generate uniform variable U
 
   CALL RANDOM_NUMBER(u)
-  IF (u < one - 0.0331*x**4) THEN
+  IF (u < one - 0.0331_wp*x**4) THEN
     fn_val = d*v
     EXIT
   ELSE IF (LOG(u) < half*x**2 + d*(one - v + LOG(v))) THEN
@@ -248,13 +256,13 @@ FUNCTION random_gamma2(s, first) RESULT(fn_val)
 !    S = SHAPE PARAMETER OF DISTRIBUTION
 !          (REAL < 1.0)
 
-REAL, INTENT(IN)    :: s
+REAL(wp), INTENT(IN)    :: s
 LOGICAL, INTENT(IN) :: first
-REAL                :: fn_val
+REAL(wp)                :: fn_val
 
 !     Local variables
-REAL       :: r, x, w
-REAL, SAVE :: a, p, c, uf, vr, d
+REAL(wp)       :: r, x, w
+REAL(wp), SAVE :: a, p, c, uf, vr, d
 
 IF (s <= zero .OR. s >= one) THEN
   WRITE(*, *) 'SHAPE PARAMETER VALUE OUTSIDE PERMITTED RANGE'
@@ -311,7 +319,7 @@ FUNCTION random_chisq(ndf, first) RESULT(fn_val)
 
 INTEGER, INTENT(IN) :: ndf
 LOGICAL, INTENT(IN) :: first
-REAL                :: fn_val
+REAL(wp)                :: fn_val
 
 fn_val = two * random_gamma(half*ndf, first)
 RETURN
@@ -330,10 +338,10 @@ FUNCTION random_exponential() RESULT(fn_val)
 ! A NEGATIVE EXPONENTIAL DlSTRIBUTION WlTH DENSITY PROPORTIONAL
 ! TO EXP(-random_exponential), USING INVERSION.
 
-REAL  :: fn_val
+REAL(wp)  :: fn_val
 
 !     Local variable
-REAL  :: r
+REAL(wp)  :: r
 
 DO
   CALL RANDOM_NUMBER(r)
@@ -355,8 +363,8 @@ FUNCTION random_Weibull(a) RESULT(fn_val)
 !               a-1  -x
 !     f(x) = a.x    e
 
-REAL, INTENT(IN) :: a
-REAL             :: fn_val
+REAL(wp), INTENT(IN) :: a
+REAL(wp)             :: fn_val
 
 !     For speed, there is no checking that a is not zero or very small.
 
@@ -381,14 +389,14 @@ FUNCTION random_beta(aa, bb, first) RESULT(fn_val)
 !     AA = SHAPE PARAMETER FROM DISTRIBUTION (0 < REAL)
 !     BB = SHAPE PARAMETER FROM DISTRIBUTION (0 < REAL)
 
-REAL, INTENT(IN)    :: aa, bb
+REAL(wp), INTENT(IN)    :: aa, bb
 LOGICAL, INTENT(IN) :: first
-REAL                :: fn_val
+REAL(wp)                :: fn_val
 
 !     Local variables
-REAL, PARAMETER  :: aln4 = 1.3862944
-REAL             :: a, b, g, r, s, x, y, z
-REAL, SAVE       :: d, f, h, t, c
+REAL, PARAMETER  :: aln4 = 1.3862944_wp
+REAL(wp)             :: a, b, g, r, s, x, y, z
+REAL(wp), SAVE       :: d, f, h, t, c
 LOGICAL, SAVE    :: swap
 
 IF (aa <= zero .OR. bb <= zero) THEN
@@ -432,7 +440,7 @@ DO
     END IF
     fn_val = y/(one + y)
   ELSE
-    IF (4.0*s > (one + one/d)**f) CYCLE
+    IF (4.0_wp*s > (one + one/d)**f) CYCLE
     fn_val = one
   END IF
   EXIT
@@ -457,14 +465,14 @@ FUNCTION random_t(m) RESULT(fn_val)
 !           (1 <= 1NTEGER)
 
 INTEGER, INTENT(IN) :: m
-REAL                :: fn_val
+REAL(wp)                :: fn_val
 
 !     Local variables
-REAL, SAVE      :: s, c, a, f, g
-REAL            :: r, x, v
+REAL(wp), SAVE      :: s, c, a, f, g
+REAL(wp)            :: r, x, v
 
-REAL, PARAMETER :: three = 3.0, four = 4.0, quart = 0.25,   &
-                   five = 5.0, sixteen = 16.0
+REAL(wp), PARAMETER :: three = 3.0_wp, four = 4.0_wp, quart = 0.25_wp,   &
+                   five = 5.0_wp, sixteen = 16.0_wp
 INTEGER         :: mm = 0
 
 IF (m < 1) THEN
@@ -539,15 +547,15 @@ SUBROUTINE random_mvnorm(n, h, d, f, first, x, ier)
 !        = 0 otherwise
 
 INTEGER, INTENT(IN)   :: n
-REAL, INTENT(IN)      :: h(:), d(:)   ! d(n*(n+1)/2)
-REAL, INTENT(IN OUT)  :: f(:)         ! f(n*(n+1)/2)
-REAL, INTENT(OUT)     :: x(:)
+REAL(wp), INTENT(IN)      :: h(:), d(:)   ! d(n*(n+1)/2)
+REAL(wp), INTENT(IN OUT)  :: f(:)         ! f(n*(n+1)/2)
+REAL(wp), INTENT(OUT)     :: x(:)
 LOGICAL, INTENT(IN)   :: first
 INTEGER, INTENT(OUT)  :: ier
 
 !     Local variables
 INTEGER       :: j, i, m
-REAL          :: y, v
+REAL(wp)          :: y, v
 INTEGER, SAVE :: n2
 
 IF (n < 1) THEN
@@ -620,14 +628,14 @@ FUNCTION random_inv_gauss(h, b, first) RESULT(fn_val)
 !     H = PARAMETER OF DISTRIBUTION (0 <= REAL)
 !     B = PARAMETER OF DISTRIBUTION (0 < REAL)
 
-REAL, INTENT(IN)    :: h, b
+REAL(wp), INTENT(IN)    :: h, b
 LOGICAL, INTENT(IN) :: first
-REAL                :: fn_val
+REAL(wp)                :: fn_val
 
 !     Local variables
-REAL            :: ym, xm, r, w, r1, r2, x
-REAL, SAVE      :: a, c, d, e
-REAL, PARAMETER :: quart = 0.25
+REAL(wp)            :: ym, xm, r, w, r1, r2, x
+REAL(wp), SAVE      :: a, c, d, e
+REAL(wp), PARAMETER :: quart = 0.25_wp
 
 IF (h < zero .OR. b <= zero) THEN
   WRITE(*, *) 'IMPERMISSIBLE DISTRIBUTION PARAMETER VALUES'
@@ -724,43 +732,43 @@ FUNCTION random_Poisson(mu, first) RESULT(ival)
 !     SEPARATION OF CASES A AND B
 
 !     .. Scalar Arguments ..
-REAL, INTENT(IN)    :: mu
+REAL(wp), INTENT(IN)    :: mu
 LOGICAL, INTENT(IN) :: first
 INTEGER             :: ival
 !     ..
 !     .. Local Scalars ..
-REAL          :: b1, b2, c, c0, c1, c2, c3, del, difmuk, e, fk, fx, fy, g,  &
+REAL(wp)          :: b1, b2, c, c0, c1, c2, c3, del, difmuk, e, fk, fx, fy, g,  &
                  omega, px, py, t, u, v, x, xx
-REAL, SAVE    :: s, d, p, q, p0
+REAL(wp), SAVE    :: s, d, p, q, p0
 INTEGER       :: j, k, kflag
 LOGICAL, SAVE :: full_init
 INTEGER, SAVE :: l, m
 !     ..
 !     .. Local Arrays ..
-REAL, SAVE    :: pp(35)
+REAL(wp), SAVE    :: pp(35)
 !     ..
 !     .. Data statements ..
-REAL, PARAMETER :: a0 = -.5, a1 = .3333333, a2 = -.2500068, a3 = .2000118,  &
-                   a4 = -.1661269, a5 = .1421878, a6 = -.1384794,   &
-                   a7 = .1250060
+REAL(wp), PARAMETER :: a0 = -.5_wp, a1 = .3333333_wp, a2 = -.2500068_wp, a3 = .2000118_wp,  &
+                   a4 = -.1661269_wp, a5 = .1421878_wp, a6 = -.1384794_wp,   &
+                   a7 = .1250060_wp
 
-REAL, PARAMETER :: fact(10) = (/ 1., 1., 2., 6., 24., 120., 720., 5040.,  &
-                                 40320., 362880. /)
+REAL(wp), PARAMETER :: fact(10) = (/ 1._wp, 1._wp, 2._wp, 6._wp, 24._wp, 120._wp, 720._wp, 5040._wp,  &
+                                 40320._wp, 362880._wp /)
 
 !     ..
 !     .. Executable Statements ..
-IF (mu > 10.0) THEN
+IF (mu > 10.0_wp) THEN
 !     C A S E  A. (RECALCULATION OF S, D, L IF MU HAS CHANGED)
 
   IF (first) THEN
     s = SQRT(mu)
-    d = 6.0*mu*mu
+    d = 6.0_wp*mu*mu
 
 !             THE POISSON PROBABILITIES PK EXCEED THE DISCRETE NORMAL
 !             PROBABILITIES FK WHENEVER K >= M(MU). L=IFIX(MU-1.1484)
 !             IS AN UPPER BOUND TO M(MU) FOR ALL MU >= 10 .
 
-    l = mu - 1.1484
+    l = mu - 1.1484_wp
     full_init = .false.
   END IF
 
@@ -768,7 +776,7 @@ IF (mu > 10.0) THEN
 !     STEP N. NORMAL SAMPLE - random_normal() FOR STANDARD NORMAL DEVIATE
 
   g = mu + s*random_normal()
-  IF (g > 0.0) THEN
+  IF (g > 0.0_wp) THEN
     ival = g
 
 !     STEP I. IMMEDIATE ACCEPTANCE IF ival IS LARGE ENOUGH
@@ -791,18 +799,18 @@ IF (mu > 10.0) THEN
 !             C=.1069/MU GUARANTEES MAJORIZATION BY THE 'HAT'-FUNCTION.
 
   IF (.NOT. full_init) THEN
-    omega = .3989423/s
-    b1 = .4166667E-1/mu
-    b2 = .3*b1*b1
-    c3 = .1428571*b1*b2
-    c2 = b2 - 15.*c3
-    c1 = b1 - 6.*b2 + 45.*c3
-    c0 = 1. - b1 + 3.*b2 - 15.*c3
-    c = .1069/mu
+    omega = .3989423_wp/s
+    b1 = .4166667E-1_wp/mu
+    b2 = .3_wp*b1*b1
+    c3 = .1428571_wp*b1*b2
+    c2 = b2 - 15._wp*c3
+    c1 = b1 - 6._wp*b2 + 45._wp*c3
+    c0 = 1._wp - b1 + 3._wp*b2 - 15._wp*c3
+    c = .1069_wp/mu
     full_init = .true.
   END IF
 
-  IF (g < 0.0) GO TO 50
+  IF (g < 0.0_wp) GO TO 50
 
 !             'SUBROUTINE' F IS CALLED (KFLAG=0 FOR CORRECT RETURN)
 
@@ -820,8 +828,8 @@ IF (mu > 10.0) THEN
   50 e = random_exponential()
   CALL RANDOM_NUMBER(u)
   u = u + u - one
-  t = 1.8 + SIGN(e, u)
-  IF (t <= (-.6744)) GO TO 50
+  t = 1.8_wp + SIGN(e, u)
+  IF (t <= (-.6744_wp)) GO TO 50
   ival = mu + s*t
   fk = ival
   difmuk = mu - fk
@@ -848,15 +856,15 @@ IF (mu > 10.0) THEN
 !             A0-A7 FOR ACCURACY WHEN ADVISABLE
 !             .8333333E-1=1./12.  .3989423=(2*PI)**(-.5)
 
-  80 del = .8333333E-1/fk
-  del = del - 4.8*del*del*del
+  80 del = .8333333E-1_wp/fk
+  del = del - 4.8_wp*del*del*del
   v = difmuk/fk
-  IF (ABS(v)>0.25) THEN
+  IF (ABS(v)>0.25_wp) THEN
     px = fk*LOG(one + v) - difmuk - del
   ELSE
     px = fk*v*v* (((((((a7*v+a6)*v+a5)*v+a4)*v+a3)*v+a2)*v+a1)*v+a0) - del
   END IF
-  py = .3989423/SQRT(fk)
+  py = .3989423_wp/SQRT(fk)
   110 x = (half - difmuk)/s
   xx = x*x
   fx = -half*xx
@@ -890,7 +898,7 @@ ELSE
 
     IF (l == 0) GO TO 150
     j = 1
-    IF (u > 0.458) j = MIN(l, m)
+    IF (u > 0.458_wp) j = MIN(l, m)
     DO k = j, l
       IF (u <= pp(k)) GO TO 180
     END DO
@@ -936,7 +944,7 @@ FUNCTION random_binomial1(n, p, first) RESULT(ival)
 !            variables', Commun. Statist. - Theor. Meth. 15(3), 805-813.
 
 INTEGER, INTENT(IN) :: n
-REAL, INTENT(IN)    :: p
+REAL(wp), INTENT(IN)    :: p
 LOGICAL, INTENT(IN) :: first
 INTEGER             :: ival
 
@@ -944,9 +952,9 @@ INTEGER             :: ival
 
 INTEGER         :: ru, rd
 INTEGER, SAVE   :: r0
-REAL            :: u, pd, pu
-REAL, SAVE      :: odds_ratio, p_r
-REAL, PARAMETER :: zero = 0.0, one = 1.0
+REAL(wp)            :: u, pd, pu
+REAL(wp), SAVE      :: odds_ratio, p_r
+REAL(wp), PARAMETER :: zero = 0.0_wp, one = 1.0_wp
 
 IF (first) THEN
   r0 = (n+1)*p
@@ -1000,13 +1008,13 @@ FUNCTION bin_prob(n, p, r) RESULT(fn_val)
 !     Calculate a binomial probability
 
 INTEGER, INTENT(IN) :: n, r
-REAL, INTENT(IN)    :: p
-REAL                :: fn_val
+REAL(wp), INTENT(IN)    :: p
+REAL(wp)                :: fn_val
 
 !     Local variable
-REAL                :: one = 1.0
+REAL(wp)                :: one = 1.0_wp
 
-fn_val = EXP( lngamma(DBLE(n+1)) - lngamma(DBLE(r+1)) - lngamma(DBLE(n-r+1)) &
+fn_val = EXP( lngamma(real(n+1,wp)) - lngamma(real(r+1,wp)) - lngamma(real(n-r+1,wp)) &
               + r*LOG(p) + (n-r)*LOG(one - p) )
 RETURN
 
@@ -1023,40 +1031,40 @@ FUNCTION lngamma(x) RESULT(fn_val)
 
 ! Latest revision of Fortran 77 version - 28 February 1988
 
-REAL (dp), INTENT(IN) :: x
-REAL (dp)             :: fn_val
+REAL (wp), INTENT(IN) :: x
+REAL (wp)             :: fn_val
 
 !       Local variables
 
-REAL (dp) :: a1 = -4.166666666554424D-02, a2 = 2.430554511376954D-03,  &
-             a3 = -7.685928044064347D-04, a4 = 5.660478426014386D-04,  &
-             temp, arg, product, lnrt2pi = 9.189385332046727D-1,       &
-             pi = 3.141592653589793D0
+REAL (wp) :: a1 = -4.166666666554424e-02_wp, a2 = 2.430554511376954e-03_wp,  &
+             a3 = -7.685928044064347e-04_wp, a4 = 5.660478426014386e-04_wp,  &
+             temp, arg, product, lnrt2pi = 9.189385332046727e-1_wp,       &
+             pi = 3.141592653589793_wp
 LOGICAL   :: reflect
 
 !       lngamma is not defined if x = 0 or a negative integer.
 
-IF (x > 0.d0) GO TO 10
+IF (x > 0._wp) GO TO 10
 IF (x /= INT(x)) GO TO 10
-fn_val = 0.d0
+fn_val = 0._wp
 RETURN
 
 !       If x < 0, use the reflection formula:
 !               gamma(x) * gamma(1-x) = pi * cosec(pi.x)
 
-10 reflect = (x < 0.d0)
+10 reflect = (x < 0._wp)
 IF (reflect) THEN
-  arg = 1.d0 - x
+  arg = 1._wp - x
 ELSE
   arg = x
 END IF
 
 !       Increase the argument, if necessary, to make it > 10.
 
-product = 1.d0
-20 IF (arg <= 10.d0) THEN
+product = 1._wp
+20 IF (arg <= 10._wp) THEN
   product = product * arg
-  arg = arg + 1.d0
+  arg = arg + 1._wp
   GO TO 20
 END IF
 
@@ -1065,9 +1073,9 @@ END IF
 !       accurate formula given by De Moivre in a letter to Stirling, which
 !       is the one usually quoted.
 
-arg = arg - 0.5D0
-temp = 1.d0/arg**2
-fn_val = lnrt2pi + arg * (LOG(arg) - 1.d0 + &
+arg = arg - 0.5_wp
+temp = 1._wp/arg**2
+fn_val = lnrt2pi + arg * (LOG(arg) - 1._wp + &
                   (((a4*temp + a3)*temp + a2)*temp + a1)*temp) - LOG(product)
 IF (reflect) THEN
   temp = SIN(pi * x)
@@ -1140,17 +1148,17 @@ FUNCTION random_binomial2(n, pp, first) RESULT(ival)
 
 !     ..
 !     .. Scalar Arguments ..
-REAL, INTENT(IN)    :: pp
+REAL(wp), INTENT(IN)    :: pp
 INTEGER, INTENT(IN) :: n
 LOGICAL, INTENT(IN) :: first
 INTEGER             :: ival
 !     ..
 !     .. Local Scalars ..
-REAL            :: alv, amaxp, f, f1, f2, u, v, w, w2, x, x1, x2, ynorm, z, z2
-REAL, PARAMETER :: zero = 0.0, half = 0.5, one = 1.0
+REAL(wp)            :: alv, amaxp, f, f1, f2, u, v, w, w2, x, x1, x2, ynorm, z, z2
+REAL(wp), PARAMETER :: zero = 0.0_wp, half = 0.5_wp, one = 1.0_wp
 INTEGER         :: i, ix, ix1, k, mp
 INTEGER, SAVE   :: m
-REAL, SAVE      :: p, q, xnp, ffm, fm, xnpq, p1, xm, xl, xr, c, al, xll,  &
+REAL(wp), SAVE      :: p, q, xnp, ffm, fm, xnpq, p1, xm, xl, xr, c, al, xll,  &
                    xlr, p2, p3, p4, qn, r, g
 
 !     ..
@@ -1164,17 +1172,17 @@ IF (first) THEN
   xnp = n * p
 END IF
 
-IF (xnp > 30.) THEN
+IF (xnp > 30._wp) THEN
   IF (first) THEN
     ffm = xnp + p
     m = ffm
     fm = m
     xnpq = xnp * q
-    p1 = INT(2.195*SQRT(xnpq) - 4.6*q) + half
+    p1 = INT(2.195_wp*SQRT(xnpq) - 4.6_wp*q) + half
     xm = fm + half
     xl = xm - p1
     xr = xm + p1
-    c = 0.134 + 20.5 / (15.3 + fm)
+    c = 0.134_wp + 20.5_wp / (15.3_wp + fm)
     al = (ffm-xl) / (ffm - xl*p)
     xll = al * (one + half*al)
     al = (xr - ffm) / (xr*q)
@@ -1254,8 +1262,8 @@ IF (xnp > 30.) THEN
 
 !     SQUEEZING USING UPPER AND LOWER BOUNDS ON LOG(F(X))
 
-  amaxp = (k/xnpq) * ((k*(k/3. + .625) + .1666666666666)/xnpq + half)
-  ynorm = -k * k / (2.*xnpq)
+  amaxp = (k/xnpq) * ((k*(k/3._wp + .625_wp) + .1666666666666_wp)/xnpq + half)
+  ynorm = -k * k / (2._wp*xnpq)
   alv = LOG(v)
   IF (alv<ynorm - amaxp) GO TO 110
   IF (alv>ynorm + amaxp) GO TO 20
@@ -1272,10 +1280,10 @@ IF (xnp > 30.) THEN
   f2 = f1 * f1
   w2 = w * w
   IF (alv - (xm*LOG(f1/x1) + (n-m+half)*LOG(z/w) + (ix-m)*LOG(w*p/(x1*q)) +    &
-      (13860.-(462.-(132.-(99.-140./f2)/f2)/f2)/f2)/f1/166320. +               &
-      (13860.-(462.-(132.-(99.-140./z2)/z2)/z2)/z2)/z/166320. +                &
-      (13860.-(462.-(132.-(99.-140./x2)/x2)/x2)/x2)/x1/166320. +               &
-      (13860.-(462.-(132.-(99.-140./w2)/w2)/w2)/w2)/w/166320.) > zero) THEN
+      (13860._wp-(462._wp-(132._wp-(99._wp-140._wp/f2)/f2)/f2)/f2)/f1/166320._wp +               &
+      (13860._wp-(462._wp-(132._wp-(99._wp-140._wp/z2)/z2)/z2)/z2)/z/166320._wp +                &
+      (13860._wp-(462._wp-(132._wp-(99._wp-140._wp/x2)/x2)/x2)/x2)/x1/166320._wp +               &
+      (13860._wp-(462._wp-(132._wp-(99._wp-140._wp/w2)/w2)/w2)/w2)/w/166320._wp) > zero) THEN
     GO TO 20
   ELSE
     GO TO 110
@@ -1329,14 +1337,14 @@ FUNCTION random_neg_binomial(sk, p) RESULT(ival)
 ! OTHERWISE A COMBINATION OF UNSTORED INVERSION AND
 ! THE REPRODUCTIVE PROPERTY IS USED.
 
-REAL, INTENT(IN)   :: sk, p
+REAL(wp), INTENT(IN)   :: sk, p
 INTEGER            :: ival
 
 !     Local variables
 ! THE PARAMETER ULN = -LOG(MACHINE'S SMALLEST REAL NUMBER).
 
-REAL, PARAMETER    :: h = 0.7
-REAL               :: q, x, st, uln, v, r, s, y, g
+REAL(wp), PARAMETER    :: h = 0.7_wp
+REAL(wp)               :: q, x, st, uln, v, r, s, y, g
 INTEGER            :: k, i, n
 
 IF (sk <= zero .OR. p <= zero .OR. p >= one) THEN
@@ -1401,18 +1409,18 @@ FUNCTION random_von_Mises(k, first) RESULT(fn_val)
 !                     for k.   When first = .TRUE., the function sets
 !                     up starting values and may be very much slower.
 
-REAL, INTENT(IN)     :: k
+REAL(wp), INTENT(IN)     :: k
 LOGICAL, INTENT(IN)  :: first
-REAL                 :: fn_val
+REAL(wp)                 :: fn_val
 
 !     Local variables
 
 INTEGER          :: j, n
 INTEGER, SAVE    :: nk
-REAL, PARAMETER  :: pi = 3.14159265
-REAL, SAVE       :: p(20), theta(0:20)
-REAL             :: sump, r, th, lambda, rlast
-REAL (dp)        :: dk
+REAL(wp), PARAMETER  :: pi = 3.14159265_wp
+REAL(wp), SAVE       :: p(20), theta(0:20)
+REAL(wp)             :: sump, r, th, lambda, rlast
+REAL (wp)        :: dk
 
 IF (first) THEN                        ! Initialization, if necessary
   IF (k < zero) THEN
@@ -1486,21 +1494,21 @@ SUBROUTINE integral(a, b, result, dk)
 
 !     Gaussian integration of exp(k.cosx) from a to b.
 
-REAL (dp), INTENT(IN) :: dk
-REAL, INTENT(IN)      :: a, b
-REAL, INTENT(OUT)     :: result
+REAL (wp), INTENT(IN) :: dk
+REAL(wp), INTENT(IN)      :: a, b
+REAL(wp), INTENT(OUT)     :: result
 
 !     Local variables
 
-REAL (dp)  :: xmid, range, x1, x2,                                    &
-  x(3) = (/0.238619186083197_dp, 0.661209386466265_dp, 0.932469514203152_dp/), &
-  w(3) = (/0.467913934572691_dp, 0.360761573048139_dp, 0.171324492379170_dp/)
+REAL (wp)  :: xmid, range, x1, x2,                                    &
+  x(3) = (/0.238619186083197_wp, 0.661209386466265_wp, 0.932469514203152_wp/), &
+  w(3) = (/0.467913934572691_wp, 0.360761573048139_wp, 0.171324492379170_wp/)
 INTEGER    :: i
 
-xmid = (a + b)/2._dp
-range = (b - a)/2._dp
+xmid = (a + b)/2._wp
+range = (b - a)/2._wp
 
-result = 0._dp
+result = 0._wp
 DO i = 1, 3
   x1 = xmid + x(i)*range
   x2 = xmid - x(i)*range
@@ -1517,10 +1525,10 @@ FUNCTION random_Cauchy() RESULT(fn_val)
 
 !     Generate a random deviate from the standard Cauchy distribution
 
-REAL     :: fn_val
+REAL(wp)     :: fn_val
 
 !     Local variables
-REAL     :: v(2)
+REAL(wp)     :: v(2)
 
 DO
   CALL RANDOM_NUMBER(v)
@@ -1545,7 +1553,7 @@ INTEGER, INTENT(OUT) :: order(n)
 !     Local variables
 
 INTEGER :: i, j, k
-REAL    :: wk
+REAL(wp)    :: wk
 
 DO i = 1, n
   order(i) = i

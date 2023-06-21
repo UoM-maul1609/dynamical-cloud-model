@@ -3,12 +3,12 @@
 	!>@brief
 	!>advection code for the dynamical cloud model
     module advection_s_3d
-    use nrtype
+    use numerics_type
     
     private
     public :: mpdata_3d, mpdata_vec_3d, first_order_upstream_3d, adv_ref_state, &
             mpdata_3d_add,mpdata_vert_3d, mpdata_vec_vert_3d
-    real(sp), parameter :: small=1e-60_sp
+    real(wp), parameter :: small=1e-60_wp
     
 	contains
 	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -31,26 +31,26 @@
 	subroutine first_order_upstream_3d(dt,dxn,dyn,dzn,&
 	                    rhoa,rhoan,ip,jp,kp,l_h,r_h,u,v,w,psi,neumann, &
 	                    dims,coords)
-	use nrtype
+	use numerics_type
 	implicit none
-	real(sp), intent(in) :: dt
+	real(wp), intent(in) :: dt
 	integer(i4b), intent(in) :: ip, jp, kp, l_h, r_h
-	real(sp), dimension(-r_h+1:kp+r_h,-r_h+1:jp+r_h,-l_h+1:ip+r_h), &
+	real(wp), dimension(-r_h+1:kp+r_h,-r_h+1:jp+r_h,-l_h+1:ip+r_h), &
 		intent(in) :: u
-	real(sp), dimension(-r_h+1:kp+r_h,-l_h+1:jp+r_h,-r_h+1:ip+r_h), &
+	real(wp), dimension(-r_h+1:kp+r_h,-l_h+1:jp+r_h,-r_h+1:ip+r_h), &
 		intent(in) :: v
-	real(sp), dimension(-l_h+1:kp+r_h,-r_h+1:jp+r_h,-r_h+1:ip+r_h), &
+	real(wp), dimension(-l_h+1:kp+r_h,-r_h+1:jp+r_h,-r_h+1:ip+r_h), &
 		intent(in) :: w
-	real(sp), dimension(-r_h+1:kp+r_h,-r_h+1:jp+r_h,-r_h+1:ip+r_h), &
+	real(wp), dimension(-r_h+1:kp+r_h,-r_h+1:jp+r_h,-r_h+1:ip+r_h), &
 		intent(inout) :: psi
-	real(sp), dimension(-l_h+1:ip+r_h), intent(in) :: dxn
-	real(sp), dimension(-l_h+1:jp+r_h), intent(in) :: dyn
-	real(sp), dimension(-l_h+1:kp+r_h), intent(in) :: dzn, rhoa, rhoan
+	real(wp), dimension(-l_h+1:ip+r_h), intent(in) :: dxn
+	real(wp), dimension(-l_h+1:jp+r_h), intent(in) :: dyn
+	real(wp), dimension(-l_h+1:kp+r_h), intent(in) :: dzn, rhoa, rhoan
 	integer(i4b), dimension(3), intent(in) :: dims, coords
 	integer(i4b), intent(in) :: neumann
 	
 	! locals
-	real(sp), dimension(kp,jp,ip) :: fx_r, fx_l, fy_r, fy_l, fz_r, fz_l
+	real(wp), dimension(kp,jp,ip) :: fx_r, fx_l, fy_r, fy_l, fz_r, fz_l
 	integer(i4b) :: i,j,k
 
 !$omp simd	
@@ -60,27 +60,27 @@
 			    ! Flux going out of right cell boundary into adjacent cell-x 
 				fx_r(k,j,i)=( (u(k,j,i)+abs(u(k,j,i)))*psi(k,j,i)+ &
 					(u(k,j,i)-abs(u(k,j,i)))*psi(k,j,i+1) )*dt/ &
-					(2._sp*dxn(i))
+					(2._wp*dxn(i))
 		        ! Flux going through left cell boundary from adjacent cell-x
 				fx_l(k,j,i)=( (u(k,j,i-1)+abs(u(k,j,i-1)))*psi(k,j,i-1)+ &
 					(u(k,j,i-1)-abs(u(k,j,i-1)))*psi(k,j,i) )*dt/ &
-					(2._sp*dxn(i-1))
+					(2._wp*dxn(i-1))
 		
 				fy_r(k,j,i)=( (v(k,j,i)+abs(v(k,j,i)))*psi(k,j,i)+ &
 					(v(k,j,i)-abs(v(k,j,i)))*psi(k,j+1,i) )*dt/ &
-					(2._sp*dyn(j))
+					(2._wp*dyn(j))
 		
 				fy_l(k,j,i)=( (v(k,j-1,i)+abs(v(k,j-1,i)))*psi(k,j-1,i)+ &
 					(v(k,j-1,i)-abs(v(k,j-1,i)))*psi(k,j,i) )*dt/ &
-					(2._sp*dyn(j-1))
+					(2._wp*dyn(j-1))
 		
 				fz_r(k,j,i)=( (w(k,j,i)+abs(w(k,j,i)))*rhoan(k)*psi(k,j,i)+ &
 					(w(k,j,i)-abs(w(k,j,i)))*rhoan(k+1)*psi(k+1,j,i) )*dt/ &
-					(2._sp*dzn(k)*rhoa(k))
+					(2._wp*dzn(k)*rhoa(k))
 		
 				fz_l(k,j,i)=( (w(k-1,j,i)+abs(w(k-1,j,i)))*rhoan(k-1)*psi(k-1,j,i)+ &
 					(w(k-1,j,i)-abs(w(k-1,j,i)))*rhoan(k)*psi(k,j,i) )*dt/ &
-					(2._sp*dzn(k-1)*rhoa(k))
+					(2._wp*dzn(k-1)*rhoa(k))
 			enddo
 		enddo
 	enddo
@@ -133,7 +133,7 @@
 						ip,jp,kp,l_h,r_h,u,v,w,psi_in,psi_1d,lbc,ubc, &
 						kord,monotone, neumann, comm3d, id, &
 						dims,coords)
-	use nrtype
+	use numerics_type
 	use mpi_module
 	use mpi
 	
@@ -142,21 +142,21 @@
 	
 	integer(i4b), intent(in) :: id, comm3d
 	integer(i4b), dimension(3), intent(in) :: dims, coords
-	real(sp), intent(in) :: dt
+	real(wp), intent(in) :: dt
 	integer(i4b), intent(in) :: ip, jp, kp, l_h, r_h,kord
-	real(sp), dimension(-r_h+1:kp+r_h,-r_h+1:jp+r_h,-l_h+1:ip+r_h), &
+	real(wp), dimension(-r_h+1:kp+r_h,-r_h+1:jp+r_h,-l_h+1:ip+r_h), &
 		intent(in) :: u
-	real(sp), dimension(-r_h+1:kp+r_h,-l_h+1:jp+r_h,-r_h+1:ip+r_h), &
+	real(wp), dimension(-r_h+1:kp+r_h,-l_h+1:jp+r_h,-r_h+1:ip+r_h), &
 		intent(in) :: v
-	real(sp), dimension(-l_h+1:kp+r_h,-r_h+1:jp+r_h,-r_h+1:ip+r_h), &
+	real(wp), dimension(-l_h+1:kp+r_h,-r_h+1:jp+r_h,-r_h+1:ip+r_h), &
 		intent(in) :: w
-	real(sp), dimension(-r_h+1:kp+r_h,-r_h+1:jp+r_h,-r_h+1:ip+r_h), &
+	real(wp), dimension(-r_h+1:kp+r_h,-r_h+1:jp+r_h,-r_h+1:ip+r_h), &
 		intent(inout) :: psi_in
-	real(sp), intent(inout) :: lbc, ubc
-	real(sp), dimension(-r_h+1:kp+r_h), intent(in) :: psi_1d
-	real(sp), dimension(-l_h+1:ip+r_h), intent(in) :: dx, dxn
-	real(sp), dimension(-l_h+1:jp+r_h), intent(in) :: dy, dyn
-	real(sp), dimension(-l_h+1:kp+r_h), intent(in) :: dz, dzn, rhoa, rhoan
+	real(wp), intent(inout) :: lbc, ubc
+	real(wp), dimension(-r_h+1:kp+r_h), intent(in) :: psi_1d
+	real(wp), dimension(-l_h+1:ip+r_h), intent(in) :: dx, dxn
+	real(wp), dimension(-l_h+1:jp+r_h), intent(in) :: dy, dyn
+	real(wp), dimension(-l_h+1:kp+r_h), intent(in) :: dz, dzn, rhoa, rhoan
 	logical, intent(in) :: monotone
 	integer(i4b), intent(in) :: neumann
 	
@@ -213,7 +213,7 @@
 						ip,jp,kp,l_h,r_h,u,v,w,psi_in,lbc,ubc, &
 						kord,monotone, neumann, comm3d, id, &
 						dims,coords)
-	use nrtype
+	use numerics_type
 	use mpi_module
 	use mpi
 	
@@ -222,43 +222,43 @@
 	
 	integer(i4b), intent(in) :: id, comm3d
 	integer(i4b), dimension(3), intent(in) :: dims, coords
-	real(sp), intent(in) :: dt
+	real(wp), intent(in) :: dt
 	integer(i4b), intent(in) :: ip, jp, kp, l_h, r_h,kord
-	real(sp), dimension(-r_h+1:kp+r_h,-r_h+1:jp+r_h,-l_h+1:ip+r_h), &
+	real(wp), dimension(-r_h+1:kp+r_h,-r_h+1:jp+r_h,-l_h+1:ip+r_h), &
 		intent(in), target :: u
-	real(sp), dimension(-r_h+1:kp+r_h,-l_h+1:jp+r_h,-r_h+1:ip+r_h), &
+	real(wp), dimension(-r_h+1:kp+r_h,-l_h+1:jp+r_h,-r_h+1:ip+r_h), &
 		intent(in), target :: v
-	real(sp), dimension(-l_h+1:kp+r_h,-r_h+1:jp+r_h,-r_h+1:ip+r_h), &
+	real(wp), dimension(-l_h+1:kp+r_h,-r_h+1:jp+r_h,-r_h+1:ip+r_h), &
 		intent(in), target :: w
-	real(sp), dimension(-r_h+1:kp+r_h,-r_h+1:jp+r_h,-r_h+1:ip+r_h), &
+	real(wp), dimension(-r_h+1:kp+r_h,-r_h+1:jp+r_h,-r_h+1:ip+r_h), &
 		intent(inout), target :: psi_in
-	real(sp), intent(inout) :: lbc, ubc
-	real(sp), dimension(-l_h+1:ip+r_h), intent(in) :: dx, dxn
-	real(sp), dimension(-l_h+1:jp+r_h), intent(in) :: dy, dyn
-	real(sp), dimension(-l_h+1:kp+r_h), intent(in) :: dz, dzn, rhoa, rhoan
+	real(wp), intent(inout) :: lbc, ubc
+	real(wp), dimension(-l_h+1:ip+r_h), intent(in) :: dx, dxn
+	real(wp), dimension(-l_h+1:jp+r_h), intent(in) :: dy, dyn
+	real(wp), dimension(-l_h+1:kp+r_h), intent(in) :: dz, dzn, rhoa, rhoan
 	logical, intent(in) :: monotone
 	integer(i4b), intent(in) :: neumann
 	
 	
 	! locals
-	real(sp) :: u_div1, u_div2, u_div3, u_j_bar1, u_j_bar2, u_j_bar3, &
+	real(wp) :: u_div1, u_div2, u_div3, u_j_bar1, u_j_bar2, u_j_bar3, &
 			denom1, denom2, minlocal, minglobal, psi_local_sum, psi_sum
 	integer(i4b) :: i,j,k, it, it2, error
-	real(sp), dimension(:,:,:), pointer :: ut
-	real(sp), dimension(:,:,:), pointer :: vt
-	real(sp), dimension(:,:,:), pointer :: wt
-	real(sp), dimension(:,:,:), pointer :: ut_sav
-	real(sp), dimension(:,:,:), pointer :: vt_sav
-	real(sp), dimension(:,:,:), pointer :: wt_sav
-	real(sp), dimension(:,:,:), pointer :: psi, psi_old
-	real(sp), dimension(-r_h+1:kp+r_h,-r_h+1:jp+r_h,-l_h+1:ip+r_h), target :: & 
+	real(wp), dimension(:,:,:), pointer :: ut
+	real(wp), dimension(:,:,:), pointer :: vt
+	real(wp), dimension(:,:,:), pointer :: wt
+	real(wp), dimension(:,:,:), pointer :: ut_sav
+	real(wp), dimension(:,:,:), pointer :: vt_sav
+	real(wp), dimension(:,:,:), pointer :: wt_sav
+	real(wp), dimension(:,:,:), pointer :: psi, psi_old
+	real(wp), dimension(-r_h+1:kp+r_h,-r_h+1:jp+r_h,-l_h+1:ip+r_h), target :: & 
 		u_store1, u_store2
-	real(sp), dimension(-r_h+1:kp+r_h,-l_h+1:jp+r_h,-r_h+1:ip+r_h), target :: &
+	real(wp), dimension(-r_h+1:kp+r_h,-l_h+1:jp+r_h,-r_h+1:ip+r_h), target :: &
 		v_store1, v_store2
-	real(sp), dimension(-l_h+1:kp+r_h,-r_h+1:jp+r_h,-r_h+1:ip+r_h), target :: &
+	real(wp), dimension(-l_h+1:kp+r_h,-r_h+1:jp+r_h,-r_h+1:ip+r_h), target :: &
 		w_store1, w_store2
-	real(sp), dimension(-r_h+1:kp+r_h,-r_h+1:jp+r_h,-r_h+1:ip+r_h), target :: psi_store
-	real(sp), dimension(-r_h+1:kp+r_h,-r_h+1:jp+r_h,-r_h+1:ip+r_h) :: &
+	real(wp), dimension(-r_h+1:kp+r_h,-r_h+1:jp+r_h,-r_h+1:ip+r_h), target :: psi_store
+	real(wp), dimension(-r_h+1:kp+r_h,-r_h+1:jp+r_h,-r_h+1:ip+r_h) :: &
 						psi_i_max, psi_i_min, psi_j_max,psi_j_min,psi_k_max,psi_k_min, &
 						beta_i_up, beta_i_down,&
 						beta_j_up, beta_j_down,&
@@ -281,9 +281,9 @@
  	    ubc=ubc+minglobal
  	    return
 	endif
-	u_store2=0._sp
-	v_store2=0._sp
-	w_store2=0._sp
+	u_store2=0._wp
+	v_store2=0._wp
+	w_store2=0._wp
 	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 	! associate pointers to targets                                                      !
 	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -351,69 +351,69 @@
 						! equation 13 page 330 of smolarkiewicz (1984) 
 						! journal of computational physics
 						! second term of u wind:
-						u_j_bar1 = 0.5_sp*dt*ut(k,j,i) * ( &
+						u_j_bar1 = 0.5_wp*dt*ut(k,j,i) * ( &
 							! equation 14:
-							0.25_sp*(wt(k,j,i+1)+wt(k,j,i)+wt(k-1,j,i+1)+wt(k-1,j,i)) * &
+							0.25_wp*(wt(k,j,i+1)+wt(k,j,i)+wt(k-1,j,i+1)+wt(k-1,j,i)) * &
 							! equation 13:
 						   ( psi_old(k+1,j,i+1)+psi_old(k+1,j,i)- &
 						     psi_old(k-1,j,i+1)-psi_old(k-1,j,i) ) / &
 						   ( psi_old(k+1,j,i+1)+psi_old(k+1,j,i)+ &
 						     psi_old(k-1,j,i+1)+psi_old(k-1,j,i)+small ) / &
-						     ( 0.5_sp*(dzn(k-1)+dzn(k)) ) + &
+						     ( 0.5_wp*(dzn(k-1)+dzn(k)) ) + &
 						    ! repeat for y dimension:
 							! equation 14:
-							0.25_sp*(vt(k,j,i+1)+vt(k,j,i)+vt(k,j-1,i+1)+vt(k,j-1,i)) * &
+							0.25_wp*(vt(k,j,i+1)+vt(k,j,i)+vt(k,j-1,i+1)+vt(k,j-1,i)) * &
 							! equation 13:
 						   ( psi_old(k,j+1,i+1)+psi_old(k,j+1,i)- &
 						     psi_old(k,j-1,i+1)-psi_old(k,j-1,i) ) / &
 						   ( psi_old(k,j+1,i+1)+psi_old(k,j+1,i)+ &
 						     psi_old(k,j-1,i+1)+psi_old(k,j-1,i)+small ) / &
-						     ( 0.5_sp*(dyn(j-1)+dyn(j)) ) )
+						     ( 0.5_wp*(dyn(j-1)+dyn(j)) ) )
 						     
 						     
 						! equation 13 page 330 of smolarkiewicz (1984) 
 						! journal of computational physics
 						! second term of v wind:
-						u_j_bar2 = 0.5_sp*dt*vt(k,j,i) * ( &
+						u_j_bar2 = 0.5_wp*dt*vt(k,j,i) * ( &
 							! equation 14:
-							0.25_sp*(wt(k,j+1,i)+wt(k,j,i)+wt(k-1,j+1,i)+wt(k-1,j,i)) * &
+							0.25_wp*(wt(k,j+1,i)+wt(k,j,i)+wt(k-1,j+1,i)+wt(k-1,j,i)) * &
 							! equation 13:
 						   ( psi_old(k+1,j+1,i)+psi_old(k+1,j,i)- &
 						     psi_old(k-1,j+1,i)-psi_old(k-1,j,i) ) / &
 						   ( psi_old(k+1,j+1,i)+psi_old(k+1,j,i)+ &
 						     psi_old(k-1,j+1,i)+psi_old(k-1,j,i)+small ) / &
-						     ( 0.5_sp*(dzn(k-1)+dzn(k)) ) + &
+						     ( 0.5_wp*(dzn(k-1)+dzn(k)) ) + &
 						    ! repeat for y dimension:
 							! equation 14:
-							0.25_sp*(ut(k,j+1,i)+ut(k,j,i)+ut(k,j+1,i-1)+ut(k,j,i-1)) * &
+							0.25_wp*(ut(k,j+1,i)+ut(k,j,i)+ut(k,j+1,i-1)+ut(k,j,i-1)) * &
 							! equation 13:
 						   ( psi_old(k,j+1,i+1)+psi_old(k,j,i+1)- &
 						     psi_old(k,j+1,i-1)-psi_old(k,j,i-1) ) / &
 						   ( psi_old(k,j+1,i+1)+psi_old(k,j,i+1)+ &
 						     psi_old(k,j+1,i-1)+psi_old(k,j,i-1)+small ) / &
-						     ( 0.5_sp*(dxn(i-1)+dxn(i)) ) )
+						     ( 0.5_wp*(dxn(i-1)+dxn(i)) ) )
 						     
 						! equation 13 page 330 of smolarkiewicz (1984) 
 						! journal of computational physics
 						! second term of w wind:
-						u_j_bar3 = 0.5_sp*dt*wt(k,j,i) * ( &
+						u_j_bar3 = 0.5_wp*dt*wt(k,j,i) * ( &
 							! equation 14:
-							0.25_sp*(vt(k+1,j,i)+vt(k,j,i)+vt(k+1,j-1,i)+vt(k,j-1,i)) * &
+							0.25_wp*(vt(k+1,j,i)+vt(k,j,i)+vt(k+1,j-1,i)+vt(k,j-1,i)) * &
 							! equation 13:
 						   ( psi_old(k+1,j+1,i)+psi_old(k,j+1,i)- &
 						     psi_old(k+1,j-1,i)-psi_old(k,j-1,i) ) / &
 						   ( psi_old(k+1,j+1,i)+psi_old(k,j+1,i)+ &
 						     psi_old(k+1,j-1,i)+psi_old(k,j-1,i)+small ) / &
-						     ( 0.5_sp*(dyn(j-1)+dyn(j)) ) + &
+						     ( 0.5_wp*(dyn(j-1)+dyn(j)) ) + &
 						    ! repeat for y dimension:
 							! equation 14:
-							0.25_sp*(ut(k+1,j,i)+ut(k,j,i)+ut(k+1,j,i-1)+ut(k,j,i-1)) * &
+							0.25_wp*(ut(k+1,j,i)+ut(k,j,i)+ut(k+1,j,i-1)+ut(k,j,i-1)) * &
 							! equation 13:
 						   ( psi_old(k+1,j,i+1)+psi_old(k,j,i+1)- &
 						     psi_old(k+1,j,i-1)-psi_old(k,j,i-1) ) / &
 						   ( psi_old(k+1,j,i+1)+psi_old(k,j,i+1)+ &
 						     psi_old(k+1,j,i-1)+psi_old(k,j,i-1)+small ) / &
-						     ( 0.5_sp*(dxn(i-1)+dxn(i)) ) )
+						     ( 0.5_wp*(dxn(i-1)+dxn(i)) ) )
 						!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 
@@ -439,11 +439,11 @@
 						!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 						! last update of eq 38 smolarkiewicz 1984
 						!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-						ut_sav(k,j,i)=ut_sav(k,j,i) - 0.25_sp*dt*ut(k,j,i) * &
+						ut_sav(k,j,i)=ut_sav(k,j,i) - 0.25_wp*dt*ut(k,j,i) * &
 						 ( (ut(k,j,i+1)-ut(k,j,i-1))/(dx(i-1))+u_div1 )
-						vt_sav(k,j,i)=vt_sav(k,j,i) - 0.25_sp*dt*vt(k,j,i) * &
+						vt_sav(k,j,i)=vt_sav(k,j,i) - 0.25_wp*dt*vt(k,j,i) * &
 						 ( (vt(k,j+1,i)-vt(k,j-1,i))/(dy(j-1))+u_div2 )
-						wt_sav(k,j,i)=wt_sav(k,j,i) - 0.25_sp*dt*wt(k,j,i) * &
+						wt_sav(k,j,i)=wt_sav(k,j,i) - 0.25_wp*dt*wt(k,j,i) * &
 						 ( (wt(k+1,j,i)-wt(k-1,j,i))/(dz(k-1))+u_div3 )
 						!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
@@ -474,11 +474,11 @@
 			endif
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 			call exchange_full(comm3d, id, kp, jp, ip, r_h,r_h,r_h,r_h,l_h,r_h, &
-														ut,0._sp,0._sp,dims,coords)
+														ut,0._wp,0._wp,dims,coords)
 			call exchange_full(comm3d, id, kp, jp, ip, r_h,r_h,l_h,r_h,r_h,r_h, &
-														vt,0._sp,0._sp,dims,coords)
+														vt,0._wp,0._wp,dims,coords)
 			call exchange_full(comm3d, id, kp, jp, ip, l_h,r_h,r_h,r_h,r_h,r_h, &
-														wt,0._sp,0._sp,dims,coords)
+														wt,0._wp,0._wp,dims,coords)
 		endif
 		
 		
@@ -551,20 +551,20 @@
 			do i=1,ip
 				do j=1,jp
 					do k=1,kp		
-						denom1=(dt*((max(ut(k,j,i-1),0._sp)*psi_old(k,j,i-1)- &
-								  min(ut(k,j,i),0._sp)*psi_old(k,j,i+1))/dx(i-1)+ &
-							    (max(vt(k,j-1,i),0._sp)*psi_old(k,j-1,i)-&
-								  min(vt(k,j,i),0._sp)*psi_old(k,j+1,i))/dy(j-1) + &
-							    (max(wt(k-1,j,i),0._sp)*psi_old(k-1,j,i)-&
-								  min(wt(k,j,i),0._sp)*psi_old(k+1,j,i))/dz(k-1) &
+						denom1=(dt*((max(ut(k,j,i-1),0._wp)*psi_old(k,j,i-1)- &
+								  min(ut(k,j,i),0._wp)*psi_old(k,j,i+1))/dx(i-1)+ &
+							    (max(vt(k,j-1,i),0._wp)*psi_old(k,j-1,i)-&
+								  min(vt(k,j,i),0._wp)*psi_old(k,j+1,i))/dy(j-1) + &
+							    (max(wt(k-1,j,i),0._wp)*psi_old(k-1,j,i)-&
+								  min(wt(k,j,i),0._wp)*psi_old(k+1,j,i))/dz(k-1) &
 								  +small))
 								  
-						denom2=(dt*((max(ut(k,j,i),0._sp)*psi_old(k,j,i)- &
-							      min(ut(k,j,i-1),0._sp)*psi_old(k,j,i))/dx(i-1) + &
-								(max(vt(k,j,i),0._sp)*psi_old(k,j,i)-&
-								  min(vt(k,j-1,i),0._sp)*psi_old(k,j,i))/dy(j-1) + &
-								(max(wt(k,j,i),0._sp)*psi_old(k,j,i)-&
-								  min(wt(k-1,j,i),0._sp)*psi_old(k,j,i))/dz(k-1) &
+						denom2=(dt*((max(ut(k,j,i),0._wp)*psi_old(k,j,i)- &
+							      min(ut(k,j,i-1),0._wp)*psi_old(k,j,i))/dx(i-1) + &
+								(max(vt(k,j,i),0._wp)*psi_old(k,j,i)-&
+								  min(vt(k,j-1,i),0._wp)*psi_old(k,j,i))/dy(j-1) + &
+								(max(wt(k,j,i),0._wp)*psi_old(k,j,i)-&
+								  min(wt(k-1,j,i),0._wp)*psi_old(k,j,i))/dz(k-1) &
 								  +small))
 								  
 						beta_i_up(k,j,i)=(psi_i_max(k,j,i)-psi_old(k,j,i)) / denom1
@@ -592,17 +592,17 @@
 			! exchange halos for beta_i_up, down
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 			call exchange_along_dim(comm3d, id, kp, jp, ip, r_h,r_h,r_h,r_h,r_h,r_h, &
-													beta_i_up,0._sp,0._sp,dims,coords)
+													beta_i_up,0._wp,0._wp,dims,coords)
 			call exchange_along_dim(comm3d, id, kp, jp, ip, r_h,r_h,r_h,r_h,r_h,r_h, &
-													beta_i_down,0._sp,0._sp,dims,coords)
+													beta_i_down,0._wp,0._wp,dims,coords)
 			call exchange_along_dim(comm3d, id, kp, jp, ip, r_h,r_h,r_h,r_h,r_h,r_h, &
-													beta_j_up,0._sp,0._sp,dims,coords)
+													beta_j_up,0._wp,0._wp,dims,coords)
 			call exchange_along_dim(comm3d, id, kp, jp, ip, r_h,r_h,r_h,r_h,r_h,r_h, &
-													beta_j_down,0._sp,0._sp,dims,coords)
+													beta_j_down,0._wp,0._wp,dims,coords)
 			call exchange_along_dim(comm3d, id, kp, jp, ip, r_h,r_h,r_h,r_h,r_h,r_h, &
-													beta_k_up,0._sp,0._sp,dims,coords)
+													beta_k_up,0._wp,0._wp,dims,coords)
 			call exchange_along_dim(comm3d, id, kp, jp, ip, r_h,r_h,r_h,r_h,r_h,r_h, &
-													beta_k_down,0._sp,0._sp,dims,coords)
+													beta_k_down,0._wp,0._wp,dims,coords)
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 								
@@ -613,18 +613,18 @@
 			do i=1,ip
 				do j=1,jp
 					do k=1,kp			
-						ut_sav(k,j,i)=min(1._sp,beta_i_down(k,j,i), &
-										 beta_i_up(k,j,i+1))*max(ut(k,j,i),0._sp) + &
-									  min(1._sp,beta_i_up(k,j,i), &
-									     beta_i_down(k,j,i+1))*min(ut(k,j,i),0._sp)
-						vt_sav(k,j,i)=min(1._sp,beta_j_down(k,j,i), &
-										 beta_j_up(k,j+1,i))*max(vt(k,j,i),0._sp) + &
-									  min(1._sp,beta_j_up(k,j,i), &
-									     beta_j_down(k,j+1,i))*min(vt(k,j,i),0._sp)
-						wt_sav(k,j,i)=min(1._sp,beta_k_down(k,j,i), &
-										 beta_k_up(k+1,j,i))*max(wt(k,j,i),0._sp) + &
-									  min(1._sp,beta_k_up(k,j,i), &
-									     beta_k_down(k+1,j,i))*min(wt(k,j,i),0._sp)
+						ut_sav(k,j,i)=min(1._wp,beta_i_down(k,j,i), &
+										 beta_i_up(k,j,i+1))*max(ut(k,j,i),0._wp) + &
+									  min(1._wp,beta_i_up(k,j,i), &
+									     beta_i_down(k,j,i+1))*min(ut(k,j,i),0._wp)
+						vt_sav(k,j,i)=min(1._wp,beta_j_down(k,j,i), &
+										 beta_j_up(k,j+1,i))*max(vt(k,j,i),0._wp) + &
+									  min(1._wp,beta_j_up(k,j,i), &
+									     beta_j_down(k,j+1,i))*min(vt(k,j,i),0._wp)
+						wt_sav(k,j,i)=min(1._wp,beta_k_down(k,j,i), &
+										 beta_k_up(k+1,j,i))*max(wt(k,j,i),0._wp) + &
+									  min(1._wp,beta_k_up(k,j,i), &
+									     beta_k_down(k+1,j,i))*min(wt(k,j,i),0._wp)
 					enddo
 				enddo
 			enddo 
@@ -642,11 +642,11 @@
 			wt_sav => w_store1
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 			call exchange_full(comm3d, id, kp, jp, ip, r_h,r_h,r_h,r_h,l_h,r_h, &
-														ut,0._sp,0._sp,dims,coords)
+														ut,0._wp,0._wp,dims,coords)
 			call exchange_full(comm3d, id, kp, jp, ip, r_h,r_h,l_h,r_h,r_h,r_h, &
-														vt,0._sp,0._sp,dims,coords)
+														vt,0._wp,0._wp,dims,coords)
 			call exchange_full(comm3d, id, kp, jp, ip, l_h,r_h,r_h,r_h,r_h,r_h, &
-														wt,0._sp,0._sp,dims,coords)
+														wt,0._wp,0._wp,dims,coords)
 		endif
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
@@ -712,21 +712,21 @@
 	subroutine first_order_upstream_vert_3d(dt,dzn,&
 	                    rhoa,rhoan,ip,jp,kp,l_h,r_h,w,psi,neumann, &
 	                    dims,coords)
-	use nrtype
+	use numerics_type
 	implicit none
-	real(sp), intent(in) :: dt
+	real(wp), intent(in) :: dt
 	integer(i4b), intent(in) :: ip, jp, kp, l_h, r_h
-	real(sp), dimension(-l_h+1:kp+r_h,-r_h+1:jp+r_h,-r_h+1:ip+r_h), &
+	real(wp), dimension(-l_h+1:kp+r_h,-r_h+1:jp+r_h,-r_h+1:ip+r_h), &
 		intent(in) :: w
-	real(sp), dimension(-r_h+1:kp+r_h,-r_h+1:jp+r_h,-r_h+1:ip+r_h), &
+	real(wp), dimension(-r_h+1:kp+r_h,-r_h+1:jp+r_h,-r_h+1:ip+r_h), &
 		intent(inout) :: psi
-	real(sp), dimension(-l_h+1:kp+r_h), intent(in) :: dzn, rhoa, rhoan
+	real(wp), dimension(-l_h+1:kp+r_h), intent(in) :: dzn, rhoa, rhoan
 	integer(i4b), dimension(3), intent(in) :: dims, coords
 	integer(i4b), intent(in) :: neumann
 	
 	! locals
-	real(sp), dimension(kp,jp,ip) :: fz_r, fz_l
-	real(sp) :: wkji,wkm1ji
+	real(wp), dimension(kp,jp,ip) :: fz_r, fz_l
+	real(wp) :: wkji,wkm1ji
 	integer(i4b) :: i,j,k
 
 !$omp simd	
@@ -741,11 +741,11 @@
     			endif
 				fz_r(k,j,i)=( (wkji+abs(wkji))*rhoan(k)*psi(k,j,i)+ &
 					(wkji-abs(wkji))*rhoan(k+1)*psi(k+1,j,i) )*dt/ &
-					(2._sp*dzn(k)*rhoa(k))
+					(2._wp*dzn(k)*rhoa(k))
 		
 				fz_l(k,j,i)=( (wkm1ji+abs(wkm1ji))*rhoan(k-1)*psi(k-1,j,i)+ &
 					(wkm1ji-abs(wkm1ji))*rhoan(k)*psi(k,j,i) )*dt/ &
-					(2._sp*dzn(k-1)*rhoa(k))
+					(2._wp*dzn(k-1)*rhoa(k))
 			enddo
 		enddo
 	enddo
@@ -797,7 +797,7 @@
 						ip,jp,kp,l_h,r_h,w,psi_in,lbc,ubc, &
 						kord,monotone, neumann, comm3d, id, &
 						dims,coords)
-	use nrtype
+	use numerics_type
 	use mpi_module
 	use mpi
 	
@@ -806,28 +806,28 @@
 	
 	integer(i4b), intent(in) :: id, comm3d
 	integer(i4b), dimension(3), intent(in) :: dims, coords
-	real(sp), intent(in) :: dt
+	real(wp), intent(in) :: dt
 	integer(i4b), intent(in) :: ip, jp, kp, l_h, r_h,kord
-	real(sp), dimension(-l_h+1:kp+r_h,-r_h+1:jp+r_h,-r_h+1:ip+r_h), &
+	real(wp), dimension(-l_h+1:kp+r_h,-r_h+1:jp+r_h,-r_h+1:ip+r_h), &
 		intent(in), target :: w
-	real(sp), dimension(-r_h+1:kp+r_h,-r_h+1:jp+r_h,-r_h+1:ip+r_h), &
+	real(wp), dimension(-r_h+1:kp+r_h,-r_h+1:jp+r_h,-r_h+1:ip+r_h), &
 		intent(inout), target :: psi_in
-	real(sp), intent(inout) :: lbc, ubc
-	real(sp), dimension(-l_h+1:kp+r_h), intent(in) :: dz, dzn, rhoa, rhoan
+	real(wp), intent(inout) :: lbc, ubc
+	real(wp), dimension(-l_h+1:kp+r_h), intent(in) :: dz, dzn, rhoa, rhoan
 	logical, intent(in) :: monotone
 	integer(i4b), intent(in) :: neumann
 	
 	! locals
-	real(sp) :: u_div3, u_j_bar3, &
+	real(wp) :: u_div3, u_j_bar3, &
 			denom1, denom2, minlocal, minglobal, psi_local_sum, psi_sum
 	integer(i4b) :: i,j,k, it, it2, error
-	real(sp), dimension(:,:,:), pointer :: wt
-	real(sp), dimension(:,:,:), pointer :: wt_sav
-	real(sp), dimension(:,:,:), pointer :: psi, psi_old
-	real(sp), dimension(-l_h+1:kp+r_h,-r_h+1:jp+r_h,-r_h+1:ip+r_h), target :: &
+	real(wp), dimension(:,:,:), pointer :: wt
+	real(wp), dimension(:,:,:), pointer :: wt_sav
+	real(wp), dimension(:,:,:), pointer :: psi, psi_old
+	real(wp), dimension(-l_h+1:kp+r_h,-r_h+1:jp+r_h,-r_h+1:ip+r_h), target :: &
 		w_store1, w_store2
-	real(sp), dimension(-r_h+1:kp+r_h,-r_h+1:jp+r_h,-r_h+1:ip+r_h), target :: psi_store
-	real(sp), dimension(-r_h+1:kp+r_h,-r_h+1:jp+r_h,-r_h+1:ip+r_h) :: &
+	real(wp), dimension(-r_h+1:kp+r_h,-r_h+1:jp+r_h,-r_h+1:ip+r_h), target :: psi_store
+	real(wp), dimension(-r_h+1:kp+r_h,-r_h+1:jp+r_h,-r_h+1:ip+r_h) :: &
 						psi_k_max,psi_k_min, &
 						beta_k_up, beta_k_down
 	
@@ -848,7 +848,7 @@
  	    ubc=ubc+minglobal
  	    return
 	endif
-	w_store2=0._sp
+	w_store2=0._wp
 	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 	! associate pointers to targets                                                      !
 	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -887,7 +887,7 @@
 						!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 						! for divergent flow: eq 38 smolarkiewicz 1984 
 						! last part of w wind:
-						u_div3=0._sp
+						u_div3=0._wp
 						!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 
@@ -897,7 +897,7 @@
 						! equation 13 page 330 of smolarkiewicz (1984) 
 						! journal of computational physics
 						! second term of w wind:
-						u_j_bar3 = 0._sp
+						u_j_bar3 = 0._wp
 						!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 
@@ -915,7 +915,7 @@
 						!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 						! last update of eq 38 smolarkiewicz 1984
 						!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-						wt_sav(k,j,i)=wt_sav(k,j,i) - 0.25_sp*dt*wt(k,j,i) * &
+						wt_sav(k,j,i)=wt_sav(k,j,i) - 0.25_wp*dt*wt(k,j,i) * &
 						 ( (wt(k+1,j,i)-wt(k-1,j,i))/(dz(k-1))+u_div3 )
 						!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
@@ -938,7 +938,7 @@
 			endif
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 			call exchange_along_z(comm3d, id, kp, jp, ip, l_h,r_h,r_h,r_h,r_h,r_h, &
-														wt,0._sp,0._sp,dims,coords)
+														wt,0._wp,0._wp,dims,coords)
 		endif
 		
 		
@@ -981,12 +981,12 @@
 			do i=1,ip
 				do j=1,jp
 					do k=1,kp		
-						denom1=(dt*((max(wt(k-1,j,i),0._sp)*psi_old(k-1,j,i)-&
-								  min(wt(k,j,i),0._sp)*psi_old(k+1,j,i))/dz(k-1) &
+						denom1=(dt*((max(wt(k-1,j,i),0._wp)*psi_old(k-1,j,i)-&
+								  min(wt(k,j,i),0._wp)*psi_old(k+1,j,i))/dz(k-1) &
 								  +small))
 								  
-						denom2=(dt*((max(wt(k,j,i),0._sp)*psi_old(k,j,i)-&
-								  min(wt(k-1,j,i),0._sp)*psi_old(k,j,i))/dz(k-1) &
+						denom2=(dt*((max(wt(k,j,i),0._wp)*psi_old(k,j,i)-&
+								  min(wt(k-1,j,i),0._wp)*psi_old(k,j,i))/dz(k-1) &
 								  +small))
 								  
 						beta_k_up(k,j,i)=(psi_k_max(k,j,i)-psi_old(k,j,i)) / denom1
@@ -1004,9 +1004,9 @@
 			! exchange halos for beta_i_up, down
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 			call exchange_along_z(comm3d, id, kp, jp, ip, r_h,r_h,r_h,r_h,r_h,r_h, &
-													beta_k_up,0._sp,0._sp,dims,coords)
+													beta_k_up,0._wp,0._wp,dims,coords)
 			call exchange_along_z(comm3d, id, kp, jp, ip, r_h,r_h,r_h,r_h,r_h,r_h, &
-													beta_k_down,0._sp,0._sp,dims,coords)
+													beta_k_down,0._wp,0._wp,dims,coords)
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 								
@@ -1017,10 +1017,10 @@
 			do i=1,ip
 				do j=1,jp
 					do k=1,kp			
-						wt_sav(k,j,i)=min(1._sp,beta_k_down(k,j,i), &
-										 beta_k_up(k+1,j,i))*max(wt(k,j,i),0._sp) + &
-									  min(1._sp,beta_k_up(k,j,i), &
-									     beta_k_down(k+1,j,i))*min(wt(k,j,i),0._sp)
+						wt_sav(k,j,i)=min(1._wp,beta_k_down(k,j,i), &
+										 beta_k_up(k+1,j,i))*max(wt(k,j,i),0._wp) + &
+									  min(1._wp,beta_k_up(k,j,i), &
+									     beta_k_down(k+1,j,i))*min(wt(k,j,i),0._wp)
 					enddo
 				enddo
 			enddo 
@@ -1034,7 +1034,7 @@
 			wt_sav => w_store1
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 			call exchange_along_z(comm3d, id, kp, jp, ip, l_h,r_h,r_h,r_h,r_h,r_h, &
-														wt,0._sp,0._sp,dims,coords)
+														wt,0._wp,0._wp,dims,coords)
 		endif
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
@@ -1099,32 +1099,32 @@
 		implicit none
 		 
     	integer(i4b), intent(in) :: id, comm3d
-		real(sp), intent(in) :: dt
+		real(wp), intent(in) :: dt
 		integer(i4b), intent(in) :: ip, jp, kp, l_h, r_h
-		real(sp), dimension(-l_h+1:ip+r_h), intent(in) :: dx,dxn
-		real(sp), dimension(-l_h+1:ip+r_h), intent(in) :: dy,dyn
-		real(sp), dimension(-l_h+1:kp+r_h), intent(in) :: rhoa, rhoan,dz, dzn, psi_ref
-		real(sp), dimension(-l_h+1:kp+r_h,-r_h+1:jp+r_h,-r_h+1:ip+r_h), intent(in) :: &
+		real(wp), dimension(-l_h+1:ip+r_h), intent(in) :: dx,dxn
+		real(wp), dimension(-l_h+1:ip+r_h), intent(in) :: dy,dyn
+		real(wp), dimension(-l_h+1:kp+r_h), intent(in) :: rhoa, rhoan,dz, dzn, psi_ref
+		real(wp), dimension(-l_h+1:kp+r_h,-r_h+1:jp+r_h,-r_h+1:ip+r_h), intent(in) :: &
 		    u,v,w
-		real(sp), dimension(-r_h+1:kp+r_h,-r_h+1:jp+r_h,-r_h+1:ip+r_h), &
+		real(wp), dimension(-r_h+1:kp+r_h,-r_h+1:jp+r_h,-r_h+1:ip+r_h), &
 							intent(inout) :: psi_3d
 		integer(i4b), dimension(3), intent(in) :: dims, coords
 		! locals:
 		integer(i4b) :: i, j, k
-    	real(sp), dimension(kp) :: fz_r, fz_l
-		real(sp), dimension(-r_h+1:kp+r_h,-r_h+1:jp+r_h,-r_h+1:ip+r_h) :: psi_3d_ref
-		real(sp) :: t1=0._sp,t2=0._sp
+    	real(wp), dimension(kp) :: fz_r, fz_l
+		real(wp), dimension(-r_h+1:kp+r_h,-r_h+1:jp+r_h,-r_h+1:ip+r_h) :: psi_3d_ref
+		real(wp) :: t1=0._wp,t2=0._wp
 		
 ! 		do i=1,ip
 ! 			do j=1,jp
 ! 				do k=1,kp
 !                     fz_r(k)=( (w(k,j,i)+abs(w(k,j,i)))*rhoan(k)*psi_ref(k)+ &
 !                         (w(k,j,i)-abs(w(k,j,i)))*rhoan(k+1)*psi_ref(k+1) )*dt/ &
-!                         (2._sp*dzn(k)*rhoa(k))
+!                         (2._wp*dzn(k)*rhoa(k))
 !         
 !                     fz_l(k)=( (w(k-1,j,i)+abs(w(k-1,j,i)))*rhoan(k-1)*psi_ref(k-1)+ &
 !                         (w(k-1,j,i)-abs(w(k-1,j,i)))*rhoan(k)*psi_ref(k) )*dt/ &
-!                         (2._sp*dzn(k-1)*rhoa(k))
+!                         (2._wp*dzn(k-1)*rhoa(k))
 !                 enddo
 !                 psi_3d(1:kp,j,i)=psi_3d(1:kp,j,i)-(fz_r-fz_l)
 !             enddo
@@ -1135,7 +1135,7 @@
 ! 			do j=1-r_h,jp+r_h
 ! 				do k=1,kp
 ! 					psi_3d(k,j,i) = psi_3d(k,j,i) &
-! 								- dt*(0.5_sp/dz(k)*(w(k,j,i)+w(k-1,j,i))* &
+! 								- dt*(0.5_wp/dz(k)*(w(k,j,i)+w(k-1,j,i))* &
 ! 								rhoa(k)*(psi_ref(k+1)-psi_ref(k)))/rhoan(k)
 ! 				enddo
 ! 			enddo
@@ -1151,16 +1151,16 @@
 			do j=1-r_h,jp+r_h
 				do k=1,kp
 					psi_3d(k,j,i) = psi_3d(k,j,i) &
-								- dt*(0.5_sp/dz(k-1)*w(k-1,j,i)*&
+								- dt*(0.5_wp/dz(k-1)*w(k-1,j,i)*&
 								rhoa(k-1)*(psi_ref(k)-psi_ref(k-1)) &
-									 + 0.5_sp/dz(k)*w(k,j,i)* &
+									 + 0.5_wp/dz(k)*w(k,j,i)* &
 								rhoa(k)*(psi_ref(k+1)-psi_ref(k)))/rhoan(k)
 				enddo
 			enddo
 		enddo
 		! bit of a fudge, because this method leads to temperature perturbations
 		! at surface
-		!if(coords(3) == 0) psi_3d(1-r_h:1,:,:)=0._sp		
+		!if(coords(3) == 0) psi_3d(1-r_h:1,:,:)=0._wp		
 		
 	end subroutine adv_ref_state
 	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -1199,7 +1199,7 @@
 						ip,jp,kp,nq,l_h,r_h,u,v,w,psi_in,lbc,ubc, &
 						kord,monotone, neumann,comm3d, id, &
 						dims,coords)
-	use nrtype
+	use numerics_type
 	use mpi_module
 	use mpi
 	
@@ -1208,43 +1208,43 @@
 	
 	integer(i4b), intent(in) :: id, comm3d
 	integer(i4b), dimension(3), intent(in) :: dims, coords
-	real(sp), intent(in) :: dt
+	real(wp), intent(in) :: dt
 	integer(i4b), intent(in) :: ip, jp, kp, nq,l_h, r_h,kord
-	real(sp), dimension(-r_h+1:kp+r_h,-r_h+1:jp+r_h,-l_h+1:ip+r_h), &
+	real(wp), dimension(-r_h+1:kp+r_h,-r_h+1:jp+r_h,-l_h+1:ip+r_h), &
 		intent(in), target :: u
-	real(sp), dimension(-r_h+1:kp+r_h,-l_h+1:jp+r_h,-r_h+1:ip+r_h), &
+	real(wp), dimension(-r_h+1:kp+r_h,-l_h+1:jp+r_h,-r_h+1:ip+r_h), &
 		intent(in), target :: v
-	real(sp), dimension(-l_h+1:kp+r_h,-r_h+1:jp+r_h,-r_h+1:ip+r_h), &
+	real(wp), dimension(-l_h+1:kp+r_h,-r_h+1:jp+r_h,-r_h+1:ip+r_h), &
 		intent(in), target :: w
-	real(sp), dimension(-r_h+1:kp+r_h,-r_h+1:jp+r_h,-r_h+1:ip+r_h,1:nq), &
+	real(wp), dimension(-r_h+1:kp+r_h,-r_h+1:jp+r_h,-r_h+1:ip+r_h,1:nq), &
 		intent(inout), target :: psi_in
-	real(sp), intent(inout), dimension(nq) :: lbc, ubc
-	real(sp), dimension(-l_h+1:ip+r_h), intent(in) :: dx, dxn
-	real(sp), dimension(-l_h+1:jp+r_h), intent(in) :: dy, dyn
-	real(sp), dimension(-l_h+1:kp+r_h), intent(in) :: dz, dzn, rhoa, rhoan
+	real(wp), intent(inout), dimension(nq) :: lbc, ubc
+	real(wp), dimension(-l_h+1:ip+r_h), intent(in) :: dx, dxn
+	real(wp), dimension(-l_h+1:jp+r_h), intent(in) :: dy, dyn
+	real(wp), dimension(-l_h+1:kp+r_h), intent(in) :: dz, dzn, rhoa, rhoan
 	logical, intent(in) :: monotone
 	integer(i4b), intent(in) :: neumann
 	
 	! locals
-	real(sp) :: u_div1, u_div2, u_div3, u_j_bar1, u_j_bar2, u_j_bar3, &
+	real(wp) :: u_div1, u_div2, u_div3, u_j_bar1, u_j_bar2, u_j_bar3, &
 			denom1, denom2, minlocal, psi_local_sum, psi_sum
-	real(sp), dimension(nq) :: minglobal
+	real(wp), dimension(nq) :: minglobal
 	integer(i4b) :: i,j,k, it, it2, n,error
-	real(sp), dimension(:,:,:), pointer :: ut
-	real(sp), dimension(:,:,:), pointer :: vt
-	real(sp), dimension(:,:,:), pointer :: wt
-	real(sp), dimension(:,:,:), pointer :: ut_sav
-	real(sp), dimension(:,:,:), pointer :: vt_sav
-	real(sp), dimension(:,:,:), pointer :: wt_sav
-	real(sp), dimension(:,:,:), pointer :: psi, psi_old
-	real(sp), dimension(-r_h+1:kp+r_h,-r_h+1:jp+r_h,-l_h+1:ip+r_h), target :: & 
+	real(wp), dimension(:,:,:), pointer :: ut
+	real(wp), dimension(:,:,:), pointer :: vt
+	real(wp), dimension(:,:,:), pointer :: wt
+	real(wp), dimension(:,:,:), pointer :: ut_sav
+	real(wp), dimension(:,:,:), pointer :: vt_sav
+	real(wp), dimension(:,:,:), pointer :: wt_sav
+	real(wp), dimension(:,:,:), pointer :: psi, psi_old
+	real(wp), dimension(-r_h+1:kp+r_h,-r_h+1:jp+r_h,-l_h+1:ip+r_h), target :: & 
 		u_store1, u_store2
-	real(sp), dimension(-r_h+1:kp+r_h,-l_h+1:jp+r_h,-r_h+1:ip+r_h), target :: &
+	real(wp), dimension(-r_h+1:kp+r_h,-l_h+1:jp+r_h,-r_h+1:ip+r_h), target :: &
 		v_store1, v_store2
-	real(sp), dimension(-l_h+1:kp+r_h,-r_h+1:jp+r_h,-r_h+1:ip+r_h), target :: &
+	real(wp), dimension(-l_h+1:kp+r_h,-r_h+1:jp+r_h,-r_h+1:ip+r_h), target :: &
 		w_store1, w_store2
-	real(sp), dimension(-r_h+1:kp+r_h,-r_h+1:jp+r_h,-r_h+1:ip+r_h,1:nq), target :: psi_store
-	real(sp), dimension(-r_h+1:kp+r_h,-r_h+1:jp+r_h,-r_h+1:ip+r_h) :: &
+	real(wp), dimension(-r_h+1:kp+r_h,-r_h+1:jp+r_h,-r_h+1:ip+r_h,1:nq), target :: psi_store
+	real(wp), dimension(-r_h+1:kp+r_h,-r_h+1:jp+r_h,-r_h+1:ip+r_h) :: &
 						psi_i_max, psi_i_min, psi_j_max,psi_j_min,psi_k_max,psi_k_min, &
 						beta_i_up, beta_i_down,&
 						beta_j_up, beta_j_down,&
@@ -1270,9 +1270,9 @@
  	    enddo
  	    return
 	endif
-	u_store2=0._sp
-	v_store2=0._sp
-	w_store2=0._sp
+	u_store2=0._wp
+	v_store2=0._wp
+	w_store2=0._wp
 	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 	! associate pointers to targets                                                      !
 	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -1340,69 +1340,69 @@
 						! equation 13 page 330 of smolarkiewicz (1984) 
 						! journal of computational physics
 						! second term of u wind:
-						u_j_bar1 = 0.5_sp*dt*ut(k,j,i) * ( &
+						u_j_bar1 = 0.5_wp*dt*ut(k,j,i) * ( &
 							! equation 14:
-							0.25_sp*(wt(k,j,i+1)+wt(k,j,i)+wt(k-1,j,i+1)+wt(k-1,j,i)) * &
+							0.25_wp*(wt(k,j,i+1)+wt(k,j,i)+wt(k-1,j,i+1)+wt(k-1,j,i)) * &
 							! equation 13:
 						   ( psi_old(k+1,j,i+1)+psi_old(k+1,j,i)- &
 						     psi_old(k-1,j,i+1)-psi_old(k-1,j,i) ) / &
 						   ( psi_old(k+1,j,i+1)+psi_old(k+1,j,i)+ &
 						     psi_old(k-1,j,i+1)+psi_old(k-1,j,i)+small ) / &
-						     ( 0.5_sp*(dzn(k-1)+dzn(k)) ) + &
+						     ( 0.5_wp*(dzn(k-1)+dzn(k)) ) + &
 						    ! repeat for y dimension:
 							! equation 14:
-							0.25_sp*(vt(k,j,i+1)+vt(k,j,i)+vt(k,j-1,i+1)+vt(k,j-1,i)) * &
+							0.25_wp*(vt(k,j,i+1)+vt(k,j,i)+vt(k,j-1,i+1)+vt(k,j-1,i)) * &
 							! equation 13:
 						   ( psi_old(k,j+1,i+1)+psi_old(k,j+1,i)- &
 						     psi_old(k,j-1,i+1)-psi_old(k,j-1,i) ) / &
 						   ( psi_old(k,j+1,i+1)+psi_old(k,j+1,i)+ &
 						     psi_old(k,j-1,i+1)+psi_old(k,j-1,i)+small ) / &
-						     ( 0.5_sp*(dyn(j-1)+dyn(j)) ) )
+						     ( 0.5_wp*(dyn(j-1)+dyn(j)) ) )
 						     
 						     
 						! equation 13 page 330 of smolarkiewicz (1984) 
 						! journal of computational physics
 						! second term of v wind:
-						u_j_bar2 = 0.5_sp*dt*vt(k,j,i) * ( &
+						u_j_bar2 = 0.5_wp*dt*vt(k,j,i) * ( &
 							! equation 14:
-							0.25_sp*(wt(k,j+1,i)+wt(k,j,i)+wt(k-1,j+1,i)+wt(k-1,j,i)) * &
+							0.25_wp*(wt(k,j+1,i)+wt(k,j,i)+wt(k-1,j+1,i)+wt(k-1,j,i)) * &
 							! equation 13:
 						   ( psi_old(k+1,j+1,i)+psi_old(k+1,j,i)- &
 						     psi_old(k-1,j+1,i)-psi_old(k-1,j,i) ) / &
 						   ( psi_old(k+1,j+1,i)+psi_old(k+1,j,i)+ &
 						     psi_old(k-1,j+1,i)+psi_old(k-1,j,i)+small ) / &
-						     ( 0.5_sp*(dzn(k-1)+dzn(k)) ) + &
+						     ( 0.5_wp*(dzn(k-1)+dzn(k)) ) + &
 						    ! repeat for y dimension:
 							! equation 14:
-							0.25_sp*(ut(k,j+1,i)+ut(k,j,i)+ut(k,j+1,i-1)+ut(k,j,i-1)) * &
+							0.25_wp*(ut(k,j+1,i)+ut(k,j,i)+ut(k,j+1,i-1)+ut(k,j,i-1)) * &
 							! equation 13:
 						   ( psi_old(k,j+1,i+1)+psi_old(k,j,i+1)- &
 						     psi_old(k,j+1,i-1)-psi_old(k,j,i-1) ) / &
 						   ( psi_old(k,j+1,i+1)+psi_old(k,j,i+1)+ &
 						     psi_old(k,j+1,i-1)+psi_old(k,j,i-1)+small ) / &
-						     ( 0.5_sp*(dxn(i-1)+dxn(i)) ) )
+						     ( 0.5_wp*(dxn(i-1)+dxn(i)) ) )
 						     
 						! equation 13 page 330 of smolarkiewicz (1984) 
 						! journal of computational physics
 						! second term of w wind:
-						u_j_bar3 = 0.5_sp*dt*wt(k,j,i) * ( &
+						u_j_bar3 = 0.5_wp*dt*wt(k,j,i) * ( &
 							! equation 14:
-							0.25_sp*(vt(k+1,j,i)+vt(k,j,i)+vt(k+1,j-1,i)+vt(k,j-1,i)) * &
+							0.25_wp*(vt(k+1,j,i)+vt(k,j,i)+vt(k+1,j-1,i)+vt(k,j-1,i)) * &
 							! equation 13:
 						   ( psi_old(k+1,j+1,i)+psi_old(k,j+1,i)- &
 						     psi_old(k+1,j-1,i)-psi_old(k,j-1,i) ) / &
 						   ( psi_old(k+1,j+1,i)+psi_old(k,j+1,i)+ &
 						     psi_old(k+1,j-1,i)+psi_old(k,j-1,i)+small ) / &
-						     ( 0.5_sp*(dyn(j-1)+dyn(j)) ) + &
+						     ( 0.5_wp*(dyn(j-1)+dyn(j)) ) + &
 						    ! repeat for y dimension:
 							! equation 14:
-							0.25_sp*(ut(k+1,j,i)+ut(k,j,i)+ut(k+1,j,i-1)+ut(k,j,i-1)) * &
+							0.25_wp*(ut(k+1,j,i)+ut(k,j,i)+ut(k+1,j,i-1)+ut(k,j,i-1)) * &
 							! equation 13:
 						   ( psi_old(k+1,j,i+1)+psi_old(k,j,i+1)- &
 						     psi_old(k+1,j,i-1)-psi_old(k,j,i-1) ) / &
 						   ( psi_old(k+1,j,i+1)+psi_old(k,j,i+1)+ &
 						     psi_old(k+1,j,i-1)+psi_old(k,j,i-1)+small ) / &
-						     ( 0.5_sp*(dxn(i-1)+dxn(i)) ) )
+						     ( 0.5_wp*(dxn(i-1)+dxn(i)) ) )
 						!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 
@@ -1431,11 +1431,11 @@
 						!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 						! last update of eq 38 smolarkiewicz 1984
 						!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-						ut_sav(k,j,i)=ut_sav(k,j,i) - 0.25_sp*dt*ut(k,j,i) * &
+						ut_sav(k,j,i)=ut_sav(k,j,i) - 0.25_wp*dt*ut(k,j,i) * &
 						 ( (ut(k,j,i+1)-ut(k,j,i-1))/(dx(i-1))+u_div1 )
-						vt_sav(k,j,i)=vt_sav(k,j,i) - 0.25_sp*dt*vt(k,j,i) * &
+						vt_sav(k,j,i)=vt_sav(k,j,i) - 0.25_wp*dt*vt(k,j,i) * &
 						 ( (vt(k,j+1,i)-vt(k,j-1,i))/(dy(j-1))+u_div2 )
-						wt_sav(k,j,i)=wt_sav(k,j,i) - 0.25_sp*dt*wt(k,j,i) * &
+						wt_sav(k,j,i)=wt_sav(k,j,i) - 0.25_wp*dt*wt(k,j,i) * &
 						 ( (wt(k+1,j,i)-wt(k-1,j,i))/(dz(k-1))+u_div3 )
 						!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
@@ -1466,11 +1466,11 @@
 			endif
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 			call exchange_full(comm3d, id, kp, jp, ip, r_h,r_h,r_h,r_h,l_h,r_h, &
-														ut,0._sp,0._sp,dims,coords)
+														ut,0._wp,0._wp,dims,coords)
 			call exchange_full(comm3d, id, kp, jp, ip, r_h,r_h,l_h,r_h,r_h,r_h, &
-														vt,0._sp,0._sp,dims,coords)
+														vt,0._wp,0._wp,dims,coords)
 			call exchange_full(comm3d, id, kp, jp, ip, l_h,r_h,r_h,r_h,r_h,r_h, &
-														wt,0._sp,0._sp,dims,coords)
+														wt,0._wp,0._wp,dims,coords)
 		endif
 		
 		
@@ -1543,20 +1543,20 @@
 			do i=1,ip
 				do j=1,jp
 					do k=1,kp		
-						denom1=(dt*((max(ut(k,j,i-1),0._sp)*psi_old(k,j,i-1)- &
-								  min(ut(k,j,i),0._sp)*psi_old(k,j,i+1))/dx(i-1)+ &
-							    (max(vt(k,j-1,i),0._sp)*psi_old(k,j-1,i)-&
-								  min(vt(k,j,i),0._sp)*psi_old(k,j+1,i))/dy(j-1) + &
-							    (max(wt(k-1,j,i),0._sp)*psi_old(k-1,j,i)-&
-								  min(wt(k,j,i),0._sp)*psi_old(k+1,j,i))/dz(k-1) &
+						denom1=(dt*((max(ut(k,j,i-1),0._wp)*psi_old(k,j,i-1)- &
+								  min(ut(k,j,i),0._wp)*psi_old(k,j,i+1))/dx(i-1)+ &
+							    (max(vt(k,j-1,i),0._wp)*psi_old(k,j-1,i)-&
+								  min(vt(k,j,i),0._wp)*psi_old(k,j+1,i))/dy(j-1) + &
+							    (max(wt(k-1,j,i),0._wp)*psi_old(k-1,j,i)-&
+								  min(wt(k,j,i),0._wp)*psi_old(k+1,j,i))/dz(k-1) &
 								  +small))
 								  
-						denom2=(dt*((max(ut(k,j,i),0._sp)*psi_old(k,j,i)- &
-							      min(ut(k,j,i-1),0._sp)*psi_old(k,j,i))/dx(i-1) + &
-								(max(vt(k,j,i),0._sp)*psi_old(k,j,i)-&
-								  min(vt(k,j-1,i),0._sp)*psi_old(k,j,i))/dy(j-1) + &
-								(max(wt(k,j,i),0._sp)*psi_old(k,j,i)-&
-								  min(wt(k-1,j,i),0._sp)*psi_old(k,j,i))/dz(k-1) &
+						denom2=(dt*((max(ut(k,j,i),0._wp)*psi_old(k,j,i)- &
+							      min(ut(k,j,i-1),0._wp)*psi_old(k,j,i))/dx(i-1) + &
+								(max(vt(k,j,i),0._wp)*psi_old(k,j,i)-&
+								  min(vt(k,j-1,i),0._wp)*psi_old(k,j,i))/dy(j-1) + &
+								(max(wt(k,j,i),0._wp)*psi_old(k,j,i)-&
+								  min(wt(k-1,j,i),0._wp)*psi_old(k,j,i))/dz(k-1) &
 								  +small))
 								  
 						beta_i_up(k,j,i)=(psi_i_max(k,j,i)-psi_old(k,j,i)) / denom1
@@ -1584,17 +1584,17 @@
 			! exchange halos for beta_i_up, down
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 			call exchange_along_dim(comm3d, id, kp, jp, ip, r_h,r_h,r_h,r_h,r_h,r_h, &
-													beta_i_up,0._sp,0._sp,dims,coords)
+													beta_i_up,0._wp,0._wp,dims,coords)
 			call exchange_along_dim(comm3d, id, kp, jp, ip, r_h,r_h,r_h,r_h,r_h,r_h, &
-													beta_i_down,0._sp,0._sp,dims,coords)
+													beta_i_down,0._wp,0._wp,dims,coords)
 			call exchange_along_dim(comm3d, id, kp, jp, ip, r_h,r_h,r_h,r_h,r_h,r_h, &
-													beta_j_up,0._sp,0._sp,dims,coords)
+													beta_j_up,0._wp,0._wp,dims,coords)
 			call exchange_along_dim(comm3d, id, kp, jp, ip, r_h,r_h,r_h,r_h,r_h,r_h, &
-													beta_j_down,0._sp,0._sp,dims,coords)
+													beta_j_down,0._wp,0._wp,dims,coords)
 			call exchange_along_dim(comm3d, id, kp, jp, ip, r_h,r_h,r_h,r_h,r_h,r_h, &
-													beta_k_up,0._sp,0._sp,dims,coords)
+													beta_k_up,0._wp,0._wp,dims,coords)
 			call exchange_along_dim(comm3d, id, kp, jp, ip, r_h,r_h,r_h,r_h,r_h,r_h, &
-													beta_k_down,0._sp,0._sp,dims,coords)
+													beta_k_down,0._wp,0._wp,dims,coords)
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 								
@@ -1605,18 +1605,18 @@
 			do i=1,ip
 				do j=1,jp
 					do k=1,kp			
-						ut_sav(k,j,i)=min(1._sp,beta_i_down(k,j,i), &
-										 beta_i_up(k,j,i+1))*max(ut(k,j,i),0._sp) + &
-									  min(1._sp,beta_i_up(k,j,i), &
-									     beta_i_down(k,j,i+1))*min(ut(k,j,i),0._sp)
-						vt_sav(k,j,i)=min(1._sp,beta_j_down(k,j,i), &
-										 beta_j_up(k,j+1,i))*max(vt(k,j,i),0._sp) + &
-									  min(1._sp,beta_j_up(k,j,i), &
-									     beta_j_down(k,j+1,i))*min(vt(k,j,i),0._sp)
-						wt_sav(k,j,i)=min(1._sp,beta_k_down(k,j,i), &
-										 beta_k_up(k+1,j,i))*max(wt(k,j,i),0._sp) + &
-									  min(1._sp,beta_k_up(k,j,i), &
-									     beta_k_down(k+1,j,i))*min(wt(k,j,i),0._sp)
+						ut_sav(k,j,i)=min(1._wp,beta_i_down(k,j,i), &
+										 beta_i_up(k,j,i+1))*max(ut(k,j,i),0._wp) + &
+									  min(1._wp,beta_i_up(k,j,i), &
+									     beta_i_down(k,j,i+1))*min(ut(k,j,i),0._wp)
+						vt_sav(k,j,i)=min(1._wp,beta_j_down(k,j,i), &
+										 beta_j_up(k,j+1,i))*max(vt(k,j,i),0._wp) + &
+									  min(1._wp,beta_j_up(k,j,i), &
+									     beta_j_down(k,j+1,i))*min(vt(k,j,i),0._wp)
+						wt_sav(k,j,i)=min(1._wp,beta_k_down(k,j,i), &
+										 beta_k_up(k+1,j,i))*max(wt(k,j,i),0._wp) + &
+									  min(1._wp,beta_k_up(k,j,i), &
+									     beta_k_down(k+1,j,i))*min(wt(k,j,i),0._wp)
 					enddo
 				enddo
 			enddo 
@@ -1634,11 +1634,11 @@
 			wt_sav => w_store1
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 			call exchange_full(comm3d, id, kp, jp, ip, r_h,r_h,r_h,r_h,l_h,r_h, &
-														ut,0._sp,0._sp,dims,coords)
+														ut,0._wp,0._wp,dims,coords)
 			call exchange_full(comm3d, id, kp, jp, ip, r_h,r_h,l_h,r_h,r_h,r_h, &
-														vt,0._sp,0._sp,dims,coords)
+														vt,0._wp,0._wp,dims,coords)
 			call exchange_full(comm3d, id, kp, jp, ip, l_h,r_h,r_h,r_h,r_h,r_h, &
-														wt,0._sp,0._sp,dims,coords)
+														wt,0._wp,0._wp,dims,coords)
 
 		endif
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -1714,7 +1714,7 @@
 						ip,jp,kp,nq,l_h,r_h,w,psi_in,lbc,ubc, &
 						kord,monotone, neumann,comm3d, id, &
 						dims,coords)
-	use nrtype
+	use numerics_type
 	use mpi_module
 	use mpi
 	
@@ -1723,29 +1723,29 @@
 	
 	integer(i4b), intent(in) :: id, comm3d
 	integer(i4b), dimension(3), intent(in) :: dims, coords
-	real(sp), intent(in) :: dt
+	real(wp), intent(in) :: dt
 	integer(i4b), intent(in) :: ip, jp, kp, nq,l_h, r_h,kord
-	real(sp), dimension(-l_h+1:kp+r_h,-r_h+1:jp+r_h,-r_h+1:ip+r_h), &
+	real(wp), dimension(-l_h+1:kp+r_h,-r_h+1:jp+r_h,-r_h+1:ip+r_h), &
 		intent(in), target :: w
-	real(sp), dimension(-r_h+1:kp+r_h,-r_h+1:jp+r_h,-r_h+1:ip+r_h,1:nq), &
+	real(wp), dimension(-r_h+1:kp+r_h,-r_h+1:jp+r_h,-r_h+1:ip+r_h,1:nq), &
 		intent(inout), target :: psi_in
-	real(sp), intent(inout), dimension(nq) :: lbc, ubc
-	real(sp), dimension(-l_h+1:kp+r_h), intent(in) :: dz, dzn, rhoa, rhoan
+	real(wp), intent(inout), dimension(nq) :: lbc, ubc
+	real(wp), dimension(-l_h+1:kp+r_h), intent(in) :: dz, dzn, rhoa, rhoan
 	logical, intent(in) :: monotone
 	integer(i4b), intent(in) :: neumann
 	
 	! locals
-	real(sp) :: u_div3, u_j_bar3, &
+	real(wp) :: u_div3, u_j_bar3, &
 			denom1, denom2, minlocal, psi_local_sum, psi_sum
-	real(sp), dimension(nq) :: minglobal
+	real(wp), dimension(nq) :: minglobal
 	integer(i4b) :: i,j,k, it, it2, n,error
-	real(sp), dimension(:,:,:), pointer :: wt
-	real(sp), dimension(:,:,:), pointer :: wt_sav
-	real(sp), dimension(:,:,:), pointer :: psi, psi_old
-	real(sp), dimension(-l_h+1:kp+r_h,-r_h+1:jp+r_h,-r_h+1:ip+r_h), target :: &
+	real(wp), dimension(:,:,:), pointer :: wt
+	real(wp), dimension(:,:,:), pointer :: wt_sav
+	real(wp), dimension(:,:,:), pointer :: psi, psi_old
+	real(wp), dimension(-l_h+1:kp+r_h,-r_h+1:jp+r_h,-r_h+1:ip+r_h), target :: &
 		w_store1, w_store2
-	real(sp), dimension(-r_h+1:kp+r_h,-r_h+1:jp+r_h,-r_h+1:ip+r_h,1:nq), target :: psi_store
-	real(sp), dimension(-r_h+1:kp+r_h,-r_h+1:jp+r_h,-r_h+1:ip+r_h) :: &
+	real(wp), dimension(-r_h+1:kp+r_h,-r_h+1:jp+r_h,-r_h+1:ip+r_h,1:nq), target :: psi_store
+	real(wp), dimension(-r_h+1:kp+r_h,-r_h+1:jp+r_h,-r_h+1:ip+r_h) :: &
 						psi_k_max,psi_k_min, &
 						beta_k_up, beta_k_down
 	
@@ -1769,7 +1769,7 @@
  	    enddo
  	    return
 	endif
-	w_store2=0._sp
+	w_store2=0._wp
 	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 	! associate pointers to targets                                                      !
 	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -1805,7 +1805,7 @@
 						!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 						! for divergent flow: eq 38 smolarkiewicz 1984 
 						! last part of w wind:
-						u_div3=0._sp
+						u_div3=0._wp
 						!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 
@@ -1815,7 +1815,7 @@
 						! equation 13 page 330 of smolarkiewicz (1984) 
 						! journal of computational physics
 						! second term of w wind:
-						u_j_bar3 = 0._sp
+						u_j_bar3 = 0._wp
 						!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 
@@ -1837,7 +1837,7 @@
 						!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 						! last update of eq 38 smolarkiewicz 1984
 						!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-						wt_sav(k,j,i)=wt_sav(k,j,i) - 0.25_sp*dt*wt(k,j,i) * &
+						wt_sav(k,j,i)=wt_sav(k,j,i) - 0.25_wp*dt*wt(k,j,i) * &
 						 ( (wt(k+1,j,i)-wt(k-1,j,i))/(dz(k-1))+u_div3 )
 						!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
@@ -1860,7 +1860,7 @@
 			endif
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 			call exchange_along_z(comm3d, id, kp, jp, ip, l_h,r_h,r_h,r_h,r_h,r_h, &
-														wt,0._sp,0._sp,dims,coords)
+														wt,0._wp,0._wp,dims,coords)
 		endif
 		
 		
@@ -1904,12 +1904,12 @@
 			do i=1,ip
 				do j=1,jp
 					do k=1,kp		
-						denom1=(dt*((max(wt(k-1,j,i),0._sp)*psi_old(k-1,j,i)-&
-								  min(wt(k,j,i),0._sp)*psi_old(k+1,j,i))/dz(k-1) &
+						denom1=(dt*((max(wt(k-1,j,i),0._wp)*psi_old(k-1,j,i)-&
+								  min(wt(k,j,i),0._wp)*psi_old(k+1,j,i))/dz(k-1) &
 								  +small))
 								  
-						denom2=(dt*((max(wt(k,j,i),0._sp)*psi_old(k,j,i)-&
-								  min(wt(k-1,j,i),0._sp)*psi_old(k,j,i))/dz(k-1) &
+						denom2=(dt*((max(wt(k,j,i),0._wp)*psi_old(k,j,i)-&
+								  min(wt(k-1,j,i),0._wp)*psi_old(k,j,i))/dz(k-1) &
 								  +small))
 								  
 						beta_k_up(k,j,i)=(psi_k_max(k,j,i)-psi_old(k,j,i)) / denom1
@@ -1927,9 +1927,9 @@
 			! exchange halos for beta_i_up, down
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 			call exchange_along_z(comm3d, id, kp, jp, ip, r_h,r_h,r_h,r_h,r_h,r_h, &
-													beta_k_up,0._sp,0._sp,dims,coords)
+													beta_k_up,0._wp,0._wp,dims,coords)
 			call exchange_along_z(comm3d, id, kp, jp, ip, r_h,r_h,r_h,r_h,r_h,r_h, &
-													beta_k_down,0._sp,0._sp,dims,coords)
+													beta_k_down,0._wp,0._wp,dims,coords)
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 								
@@ -1940,10 +1940,10 @@
 			do i=1,ip
 				do j=1,jp
 					do k=1,kp			
-						wt_sav(k,j,i)=min(1._sp,beta_k_down(k,j,i), &
-										 beta_k_up(k+1,j,i))*max(wt(k,j,i),0._sp) + &
-									  min(1._sp,beta_k_up(k,j,i), &
-									     beta_k_down(k+1,j,i))*min(wt(k,j,i),0._sp)
+						wt_sav(k,j,i)=min(1._wp,beta_k_down(k,j,i), &
+										 beta_k_up(k+1,j,i))*max(wt(k,j,i),0._wp) + &
+									  min(1._wp,beta_k_up(k,j,i), &
+									     beta_k_down(k+1,j,i))*min(wt(k,j,i),0._wp)
 					enddo
 				enddo
 			enddo 
@@ -1957,7 +1957,7 @@
 			wt_sav => w_store1
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 			call exchange_along_z(comm3d, id, kp, jp, ip, l_h,r_h,r_h,r_h,r_h,r_h, &
-														wt,0._sp,0._sp,dims,coords)
+														wt,0._wp,0._wp,dims,coords)
 
 		endif
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!

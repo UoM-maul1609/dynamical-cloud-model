@@ -3,7 +3,7 @@
 	!>@brief
 	!>variables for the dynamical cloud model
     module variables
-    use nrtype
+    use numerics_type
 	!>@author
 	!>Paul J. Connolly, The University of Manchester
 	!>@brief
@@ -20,10 +20,10 @@
             integer(i4b) :: ip, jp, kp, ntim, l_halo, r_halo, ipstart, jpstart, kpstart, &
                             nq=n_q
             integer(i4b), dimension(3) :: coords
-            real(sp) :: f, re, g, dt
-            real(sp), dimension(:,:,:), allocatable :: u,v, w
-            real(sp), dimension(:,:,:,:), allocatable :: q
-            real(sp), dimension(:), allocatable ::	dx, dy, dz, dxn,dyn,dzn, &
+            real(wp) :: f, re, g, dt
+            real(wp), dimension(:,:,:), allocatable :: u,v, w
+            real(wp), dimension(:,:,:,:), allocatable :: q
+            real(wp), dimension(:), allocatable ::	dx, dy, dz, dxn,dyn,dzn, &
             										x, y, z, xn,yn,zn, &
             										rhoa, rhoan,lamsq, lamsqn, &
             										lbc,ubc
@@ -39,10 +39,10 @@
             integer(i4b) :: ip, jp, kp, ntim, l_halo, r_halo, ipstart, jpstart, kpstart, &
                             nq=n_q
             integer(i4b), dimension(3) :: coords
-            real(sp) :: f, re, g, dt
-            real(sp), dimension(:), allocatable :: u,v, w
-            real(sp), dimension(:,:), allocatable :: q
-            real(sp), dimension(:), allocatable ::	dx, dy, dz, dxn,dyn,dzn, &
+            real(wp) :: f, re, g, dt
+            real(wp), dimension(:), allocatable :: u,v, w
+            real(wp), dimension(:,:), allocatable :: q
+            real(wp), dimension(:), allocatable ::	dx, dy, dz, dxn,dyn,dzn, &
             										x, y, z, xn,yn,zn, &
             										rhoa, rhoan,lamsq, lamsqn
             										 
@@ -58,10 +58,10 @@
             integer(i4b) :: ip, jp, kp, ntim, l_halo, r_halo, ipstart, jpstart, kpstart, &
                             nq=n_q
             integer(i4b), dimension(3) :: coords
-            real(sp) :: f, re, g, dt
-            real(sp), dimension(:,:), allocatable :: u,v, w
-            real(sp), dimension(:,:,:), allocatable :: q
-            real(sp), dimension(:), allocatable ::	dx, dy, dz, dxn,dyn,dzn, &
+            real(wp) :: f, re, g, dt
+            real(wp), dimension(:,:), allocatable :: u,v, w
+            real(wp), dimension(:,:,:), allocatable :: q
+            real(wp), dimension(:), allocatable ::	dx, dy, dz, dxn,dyn,dzn, &
             										x, y, z, xn,yn,zn, &
             										rhoa, rhoan,lamsq, lamsqn
             										 
@@ -84,16 +84,16 @@
             			dissipate_h, nudge, restart, &
             			monotone
             integer(i4b) :: ip, jp, kp, subgrid_model, advection_scheme, kord, neumann
-            real(sp) :: vis, &
+            real(wp) :: vis, &
             			runtime, dt, output_interval, &
             			rotation_period_hours, &
             			nudge_timescale, &
             			cvis,  &
             			dx, dy, dz
-            real(sp) :: psurf,tsurf
+            real(wp) :: psurf,tsurf
             integer(i4b) :: n_levels
-            real(sp), dimension(n_lev) :: theta_read, z_read
-            real(sp), dimension(n_q,n_lev) :: q_read
+            real(wp), dimension(n_lev) :: theta_read, z_read
+            real(wp), dimension(n_q,n_lev) :: q_read
         end type namelist_input
 
 

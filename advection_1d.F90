@@ -3,11 +3,11 @@
 	!>@brief
 	!>advection code 
     module advection_s_1d
-    use nrtype
+    use numerics_type
     
     private
     public :: mpdata_1d, mpdata_vec_1d, first_order_upstream_1d
-    real(sp), parameter :: small=1e-60_sp
+    real(wp), parameter :: small=1e-60_wp
 			
 	contains
 	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -25,30 +25,30 @@
 	!>@param[inout] psi
 	!>@param[in] neumann: boundary condition flag for advection schemes
 	subroutine first_order_upstream_1d(dt,dzn,rhoa,rhoan, kp,l_h,r_h,w,psi,neumann)
-	use nrtype
+	use numerics_type
 	implicit none
-	real(sp), intent(in) :: dt
+	real(wp), intent(in) :: dt
 	integer(i4b), intent(in) :: kp, l_h, r_h
-	real(sp), dimension(-l_h+1:kp+r_h), &
+	real(wp), dimension(-l_h+1:kp+r_h), &
 		intent(in) :: w
-	real(sp), dimension(-r_h+1:kp+r_h), &
+	real(wp), dimension(-r_h+1:kp+r_h), &
 		intent(inout) :: psi
-	real(sp), dimension(-l_h+1:kp+r_h), intent(in) :: dzn, rhoa, rhoan
+	real(wp), dimension(-l_h+1:kp+r_h), intent(in) :: dzn, rhoa, rhoan
 	integer(i4b), intent(in) :: neumann
 	
 	! locals
-	real(sp), dimension(kp) :: fz_r, fz_l
+	real(wp), dimension(kp) :: fz_r, fz_l
 	integer(i4b) :: k
 
 !$omp simd	
     do k=1,kp
         fz_r(k)=( (w(k)+abs(w(k)))*rhoa(k)*psi(k)+ &
             (w(k)-abs(w(k)))*rhoan(k+1)*psi(k+1) )*dt/ &
-            (2._sp*dzn(k)*rhoa(k))
+            (2._wp*dzn(k)*rhoa(k))
 
         fz_l(k)=( (w(k-1)+abs(w(k-1)))*rhoa(k-1)*psi(k-1)+ &
             (w(k-1)-abs(w(k-1)))*rhoan(k)*psi(k) )*dt/ &
-            (2._sp*dzn(k)*rhoa(k))
+            (2._wp*dzn(k)*rhoa(k))
     enddo
 !$omp end simd
 	
@@ -100,7 +100,7 @@
 						rhoa,rhoan,kp,l_h,r_h,w,psi_in,kord,monotone, neumann, &
 						boundary_cond)
 #endif
-	use nrtype
+	use numerics_type
 #ifdef MPI
 	use mpi_module
 	use mpi
@@ -111,30 +111,30 @@
 	integer(i4b), intent(in) :: id, comm3d
 	integer(i4b), dimension(1), intent(in) :: dims, coords
 #endif
-	real(sp), intent(in) :: dt
+	real(wp), intent(in) :: dt
 	integer(i4b), intent(in) :: kp, l_h, r_h,kord
-	real(sp), dimension(-l_h+1:kp+r_h), &
+	real(wp), dimension(-l_h+1:kp+r_h), &
 		intent(in), target :: w
-	real(sp), dimension(-r_h+1:kp+r_h), &
+	real(wp), dimension(-r_h+1:kp+r_h), &
 		intent(inout), target :: psi_in
-	real(sp), dimension(-l_h+1:kp+r_h), intent(in) :: dz, dzn, rhoa,rhoan
+	real(wp), dimension(-l_h+1:kp+r_h), intent(in) :: dz, dzn, rhoa,rhoan
 	logical, intent(in) :: monotone
 	integer(i4b), intent(in) :: neumann
 	integer(i4b), intent(in) :: boundary_cond
 	
 	! locals
-	real(sp) :: u_div3, u_j_bar3, &
+	real(wp) :: u_div3, u_j_bar3, &
 			denom1, denom2, minlocal, minglobal, psi_local_sum, psi_sum
 	integer(i4b) :: i,j,k, it, it2, error
-	real(sp), dimension(:), pointer :: wt
-	real(sp), dimension(:), pointer :: wt_sav
-	real(sp), dimension(:), pointer :: psi, psi_old
-	real(sp), dimension(-r_h+1:kp+r_h), target :: & 
+	real(wp), dimension(:), pointer :: wt
+	real(wp), dimension(:), pointer :: wt_sav
+	real(wp), dimension(:), pointer :: psi, psi_old
+	real(wp), dimension(-r_h+1:kp+r_h), target :: & 
 		u_store1, u_store2
-	real(sp), dimension(-l_h+1:kp+r_h), target :: &
+	real(wp), dimension(-l_h+1:kp+r_h), target :: &
 		w_store1, w_store2
-	real(sp), dimension(-r_h+1:kp+r_h), target :: psi_store
-	real(sp), dimension(-r_h+1:kp+r_h) :: &
+	real(wp), dimension(-r_h+1:kp+r_h), target :: psi_store
+	real(wp), dimension(-r_h+1:kp+r_h) :: &
 						psi_k_max,psi_k_min, &
 						beta_k_up, beta_k_down
 	
@@ -158,7 +158,7 @@
  	    psi_in(:)=psi_in(:)+minglobal
      	return
 	endif
-	w_store2=0._sp
+	w_store2=0._wp
 	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 	! associate pointers to targets                                                      !
 	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -195,7 +195,7 @@
                 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
                 ! for divergent flow: eq 38 smolarkiewicz 1984 
                 ! last part of w wind:
-                u_div3=0._sp 
+                u_div3=0._wp 
                 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 
@@ -205,7 +205,7 @@
                 ! equation 13 page 330 of smolarkiewicz (1984) 
                 ! journal of computational physics
                 ! second term of w wind:
-                u_j_bar3 = 0._sp
+                u_j_bar3 = 0._wp
                 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 
@@ -223,7 +223,7 @@
                 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
                 ! last update of eq 38 smolarkiewicz 1984
                 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-                wt_sav(k)=wt_sav(k) - 0.25_sp*dt*wt(k) * &
+                wt_sav(k)=wt_sav(k) - 0.25_wp*dt*wt(k) * &
                  ( (wt(k+1)-wt(k-1))/(dz(k-1))+u_div3 )
                 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
@@ -289,12 +289,12 @@
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !$omp simd	
             do k=1,kp		
-                denom1=(dt*((max(wt(k-1),0._sp)*psi_old(k-1)-&
-                          min(wt(k),0._sp)*psi_old(k+1))/dz(k-1) &
+                denom1=(dt*((max(wt(k-1),0._wp)*psi_old(k-1)-&
+                          min(wt(k),0._wp)*psi_old(k+1))/dz(k-1) &
                           +small))
                           
-                denom2=(dt*((max(wt(k),0._sp)*psi_old(k)-&
-                          min(wt(k-1),0._sp)*psi_old(k))/dz(k-1) &
+                denom2=(dt*((max(wt(k),0._wp)*psi_old(k)-&
+                          min(wt(k-1),0._wp)*psi_old(k))/dz(k-1) &
                           +small))
                           
                 beta_k_up(k)=(psi_k_max(k)-psi_old(k)) / denom1
@@ -331,10 +331,10 @@
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !$omp simd	
             do k=1,kp			
-                wt_sav(k)=min(1._sp,beta_k_down(k), &
-                                 beta_k_up(k+1))*max(wt(k),0._sp) + &
-                              min(1._sp,beta_k_up(k), &
-                                 beta_k_down(k+1))*min(wt(k),0._sp)
+                wt_sav(k)=min(1._wp,beta_k_down(k), &
+                                 beta_k_up(k+1))*max(wt(k),0._wp) + &
+                              min(1._wp,beta_k_up(k), &
+                                 beta_k_down(k+1))*min(wt(k),0._wp)
             enddo
 !$omp end simd
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -380,8 +380,8 @@
 !             psi_old(:,-l_h+1:0)=psi_old(:,ip-l_h+1:ip)
             select case(boundary_cond)
                 case(0) ! nothing top and bottom
-                    psi_old(0)=0._sp
-                    psi_old(kp+1)=0._sp
+                    psi_old(0)=0._wp
+                    psi_old(kp+1)=0._wp
                 case(1) ! same top and bottom
                     psi_old(0)=psi_old(1)
                     psi_old(kp+1)=psi_old(kp)                  
@@ -440,7 +440,7 @@
 	subroutine mpdata_vec_1d(dt,dz,dzn,&
 						rhoa,rhoan,kp,nq,l_h,r_h,w,psi_in,kord,monotone,neumann)
 #endif
-	use nrtype
+	use numerics_type
 #ifdef MPI
 	use mpi_module
 	use mpi
@@ -451,28 +451,28 @@
 	integer(i4b), intent(in) :: id, comm3d
 	integer(i4b), dimension(1), intent(in) :: dims, coords
 #endif
-	real(sp), intent(in) :: dt
+	real(wp), intent(in) :: dt
 	integer(i4b), intent(in) :: kp, nq,l_h, r_h,kord
-	real(sp), dimension(-l_h+1:kp+r_h), &
+	real(wp), dimension(-l_h+1:kp+r_h), &
 		intent(in), target :: w
-	real(sp), dimension(-r_h+1:kp+r_h,1:nq), &
+	real(wp), dimension(-r_h+1:kp+r_h,1:nq), &
 		intent(inout), target :: psi_in
-	real(sp), dimension(-l_h+1:kp+r_h), intent(in) :: dz, dzn, rhoa, rhoan
+	real(wp), dimension(-l_h+1:kp+r_h), intent(in) :: dz, dzn, rhoa, rhoan
 	logical, intent(in) :: monotone
 	integer(i4b), intent(in) :: neumann
 	
 	! locals
-	real(sp) :: u_div3, u_j_bar3, &
+	real(wp) :: u_div3, u_j_bar3, &
 			denom1, denom2, minlocal, psi_local_sum, psi_sum
-	real(sp), dimension(nq) :: minglobal
+	real(wp), dimension(nq) :: minglobal
 	integer(i4b) :: i,k, it, it2, n,error
-	real(sp), dimension(:), pointer :: wt
-	real(sp), dimension(:), pointer :: wt_sav
-	real(sp), dimension(:), pointer :: psi, psi_old
-	real(sp), dimension(-l_h+1:kp+r_h), target :: &
+	real(wp), dimension(:), pointer :: wt
+	real(wp), dimension(:), pointer :: wt_sav
+	real(wp), dimension(:), pointer :: psi, psi_old
+	real(wp), dimension(-l_h+1:kp+r_h), target :: &
 		w_store1, w_store2
-	real(sp), dimension(-r_h+1:kp+r_h,1:nq), target :: psi_store
-	real(sp), dimension(-r_h+1:kp+r_h) :: &
+	real(wp), dimension(-r_h+1:kp+r_h,1:nq), target :: psi_store
+	real(wp), dimension(-r_h+1:kp+r_h) :: &
 						psi_k_max,psi_k_min, &
 						beta_k_up, beta_k_down
 	
@@ -500,7 +500,7 @@
      	enddo
      	return
 	endif
-	w_store2=0._sp
+	w_store2=0._wp
 	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 	! associate pointers to targets                                                      !
 	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -536,7 +536,7 @@
                 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
                 ! for divergent flow: eq 38 smolarkiewicz 1984 
                 ! last part of w wind:
-                u_div3=0._sp 
+                u_div3=0._wp 
                 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 
@@ -546,7 +546,7 @@
                 ! equation 13 page 330 of smolarkiewicz (1984) 
                 ! journal of computational physics
                 ! second term of w wind:
-                u_j_bar3 = 0._sp
+                u_j_bar3 = 0._wp
                 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 
@@ -564,7 +564,7 @@
                 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
                 ! last update of eq 38 smolarkiewicz 1984
                 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-                wt_sav(k)=wt_sav(k) - 0.25_sp*dt*wt(k) * &
+                wt_sav(k)=wt_sav(k) - 0.25_wp*dt*wt(k) * &
                  ( (wt(k+1)-wt(k-1))/(dz(k-1))+u_div3 )
                 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
@@ -632,12 +632,12 @@
 !$omp simd	
             do k=1,kp	
                 	
-                denom1=dt*((max(wt(k-1),0._sp)*psi_old(k-1)-&
-                          min(wt(k),0._sp)*psi_old(k+1))/dz(k-1) &
+                denom1=dt*((max(wt(k-1),0._wp)*psi_old(k-1)-&
+                          min(wt(k),0._wp)*psi_old(k+1))/dz(k-1) &
                           +small)
                           
-                denom2=dt*((max(wt(k),0._sp)*psi_old(k)-&
-                          min(wt(k-1),0._sp)*psi_old(k))/dz(k-1) &
+                denom2=dt*((max(wt(k),0._wp)*psi_old(k)-&
+                          min(wt(k-1),0._wp)*psi_old(k))/dz(k-1) &
                           +small)
                           
 
@@ -673,10 +673,10 @@
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !$omp simd	
             do k=1,kp			
-                wt_sav(k)=min(1._sp,beta_k_down(k), &
-                                 beta_k_up(k+1))*max(wt(k),0._sp) + &
-                              min(1._sp,beta_k_up(k), &
-                                 beta_k_down(k+1))*min(wt(k),0._sp)
+                wt_sav(k)=min(1._wp,beta_k_down(k), &
+                                 beta_k_up(k+1))*max(wt(k),0._wp) + &
+                              min(1._wp,beta_k_up(k), &
+                                 beta_k_down(k+1))*min(wt(k),0._wp)
             enddo
 !$omp end simd
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -717,8 +717,8 @@
     ! 									psi_old,dims,coords)
                 ! halos
     !             psi_old(:,-l_h+1:0)=psi_old(:,ip-l_h+1:ip)
-                psi_in(0,n)=0._sp
-                psi_in(kp+1,n)=0._sp
+                psi_in(0,n)=0._wp
+                psi_in(kp+1,n)=0._wp
                 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!			
     		endif		
         enddo
