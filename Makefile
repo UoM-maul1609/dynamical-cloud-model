@@ -48,7 +48,6 @@ main.exe	:  main.$(OBJ) variables.$(OBJ) mpi_module.$(OBJ) \
 	    diagnostics.$(OBJ) \
 		 initialisation.$(OBJ) driver_code.$(OBJ) \
 		  dynamics.$(OBJ) \
-		  $(SFVT_DIR)/model_lib.a \
 		  $(SGM_DIR)/sg_model_lib.a \
 		  $(PAMM_DIR)/pmicro_lib.a \
 		  $(RTM_DIR)/rtm_lib.a \
