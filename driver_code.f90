@@ -553,12 +553,12 @@
 	    
 		! write variable: th
 		call check( nf90_inq_varid(ncid, "flux_u", varid ) )
-		call check( nf90_put_var(ncid, varid, flux_u(1:kpp,1:jpp,1:ipp,1:nbands), &
+		call check( nf90_put_var(ncid, varid, real(flux_u(1:kpp,1:jpp,1:ipp,1:nbands),sp), &
 					start = (/kpstart,jpstart,ipstart,1,n/)))	
 
 		! write variable: u
 		call check( nf90_inq_varid(ncid, "flux_d", varid ) )
-		call check( nf90_put_var(ncid, varid, flux_d(1:kpp,1:jpp,1:ipp,1:nbands), &
+		call check( nf90_put_var(ncid, varid, real(flux_d(1:kpp,1:jpp,1:ipp,1:nbands),sp), &
 					start = (/kpstart,jpstart,ipstart,1,n/)))
 
 		! write variable: v
