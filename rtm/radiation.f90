@@ -55,8 +55,8 @@
             integer(i4b) :: nmolecule = 8
             integer(i4b), dimension(20) :: moleculeID
             real(wp), dimension(20) :: moleculePPM
-            real(wp), dimension(20) :: lambda_read_s
-            real(wp), dimension(20) :: lambda_read_l
+            real(wp), dimension(100) :: lambda_read_s
+            real(wp), dimension(100) :: lambda_read_l
             real(wp) :: lambda_s_low, lambda_s_high, lambda_l_low, lambda_l_high
             logical :: gas_absorption=.false.
         end type namelist_rad

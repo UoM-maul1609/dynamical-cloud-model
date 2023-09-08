@@ -105,22 +105,62 @@ h2ohigh=0.03
 Pcalc=np.linspace(plow,phigh,npress)
 Tcalc=np.linspace(tlow,thigh,ntemp)
 h2ocalc=np.linspace(h2olow,h2ohigh,nh2o)
-lambdas=np.array([100.e-9,200.e-9,300.e-9,350.e-9,400.e-9,450.e-9,\
-         500.e-9,550.e-9,600.e-9,700.e-9,800.e-9,900.e-9,\
-         1000.e-9,1100.e-9,1200.e-9,1300.e-9,1400.e-9,10500.e-9,\
-        16000.e-9,120000.e-9])
-# lambdas=np.logspace(-7,-3,50)
-lambdalow=10.e-9
-lambdahigh=150000.e-9
+
+
+gen_flag=2
+
+if gen_flag == 1:
+	lambdas=np.array([100.e-9,200.e-9,300.e-9,350.e-9,400.e-9,450.e-9,\
+			 500.e-9,550.e-9,600.e-9,700.e-9,800.e-9,900.e-9,\
+			 1000.e-9,1100.e-9,1200.e-9,1300.e-9,1400.e-9,10500.e-9,\
+			16000.e-9,120000.e-9])
+	# lambdas=np.logspace(-7,-3,50)
+	lambdalow=10.e-9
+	lambdahigh=150000.e-9
+
+	lambda_low=np.zeros((len(lambdas),))
+	lambda_high=np.zeros((len(lambdas),))
+	lambda_low[0]=lambdalow
+	lambda_low[1:]=[(lambdas[i+1]+lambdas[i])/2. for i in range(len(lambdas)-1)]
+	lambda_high[-1]=lambdahigh
+	lambda_high[0:-1]=[(lambdas[i+1]+lambdas[i])/2. for i in range(len(lambdas)-1)]
+
+	lambda_low[10]=705e-9
+	lambda_high[9]=705e-9
+
+elif gen_flag == 2:
+	lambdas=np.array([0.165, 0.175,0.1825,0.1875,0.1925,0.1975,0.2025,0.2075,0.2125,\
+				0.2175,0.2225,0.2275,0.2325,0.2375,0.2425,0.2475,0.2525,0.2575, \
+				0.2625,0.2675,0.2725,0.2775,0.2825,0.2875,0.2925,0.2975,0.302,0.305,\
+				0.307,0.309,0.311,0.313,0.315,0.3175,0.3225,0.3275,0.3325,0.3375, \
+				0.3425,0.3475,0.3525,0.3575,0.3625,0.3675,0.3725,0.3775,0.3825,0.3875,\
+				0.3925,0.3975,0.4025,0.4075,0.4125,0.4175,0.4225,0.4275,0.435,0.445, \
+				0.455,0.465,0.475,0.485,0.495,0.505,0.515,0.525,0.535,0.545,0.555, \
+				0.565,0.575,0.585,0.595,0.605,0.615,0.625,0.635,0.645,0.655,0.665, \
+				0.695,0.705,0.730,0.750,0.770,0.790,0.805,0.82,0.85,0.90,0.95,1.00, \
+				1.05,1.10,1.15,1.2,1.4,1.6,1.8,2.0,2.5,3.0,3.5,4.0,4.5,5.0,5.5,6.0, \
+				6.5,7.0,7.5,8.0,8.5,9.0,9.5,10.0,10.5,11.0,11.5,12.0,12.5,13.0,13.5, \
+				14.0,14.5,15.0,15.5,16.0,16.5,17.0,17.5,18.0,18.5,19.0,19.5,20.,22., \
+				25.,30.,35.,40.,50.,70.,100.,200.,300,500,700.,1000])*1.e-6
+	lambdalow=165.e-9
+	lambdahigh=1000000.e-9
+	
+	lambda_low=lambdas[0:-1]
+	lambda_high=lambdas[1:]
+	
+	# redefine lambdas - which are the mid-points in this version
+	lambdas = np.zeros_like(lambda_low)
+	lambdas[0] = lambdalow/2.
+	for i in range(len(lambdas)):
+    	lambdas[i] = 2.*lambda_low[i] - lambdas[i-1]
+    
+	#lambdas = (lambda_high-lambda_low)/2+lambda_low
+	print('Lambda low / high (short / long) ' + str(lambda_low[81]*1e9))
+
+
+
 # lambdahigh=1.5e-3
-lambda_low=np.zeros((len(lambdas),))
-lambda_high=np.zeros((len(lambdas),))
-lambda_low[0]=lambdalow
-lambda_low[1:]=[(lambdas[i+1]+lambdas[i])/2. for i in range(len(lambdas)-1)]
-lambda_high[-1]=lambdahigh
-lambda_high[0:-1]=[(lambdas[i+1]+lambdas[i])/2. for i in range(len(lambdas)-1)]
-lambda_low[10]=705e-9
-lambda_high[9]=705e-9
+
 
 nbands=len(lambda_low)
 
