@@ -276,7 +276,7 @@
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 			psolve=psurf
 			if( z(i) < 0._wp ) then
-				hmin=-1.e-2_wp
+				hmin=1.e-2_wp
 				htry=-dz(i)
 				call vode_integrate(psolve,0._wp,z(i),eps2,htry,hmin,hydrostatic1a)
 			else
@@ -311,7 +311,7 @@
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 			psolve=psurf
 			if( zn(i) < 0._wp ) then
-				hmin=-1.e-2_wp
+				hmin=1.e-2_wp
 				htry=-dzn(i)
 				call vode_integrate(psolve,0._wp,zn(i),eps2,htry,hmin,hydrostatic1a)
 			else
