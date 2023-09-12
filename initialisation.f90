@@ -510,7 +510,7 @@
                 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
                 psolve=psurf
                 if( z(i) <= 0._wp ) then
-                    hmin=-1.e-2_wp
+                    hmin=1.e-2_wp
                     !htry=-dz(i)
                     !call vode_integrate(psolve,0._wp,z(i),eps2,htry,hmin,hydrostatic1a)
                 else
@@ -547,7 +547,7 @@
                 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
                 psolve=psurf
                 if( zn(i) < 0._wp ) then
-                    hmin=-1.e-2_wp
+                    hmin=1.e-2_wp
                     htry=-dzn(i)
                     call vode_integrate(psolve,0._wp,zn(i),eps2,htry,hmin,hydrostatic1a)
                 else
@@ -952,7 +952,7 @@
                 hmin=1.e-2_wp
                 htry=dz(k)
             else
-                hmin=-1.e-2_wp
+                hmin=1.e-2_wp
                 htry=-dz(k)
             endif
             psolve(1)=psurf
@@ -1072,7 +1072,7 @@
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         ! 5. calculate the cloud-top height                                              !
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-        hmin=-1.e-2_wp
+        hmin=1.e-2_wp
         htry=-10._wp
         zsolve(1)=zcb
         t_glob=t_cbase
@@ -1143,7 +1143,7 @@
                 hmin=1.e-2_wp
                 htry=dzn(k)
             else
-                hmin=-1.e-2_wp
+                hmin=1.e-2_wp
                 htry=-dzn(k)
             endif
             psolve(1)=psurf
@@ -1268,7 +1268,7 @@
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         ! 5. calculate the cloud-top height                                              !
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-        hmin=-1.e-2_wp
+        hmin=1.e-2_wp
         htry=-10._wp
         zsolve(1)=zcb
         t_glob=t_cbase
