@@ -2384,7 +2384,7 @@
             ! 5. ice nucleation with drop-freezing SIP                                   !
             !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
             ! cloud water
-            if((q(k,inc) > 0._wp).and.(nin_c>0._wp)) then 
+            if(q(k,inc) > 0._wp) then 
                 ! nin_c, nfrag_nucc, massc_nucc are deltas, not rates
                 call ice_nucleation_and_mode1(n_mode, q(k,inc), &
                     q(k,ini), q(k,iqc), t(k), q(k,cst(cat_c)+3:cen(cat_c)-1:3), & ! surface area
@@ -2397,7 +2397,7 @@
                     mode1_ice_flag)
             endif
             ! rain water
-            if((q(k,inr) > 0._wp).and.(nin_r>0._wp)) then
+            if(q(k,inr) > 0._wp) then
                 ! nin_r, nfrag_nucr, massc_nucr are deltas, not rates
                 call ice_nucleation_and_mode1(n_mode, q(k,inr), &
                     q(k,ini), q(k,iqr), t(k), q(k,cst(cat_r)+3:cen(cat_r)-1:3), & ! surface area
