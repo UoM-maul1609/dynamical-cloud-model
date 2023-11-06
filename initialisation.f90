@@ -1400,11 +1400,11 @@
         real(wp), dimension(:), intent(out) :: dzdp
         real(wp) :: t
     
-        p_glob=p
+        p_glob=p ! actual pressure, t_glob is cloud base temp
 
         t=tsurf_glob*(p_glob/1.e5_wp)**(ra/cp)
         ! find the temperature by iteration
-        t=zeroin(t,t_glob,calc_theta_q,1.e-5_wp)
+        t=zeroin(20._wp,t_glob,calc_theta_q,1.e-5_wp)
 
         dzdp(1)=-(ra*t)/(grav*p)
 	
