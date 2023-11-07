@@ -2975,42 +2975,43 @@
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
         ! melting ice!
-        if(((t(k)+lf/cp*q(k,iqi) ).gt.ttr).and.ice_flag) then
-            !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-            ! calculate the number conc. of ice melted
-            !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-            pimlt(k)=q(k,iqi)/dt
-            dummy2=rimlt(k)*(q(k,ini)/(qsmall+q(k,iqi)))*dt
-            dummy2=min(dummy2,q(k,ini))
-            !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        if(ice_flag) then
+            if((t(k)+lf/cp*q(k,iqi) ).gt.ttr) then
+                !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+                ! calculate the number conc. of ice melted
+                !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+                pimlt(k)=q(k,iqi)/dt
+                dummy2=rimlt(k)*(q(k,ini)/(qsmall+q(k,iqi)))*dt
+                dummy2=min(dummy2,q(k,ini))
+                !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-            if(dummy2 .gt. qsmall) then
-                !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-                ! move aerosol in melting ice to the aerosol in rain
-                !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-                call move_aerosol_proportional( n_mode, &
-                    q(k,iai:iai+(n_mode-2)*3:3), & ! number in ice mode
-                    q(k,iai+1:iai+(n_mode-2)*3+1:3), & !sa in ice mode
-                    q(k,iai+2:iai+(n_mode-2)*3+2:3), & ! mass in ice mode
-                    q(k,cst(cat_r)+2:cst(cat_r)+2+(n_mode-2)*3:3), &
-                    q(k,cst(cat_r)+3:cst(cat_r)+3+(n_mode-2)*3:3), &
-                    q(k,cst(cat_r)+4:cst(cat_r)+4+(n_mode-2)*3:3), &
-                    dummy2,q(k,ini) ,recycle)
-                !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-                ! ice properties
-                q(k,cst(cat_i):cst(cat_i)+5) = q(k,cst(cat_i):cst(cat_i)+5) * &
-                    (1._wp - min(dummy2/(q(k,ini)+qsmall),1._wp ))
+                if(dummy2 .gt. qsmall) then
+                    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+                    ! move aerosol in melting ice to the aerosol in rain
+                    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+                    call move_aerosol_proportional( n_mode, &
+                        q(k,iai:iai+(n_mode-2)*3:3), & ! number in ice mode
+                        q(k,iai+1:iai+(n_mode-2)*3+1:3), & !sa in ice mode
+                        q(k,iai+2:iai+(n_mode-2)*3+2:3), & ! mass in ice mode
+                        q(k,cst(cat_r)+2:cst(cat_r)+2+(n_mode-2)*3:3), &
+                        q(k,cst(cat_r)+3:cst(cat_r)+3+(n_mode-2)*3:3), &
+                        q(k,cst(cat_r)+4:cst(cat_r)+4+(n_mode-2)*3:3), &
+                        dummy2,q(k,ini) ,recycle)
+                    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+                    ! ice properties
+                    q(k,cst(cat_i):cst(cat_i)+5) = q(k,cst(cat_i):cst(cat_i)+5) * &
+                        (1._wp - min(dummy2/(q(k,ini)+qsmall),1._wp ))
         
-                ! add the number of ice and mass to the rain
-                q(k,inr)=q(k,inr)+dummy2
+                    ! add the number of ice and mass to the rain
+                    q(k,inr)=q(k,inr)+dummy2
 
-                ! mass already added
-                q(k,iqr)=q(k,iqr)+pimlt(k)*dt
-                !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-            endif
-            t(k)=t(k)-lf/cp*pimlt(k)*dt   
-        endif    
-
+                    ! mass already added
+                    q(k,iqr)=q(k,iqr)+pimlt(k)*dt
+                    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+                endif
+                t(k)=t(k)-lf/cp*pimlt(k)*dt   
+            endif    
+        endif
 
         q(k,cst(cat_r)+1)=q(k,cst(cat_r)+1)-prevp(k)*dt
     
