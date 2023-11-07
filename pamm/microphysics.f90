@@ -1859,13 +1859,16 @@
 				piacr_g,riacr_g, & ! riming of cloud ice by large rain drops to form graupel
 				piacr_s,riacr_s, & ! riming of cloud ice by small rain drops to form snow
 				piacw, & ! riming of ice cloud ice by liquid cloud 
+				riacw, &
 				picnt, & ! nucleation of ice crystals by contact freezing
 				pidep, & ! deposition of water vapour onto cloud ice
 				piprm, & ! primary nucleation of ice crystals by INPs
 				pifrw, & ! nucleation of ice crystals by homogeneous freezing of cloud
 				rihal, & ! production of ice crystals by hm process
 				pimlt, & ! cloud ice melting to form rain
+				rimlt, &
 				pisub, & ! sublimation of cloud ice
+				risub, &
 				praci_g, & ! accretion of cloud ice by rain to form graupel
 				praci_s, & ! accretion of cloud ice by rain to form snow
 				pracs, & ! accretion of snow by rain to form graupel
@@ -1897,7 +1900,12 @@
     			nfrag_nucc, &
     			massc_nucc, &
     			nfrag_nucr, &
-    			massr_nucr
+    			massr_nucr, &
+    			frac_r, &
+    			frac_x, &
+    			vimlt, &
+    			mono1, &
+    			phi11
     				    
     real(wp) :: pgwet ! amount of liquid that graupel can freeze without shedding
     								
@@ -1938,49 +1946,22 @@
     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     vqr=0._wp
     vqc=0._wp
-	pgaci=0._wp
-	pgacr=0._wp
-	pgacs=0._wp
-	rgacs=0._wp
-	pgacw=0._wp
-	pgaut=0._wp
-	pgdep=0._wp
 	pgfr=0._wp
 	rgfr=0._wp
-	pgmlt=0._wp
-	pgshd=0._wp
-	pgsub=0._wp
 	riaci=0._wp
-	piacr_g=0._wp
-	riacr_g=0._wp
-	piacr_s=0._wp
-	riacr_s=0._wp
 	piacw=0._wp
-	picnt=0._wp
+	riacw=0._wp ! new
 	pidep=0._wp
-	piprm=0._wp
 	pifrw=0._wp
 	rihal=0._wp
 	pimlt=0._wp
+	rimlt=0._wp ! new
 	pisub=0._wp
-	praci_g=0._wp
-	praci_s=0._wp
-	pracs=0._wp
+	risub=0._wp ! new
 	pracw=0._wp
 	praut=0._wp
 	prevp=0._wp
 	rrevp=0._wp
-	psacr=0._wp
-	rsacr=0._wp
-	psaci=0._wp
-	rsacs=0._wp
-	psacw=0._wp
-	psaut=0._wp
-	rsaut=0._wp
-	rsbrk=0._wp
-	psdep=0._wp
-	psmlt=0._wp
-	pssub=0._wp
 	rcwaut=0._wp
     rcwacr=0._wp
     rraut=0._wp
@@ -1997,6 +1978,11 @@
     massc_nucc=0._wp
     nfrag_nucr=0._wp
     massr_nucr=0._wp
+    frac_r=0._wp ! new
+    frac_x=0._wp ! new
+    vimlt=0._wp ! new
+    mono1=0._wp ! new
+    phi11=0._wp ! new
     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     
     
@@ -2149,15 +2135,7 @@
     
     
     ! loop over all levels
-    do k=-o_halo+1,kp+o_halo   
-        ! inhomogeneous mixing -https://journals.ametsoc.org/doi/pdf/10.1175/2007JAS2374.1
- !        if(q(2,k)<qold) then
-!             q(4,k)=q(4,k)*(q(2,k)/qold)**1._wp
-!         endif
-        
-        
-        
-        
+    do k=-o_halo+1,kp+o_halo         
 
 		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         ! activation of cloud drops                                                      !
@@ -2334,6 +2312,15 @@
 		nin_c=0._wp
 		nin_r=0._wp
 		if(ice_flag.and.(t(k).lt.ttr)) then
+            !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+            ! 0. define properties                                                       !
+            !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+            frac_r(k) = q(k,ini+5) / (q(k,iqi)+qsmall) ! fraction of rime to total
+            frac_x(k) = (q(k,iqi)-q(k,ini+5)) / (q(k,iqi)+qsmall) ! frac of xtal to total
+            phi11(k) = q(k,iqi+1) / (q(k,ini)+qsmall) ! phi
+            mono1(k) = q(k,iqi+3) / (q(k,ini)+qsmall) ! number of monomers
+		
+		
             !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
             ! 1. collisions between precipitating particles of different species         !
             ! praci, rraci, piacr, riacr, rates                                          !
@@ -2589,16 +2576,17 @@
             !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
             call scale_microphysics(praci(k),rraci(k), piacr(k), riacr(k), &
                 nin_c, nin_r, massc_nucc(k), massr_nucr(k), &
-                piacw(k), rihal(k), pidep(k), pisub(k), riaci(k), &
-                pimlt(k), prevp(k), praut(k), pracw(k), rcwacr(k), rraut(k), rrsel(k), &
+                piacw(k), riacw(k), rihal(k), pidep(k), pisub(k), risub(k), riaci(k), &
+                pimlt(k), rimlt(k), prevp(k), rrevp(k), &
+                praut(k), pracw(k), rcwacr(k), rraut(k), rrsel(k), &
                 rcwaut(k),rcwsel(k), &
-                q(k,inc),q(k,iqc),q(k,inr), q(k,iqr),q(k,ini),q(k,iqi),t(k),dt)
+                q(k,1),q(k,inc),q(k,iqc),q(k,inr), q(k,iqr),q(k,ini),q(k,iqi),t(k),dt)
             !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         else
             !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
             ! Scale process rates so that cannot get negative values                     !
             !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-            call scale_microphysics_warm(prevp(k), praut(k), &
+            call scale_microphysics_warm(rrevp(k), prevp(k), praut(k), &
                 pracw(k), rcwacr(k), rraut(k), rrsel(k), rcwaut(k),rcwsel(k), &
                 q(k,inc),q(k,iqc),q(k,inr), q(k,iqr),dt)
             !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!        
@@ -2720,8 +2708,7 @@
             !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
             ! calculate the number conc. of rain drops evaporated
             !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-            dummy2=prevp(k)*(q(k,cst(cat_r))/(qsmall+q(k,cst(cat_r)+1)))*dt
-            dummy2=min(dummy2,q(k,cst(cat_r)))
+            dummy2=rrevp(k)*dt
             !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
             if(dummy2 .gt. qsmall) then
@@ -2742,8 +2729,6 @@
                     prevp(k)*dt,q(k,  iqr)-pgfr(k)*dt-praci(k)*dt , recycle )
                 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
             endif
-            ! rain number sink
-            rrevp(k)=dummy2/dt
         endif
 
 
@@ -2850,8 +2835,6 @@
             q(k,  inr)  =q(k, inr)-rraci(k)*dt
 
 
-
-
             ! rime mass - could do this in proportion i.e. rm/q*dm
             ! NOTE, iqi has been changed prior
             q(k,iqi+4)=q(k,iqi+4)+dummy1*(pidep(k)-pisub(k))*dt
@@ -2882,7 +2865,7 @@
                 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
                 
-                q(k,inc)=q(k,inc)-piacw(k)*dummy4/(dummy3+qsmall)*dt
+                q(k,inc)=q(k,inc)-riacw(k)*dt
                 q(k,iqc)=q(k,iqc)-piacw(k)*dt
                 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
                 ! h-m process                                                            !
@@ -2912,8 +2895,8 @@
             q(k,ini)=q(k,ini)-(riaci(k))*dt
             if(q(k,iqi)<qsmall) then
                 dummy2=q(k,ini)
-                q(k,ini)=0._wp
-                q(k,ini+2:ini+5)=0._wp ! all properties, except aerosol
+                q(k,1)=q(k,1)+q(k,iqi)
+                q(k,ini:ini+5)=0._wp ! all properties, except aerosol
                 
             
                 if(recycle) &
@@ -2974,7 +2957,8 @@
                 q(k,cst(2)+2:cst(n_mode)+2:3), &
                 1._wp,1._wp ,recycle)
             !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-            q(k,inc) = 0.0_wp
+            q(k,1)=q(k,1)+q(k,iqc)
+            q(k,inc:iqc) = 0.0_wp
         endif
         
 
@@ -2990,6 +2974,43 @@
             lf/cp*(piacw(k))*dt
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
+        ! melting ice!
+        if(((t(k)+lf/cp*q(k,iqi) ).gt.ttr).and.ice_flag) then
+            !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+            ! calculate the number conc. of ice melted
+            !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+            pimlt(k)=q(k,iqi)/dt
+            dummy2=rimlt(k)*(q(k,ini)/(qsmall+q(k,iqi)))*dt
+            dummy2=min(dummy2,q(k,ini))
+            !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+            if(dummy2 .gt. qsmall) then
+                !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+                ! move aerosol in melting ice to the aerosol in rain
+                !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+                call move_aerosol_proportional( n_mode, &
+                    q(k,iai:iai+(n_mode-2)*3:3), & ! number in ice mode
+                    q(k,iai+1:iai+(n_mode-2)*3+1:3), & !sa in ice mode
+                    q(k,iai+2:iai+(n_mode-2)*3+2:3), & ! mass in ice mode
+                    q(k,cst(cat_r)+2:cst(cat_r)+2+(n_mode-2)*3:3), &
+                    q(k,cst(cat_r)+3:cst(cat_r)+3+(n_mode-2)*3:3), &
+                    q(k,cst(cat_r)+4:cst(cat_r)+4+(n_mode-2)*3:3), &
+                    dummy2,q(k,ini) ,recycle)
+                !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+                ! ice properties
+                q(k,cst(cat_i):cst(cat_i)+5) = q(k,cst(cat_i):cst(cat_i)+5) * &
+                    (1._wp - min(dummy2/(q(k,ini)+qsmall),1._wp ))
+        
+                ! add the number of ice and mass to the rain
+                q(k,inr)=q(k,inr)+dummy2
+
+                ! mass already added
+                q(k,iqr)=q(k,iqr)+pimlt(k)*dt
+                !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+            endif
+            t(k)=t(k)-lf/cp*pimlt(k)*dt   
+        endif    
+
 
         q(k,cst(cat_r)+1)=q(k,cst(cat_r)+1)-prevp(k)*dt
     
@@ -2997,8 +3018,17 @@
     
         q(k,1)=q(k,1)+prevp(k)*dt
         
-        q(k,:)=max(q(k,:),0._wp)	
+!         if(any(q(k,:)< 0._wp)) then 
+!             print *, t(k),k,q(k,:)
+!             stop
+!         endif
 
+
+             
+
+
+
+        q(k,:)=max(q(k,:),0._wp)	
 
      
         if (theta_flag) th(k)=t(k)*(1.e5_wp/p(k))**(ra/cp)-theta(k)
@@ -3075,48 +3105,6 @@
 #endif	
         endif
         
-        do k=-o_halo+1,kp+o_halo   
-            ! melting ice!
-            if((t(k)+lf/cp*q(k,iqi) ).gt.ttr) then
-                !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-                ! calculate the number conc. of ice melted
-                !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-                pimlt(k)=q(k,iqi)/dt
-                dummy2=pimlt(k)*(q(k,ini)/(qsmall+q(k,iqi)))*dt
-                dummy2=min(dummy2,q(k,ini))
-    !             pimlt(k)=dummy2/dt
-                !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-
-                if(dummy2 .gt. qsmall) then
-                    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-                    ! move aerosol in melting ice to the aerosol in rain
-                    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-                    call move_aerosol_proportional( n_mode, &
-                        q(k,iai:iai+(n_mode-2)*3:3), & ! number in ice mode
-                        q(k,iai+1:iai+(n_mode-2)*3+1:3), & !sa in ice mode
-                        q(k,iai+2:iai+(n_mode-2)*3+2:3), & ! mass in ice mode
-                        q(k,cst(cat_r)+2:cst(cat_r)+2+(n_mode-2)*3:3), &
-                        q(k,cst(cat_r)+3:cst(cat_r)+3+(n_mode-2)*3:3), &
-                        q(k,cst(cat_r)+4:cst(cat_r)+4+(n_mode-2)*3:3), &
-                        dummy2,q(k,ini) ,recycle)
-                    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-                    ! ice properties
-                    q(k,cst(cat_i):cst(cat_i)+5) = q(k,cst(cat_i):cst(cat_i)+5) * &
-                        (1._wp - min(dummy2/(q(k,ini)+qsmall),1._wp ))
-            
-                    ! add the number of ice and mass to the rain
-                    q(k,inr)=q(k,inr)+dummy2
-
-                    ! mass already added
-                    q(k,iqr)=q(k,iqr)+pimlt(k)*dt
-                    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    !                 if(t(k) > ttr) q(k,cst(cat_i):cen(cat_i))=0._wp
-                endif
-                t(k)=t(k)-lf/cp*pimlt(k)*dt   
-                if (theta_flag) th(k)=t(k)*(1.e5_wp/p(k))**(ra/cp)-theta(k)
-            endif    
-             
-        enddo
     endif
  	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     
@@ -4804,55 +4792,24 @@
     !>        piacw, rihal, pidep, pisub, riaci, pimlt, prevp, praut, pracw, &
     !>        rcwaut, rcwacr, rraut, rrsel, rcwsel
     subroutine scale_microphysics(praci,rraci, piacr, riacr, &
-        nin_c, nin_r, massc_nucc, massr_nucr, piacw, rihal, pidep, pisub, riaci, &
-        pimlt, prevp, praut, pracw, rcwaut, rcwacr, rraut, rrsel, &
-        rcwsel, nc,qc,nr, qr,ni,qi,t,dt)
+        nin_c, nin_r, massc_nucc, massr_nucr, piacw, riacw, rihal, pidep, pisub, risub, &
+        riaci, &
+        pimlt, rimlt, prevp, rrevp, praut, pracw, rcwacr, rraut, rrsel, rcwaut, &
+        rcwsel, qv,nc,qc,nr, qr,ni,qi,t,dt)
         implicit none
-        real(wp), intent(inout) :: praci, rraci, piacr, riacr, nin_c, nin_r, &
-            massc_nucc, massr_nucr, &
-            piacw, rihal, pidep, pisub, riaci, pimlt, prevp, praut, pracw, &
-            rcwaut, rcwacr, rraut, rrsel, rcwsel
-        real(wp), intent(in) :: nc, qc, nr, qr, ni, qi,t,dt
+        real(wp), intent(inout) :: praci,rraci, piacr, riacr, &
+            nin_c, nin_r, massc_nucc, massr_nucr, piacw, riacw, &
+            rihal, pidep, pisub, risub, riaci, pimlt, rimlt, prevp, rrevp, &
+            praut, pracw, rcwacr, rraut, rrsel, rcwaut, rcwsel
+        real(wp), intent(in) :: qv,nc, qc, nr, qr, ni, qi,t,dt
 
 
-        real(wp) :: factor1, factor2, factor3, n_melt, n_sub, n_left
+        real(wp) :: factor1, factor2, factor3
 
         
-        ! SCALING: 
-        ! 1. praci(k),rraci(k),piacr(k),riacr(k)
-        ! 2-4. nfrag_m1c, nfrag_m2, nfrag_ii
-        ! 5. nin_c, nfrag_nucc, massc_nucc, nin_r, nfrag_nucr, massc_nucr
-        ! 6. piacw
-        ! 7. rihal
-        ! 8. pidep, pisub
-        ! 9. riaci
-        ! 10. pimlt
-        ! 11. prevp
-        ! 12. praut, pracw, rcwaut, rcwacr, rraut, rrsel, rcwsel
-        ! **Sinks:
-        ! cloud water number: nin_c, (piacw), rcwaut,rcwacr,rcwsel
-        ! cloud water mass: piacw, praut, pracw, massc_nucc
-        ! rain water number: nin_r, rraci, 
-        ! rain water mass: praci, massc_nucr
-        ! ice water number: (pimlt), (pisub), riaci, riacr
-        ! ice water mass: pimlt, pisub, piacr
-        ! **Sources:
-        ! rain water number: rraut, rrsel, (pimlt)
-        ! rain water mass: praut, pracw, pimlt
-        ! ice water number: nin_c, nfrag_nucc, nin_r, nfrag_nucr, rihal, rraci, riacr
-        ! ice water mass: piacw, pidep, massc_nucc, massc_nucr, praci, piacr
-    
-        ! strategy: 
-        ! 1. sink: scale ice water sinks to total ice mass
-        ! 2. sink: ice water number: scale exponentially (aggregation term)
-        ! 3.a sink: scale piacw, praut, pracw, massc_nucc to total liquid mass
-        ! 3.b sink, scale nin_c, rcwaut, rcwacr, rcwsel to total liquid number
-        ! 4.a sink: scale praci, massc_nucr, prevp to rain mass
-        ! 4.b sink, scale nin_r, rraut, rrsel, rraci to total liquid number
-        
-        ! 1. scale ice water sinks to total mass - nb, piacr is a sink, but also a source
-        !    so not included in scaling
-        
+        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        ! set some rates to zero, or max                                                 !
+        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         if(t.gt.ttr) then
             pimlt=qi/dt
             pisub=0._wp
@@ -4868,84 +4825,100 @@
             rraci=0._wp
             piacr=0._wp
             riacr=0._wp
+            rihal=0._wp
         endif
+        pidep=min(qv/dt,pidep)
+        riacw = piacw *nc/(qc+qsmall)
+        rrevp = prevp * nr/(qr+qsmall)
+        rimlt = pimlt *ni / (qi+qsmall)
+        risub = pisub *ni / (qi+qsmall)
+        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         
-        factor1 = (pimlt + pisub + piacr)
+
+        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        ! sinks of q-cloud                                                               !
+        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        factor1 = (praut+pracw+massc_nucc/dt+piacw)
         if(factor1 .gt. 0._wp) then
-            factor2 = min(factor1,qi/dt) / factor1
-            pimlt = pimlt*factor2
-            pisub = pisub*factor2
-            piacr = piacr*factor2
-        endif    
-        
-        ! 2. scale ice water number sinks - nb riacr is a sink, but also a source
-        !    so not included in scaling
-        if((qi .gt. 0._wp).and.(riaci.gt.0._wp)) then
-            n_melt = pimlt * ni / (qi+qsmall)
-            n_sub =  pisub * ni / (qi+qsmall)
-            riaci = ni*(1._wp-exp(-riaci/ni*dt))/dt
-            
-            n_left = ni-n_melt*dt-n_sub*dt
-            
-            factor1 = riaci+riacr
-            factor3 = min(factor1,n_left/dt)
-            if(factor3 .gt.0._wp) then
-                riaci = riaci*factor3/factor1
-                riacr = riacr*factor3/factor1
-            else
-                riaci = 0._wp
-                riacr = 0._wp
-            endif
-        else
-            riaci=0._wp
-            riacr=0._wp
-        endif    
-        
-        ! 3.a scale liquid water mass sinks
-        factor1 = (piacw+praut+pracw+massc_nucc/dt)
-        if(factor1 .gt. 0._wp) then
-            factor2 = min(piacw+praut+pracw+massc_nucc/dt,qc/dt) / factor1
-            piacw = piacw*factor2
+            factor2 = min(factor1,qc/dt) / factor1
             praut = praut*factor2
             pracw = pracw*factor2
             massc_nucc = massc_nucc*factor2
+            piacw = piacw*factor2
         endif    
-        
-        ! 3.b scale liquid water number sinks
-        factor1 = nin_c/dt -rcwaut-rcwacr-rcwsel 
-        if(factor1 .gt. 0._wp) then      
-            factor2 = min(factor1,nc/dt-piacw*nc/(qc+qsmall)) / factor1
-            nin_c = nin_c*factor2
+        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+
+
+        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        ! sinks of n-cloud - note number rates are negative                              !
+        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        factor1 = (-rcwaut-rcwacr-rcwsel+nin_c/dt+riacw)
+        if(factor1 .gt. 0._wp) then
+            factor2 = min(factor1,nc/dt) / factor1
             rcwaut = rcwaut*factor2
             rcwacr = rcwacr*factor2
             rcwsel = rcwsel*factor2
+            nin_c = nin_c*factor2
+            riacw = riacw*factor2
         endif    
-        
-        ! 4.a scale rain water mass sinks
-        factor1 = (praci+prevp+massr_nucr/dt)
+        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+
+
+        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        ! sinks of q-rain                                                                !
+        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        factor1 = (massr_nucr/dt+prevp+praci)
         if(factor1 .gt. 0._wp) then
-            factor2 = min(praci+prevp+massr_nucr/dt,qr/dt) / factor1
-            praci = praci*factor2
+            factor2 = min(factor1,qr/dt) / factor1
             massr_nucr = massr_nucr*factor2
             prevp = prevp*factor2
+            praci = praci*factor2
         endif    
-        
-        ! 4.b scale rain water number sinks
-        factor1 = nin_r/dt - rraut-rrsel-rraci
-        if(factor1 .gt. 0._wp) then    
-            factor3 = nr/dt-min(prevp*nr/(qr+qsmall),nr/dt)
-            if(factor3 .gt. 0._wp) then
-                factor2 = min(factor1,factor3) / factor1
-                nin_r = nin_r*factor2
-                rraut = rraut*factor2
-                rraci = rraci*factor2
-            else
-                prevp=qr/dt
-                nin_r=0._wp
-                rraut=0._wp
-                rraci=0._wp
-            endif
+        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        ! sinks of n-rain                                                                !
+        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        factor1 = (-rraut-rrsel+nin_r/dt+rraci+rrevp)
+        if(factor1 .gt. 0._wp) then
+            factor2 = min(factor1,nr/dt) / factor1
+            rraut = rraut*factor2
+            rrsel = rrsel*factor2
+            nin_r = nin_r*factor2
+            rraci = rraci*factor2
+            rrevp = rrevp*factor2
         endif    
+        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+
+        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        ! sinks of q-ice                                                                 !
+        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        factor1 = (pisub+pimlt)
+        if(factor1 .gt. 0._wp) then
+            factor2 = min(factor1,qi/dt) / factor1
+            pisub = pisub*factor2
+            pimlt = pimlt*factor2
+        endif    
+        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+
+        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        ! sinks of n-ice                                                                 !
+        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        factor1 = (riaci+rimlt+risub)
+        if(factor1 .gt. 0._wp) then
+            factor2 = min(factor1,ni/dt) / factor1
+            riaci = riaci*factor2
+            rimlt = rimlt*factor2
+            risub = risub*factor2
+        endif    
+        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+
+ 
                
     end subroutine scale_microphysics
     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -4959,53 +4932,74 @@
 	!>@param[in] nc, qc, nr, qr, dt
 	!>@param[inout] prevp, praut, pracw, &
     !>        rcwaut, rcwacr, rraut, rrsel, rcwsel
-    subroutine scale_microphysics_warm(prevp, praut, pracw, rcwaut, rcwacr, rraut, rrsel, &
+    subroutine scale_microphysics_warm(prevp, rrevp, &
+        praut, pracw, rcwaut, rcwacr, rraut, rrsel, &
         rcwsel, nc,qc,nr, qr,dt)
         implicit none
-        real(wp), intent(inout) :: prevp, praut, pracw, &
+        real(wp), intent(inout) :: rrevp, prevp, praut, pracw, &
             rcwaut, rcwacr, rraut, rrsel, rcwsel
         real(wp), intent(in) :: nc, qc, nr, qr, dt
 
 
         real(wp) :: factor1, factor2, factor3
         
-        ! 3.a scale liquid water mass sinks
+        rrevp = prevp * nr/(qr+qsmall)
+        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        
+
+        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        ! sinks of q-cloud                                                               !
+        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         factor1 = (praut+pracw)
         if(factor1 .gt. 0._wp) then
-            factor2 = min(praut+pracw,qc/dt) / factor1
+            factor2 = min(factor1,qc/dt) / factor1
             praut = praut*factor2
             pracw = pracw*factor2
         endif    
-        
-        ! 3.b scale liquid water number sinks
-        factor1 = -rcwaut-rcwacr-rcwsel
-        if(factor1 .gt. 0._wp) then      
+        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+
+
+        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        ! sinks of n-cloud - note number rates are negative                              !
+        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        factor1 = (-rcwaut-rcwacr-rcwsel)
+        if(factor1 .gt. 0._wp) then
             factor2 = min(factor1,nc/dt) / factor1
             rcwaut = rcwaut*factor2
             rcwacr = rcwacr*factor2
             rcwsel = rcwsel*factor2
         endif    
-        
-        ! 4.a scale rain water mass sinks
+        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+
+
+        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        ! sinks of q-rain                                                                !
+        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         factor1 = (prevp)
         if(factor1 .gt. 0._wp) then
-            factor2 = min(prevp,qr/dt) / factor1
+            factor2 = min(factor1,qr/dt) / factor1
             prevp = prevp*factor2
         endif    
-        
-        ! 4.b scale rain water number sinks
-        factor1 = -rraut-rrsel
-        if(factor1 .gt. 0._wp) then    
-            factor3 = nr/dt-min(prevp*nr/(qr+qsmall),nr/dt)
-            if(factor3 .gt. 0._wp) then
-                factor2 = min(factor1,factor3) / factor1
-                rraut = rraut*factor2
-            else
-                prevp=qr/dt
-                rraut=0._wp
-            endif
+        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        ! sinks of n-rain                                                                !
+        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        factor1 = (-rraut-rrsel+rrevp)
+        if(factor1 .gt. 0._wp) then
+            factor2 = min(factor1,nr/dt) / factor1
+            rraut = rraut*factor2
+            rrsel = rrsel*factor2
+            rrevp = rrevp*factor2
         endif    
-               
+        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+
+
+
+
     end subroutine scale_microphysics_warm
     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
