@@ -12,7 +12,7 @@ nc = Dataset('/tmp/output.nc')
 # extract needed variables
 y = nc['y'][:]
 z = nc['z'][:]
-th = np.squeeze(nc['q'][1,0,:,:,23])
+th = np.squeeze(nc['q'][1,0,:,:,30])
 
 print(np.shape(th))
 
