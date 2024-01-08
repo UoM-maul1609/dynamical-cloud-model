@@ -170,7 +170,8 @@ def P_hhc(x,y,gR):
     
     f2=1.0 # f2 needs to be 1, because this is for one ice particle in the experiment
     
-    P=C*f_hm(T)*gR*np.pi*(x+1.e-3)**2*v_impact*f2*f1*E
+    P=C*f_hm(T)*gR*np.pi*(x+1.e-3)**2*v_impact*f2*f1*E # note, there is a mistake here
+                # I actually need to divide by 4.
     return P
 
 
