@@ -145,7 +145,7 @@ def riming_rate(x):
         f=N_DSD[n]/(x*np.sqrt(2.0*np.pi)*np.log(S_DSD[n]))* \
             np.exp(-np.log(x/D_DSD[n])**2/(2.0*np.log(S_DSD[n])**2))
     
-    return f*1e-3**2/4.0*E*np.pi*np.pi/6.0*x**3*1000.*v_impact
+    return f*(1e-3+x)**2/4.0*E*np.pi*np.pi/6.0*x**3*1000.*v_impact
 
 """
     this is to do the integral in HH and cooper, to calculate the SIP due to RS
