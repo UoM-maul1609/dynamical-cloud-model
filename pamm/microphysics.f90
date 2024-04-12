@@ -4150,7 +4150,7 @@
                     rhoi1,rhoi2,frime1,frime2, phi1, phi2, vol1, t=0._wp
         integer(i4b) :: i
 
-
+		t=t_send
         mr=x
         mi=y
         diamr=(mr/ci_new)**(1.0_wp/di)
@@ -4647,7 +4647,7 @@
             mrupper=ci*(pthreshi/lambda0r)**di
             miupper=ci*(pthreshi/lambda0i)**di
             mrupper=min(mrupper,miupper)
-        
+        	t_send=t
             ! only call integral if mrupper gt mrthresh
             if((mrupper.gt.mrthresh).and.(qi.gt.qsmall)) then
 

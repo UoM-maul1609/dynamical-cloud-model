@@ -1,17 +1,22 @@
 import numpy as np
 from scipy import integrate
 import matplotlib.pyplot as plt
+import scipy.interpolate as scint 
+
 
 """
     Values to alter / update
 """
+visco = 1.75e-5  # visocity of air
+dtarget = 1.e-3 # size of ice target
 v_impact=1.0    # impact speed between drop and ice particle
 E=1.0           # collision efficiency, just use 1 for now - size independent
 C=0.16          # C parameter (see hh and cooper)
 T=-5.0          # temperature in deg C - determines HM coefficient
+rho_target = 100000./(T+273.15)/287. # density of air around ice target
 plot_flag=False # whether to generate figure of PSDs
 plot_fits=False # whether to generate figure of PSDs
-nPSD=1          # set to 1, 2, 3, or 4 - to do analysis of particular PSD
+nPSD=2          # set to 1, 2, 3, or 4 - to do analysis of particular PSD
 allRime=False   # if False it does the HH and Cooper analysis that depends on drop size
                 # if True it calculates SIP based on all Rime accreted
 
@@ -91,6 +96,36 @@ analysis for particular PSD
 n=nPSD-1
 
 
+
+"""
+Loffler and Muhr (1972) 
+"""
+def ecoll_lm(dw,di):
+
+	Re_t=v_impact*di*rho_target/visco
+	Re_t=np.maximum(np.minimum(500.,Re_t),50.)
+	# from L + M equations 14
+	f1=-0.0133*np.log(Re_t)+0.931
+	f2= 0.0353*np.log(Re_t)-0.36
+	f3=-0.0537*np.log(Re_t)+0.398
+	
+	# trajectory parameter
+	phi1 = 1000.*dw**2*v_impact / (18.0*visco*di)
+	
+	# impact degree, equation 12
+	nab1 = phi1**3/(phi1**3+f1*phi1**2+f2*phi1+f3)
+	
+	# blocking term, equation 13
+	#nabsp=dw/di
+	nabsp=3*(2/Re_t*rho_target/1000*phi1)**0.5
+	
+	# total, equation 11
+	nabt=nab1+nabsp
+	
+	return nabt
+
+
+
 """
  HM temperature function
 """
@@ -130,7 +165,25 @@ def g_func_hhc(x):
         f=N_DSD[n]/(x*np.sqrt(2.0*np.pi)*np.log(S_DSD[n]))* \
             np.exp(-np.log(x/D_DSD[n])**2/(2.0*np.log(S_DSD[n])**2))
     
+    E=ecoll_lm(x,dtarget)
     return f*x**2/4.0*E
+
+"""
+    this is to do the integral for the number-riming rate
+"""
+def num_riming_rate(x):
+    if(n == 2):
+        f=N_DSD[n][0]/(x*np.sqrt(2.0*np.pi)*np.log(S_DSD[n][0]))* \
+            np.exp(-np.log(x/D_DSD[n][0])**2/(2.0*np.log(S_DSD[n][0])**2))
+        f=f+N_DSD[n][1]/(x*np.sqrt(2.0*np.pi)*np.log(S_DSD[n][1]))* \
+            np.exp(-np.log(x/D_DSD[n][1])**2/(2.0*np.log(S_DSD[n][1])**2))
+    else:
+        f=N_DSD[n]/(x*np.sqrt(2.0*np.pi)*np.log(S_DSD[n]))* \
+            np.exp(-np.log(x/D_DSD[n])**2/(2.0*np.log(S_DSD[n])**2))
+
+    E=ecoll_lm(x,dtarget)
+    
+    return f*(dtarget+x)**2/4.0*E*np.pi*v_impact
 
 """
     this is to do the integral for the mass-riming rate
@@ -144,8 +197,10 @@ def riming_rate(x):
     else:
         f=N_DSD[n]/(x*np.sqrt(2.0*np.pi)*np.log(S_DSD[n]))* \
             np.exp(-np.log(x/D_DSD[n])**2/(2.0*np.log(S_DSD[n])**2))
+
+    E=ecoll_lm(x,dtarget)
     
-    return f*(1e-3+x)**2/4.0*E*np.pi*np.pi/6.0*x**3*1000.*v_impact
+    return f*(dtarget+x)**2/4.0*E*np.pi*np.pi/6.0*x**3*1000.*v_impact
 
 """
     this is to do the integral in HH and cooper, to calculate the SIP due to RS
@@ -170,24 +225,50 @@ def P_hhc(x,y,gR):
     
     f2=1.0 # f2 needs to be 1, because this is for one ice particle in the experiment
     
-    P=C*f_hm(T)*gR*np.pi*(x+1.e-3)**2*v_impact*f2*f1*E # note, there is a mistake here
-                # I actually need to divide by 4.
+    E=ecoll_lm(x,dtarget)
+    
+    P=C*f_hm(T)*gR*np.pi*(x+dtarget)**2*v_impact*f2*f1*E/4.0 # note, there was a mistake here
+                # I actually needed to divide by 4.
     return P
+
+
+"""
+    this is to do the integral in HH and cooper, to calculate the SIP due to RS
+"""
+def P_hhc_s(x,gR):
+    if(n == 2):
+        f1=N_DSD[n][0]/(x*np.sqrt(2.0*np.pi)*np.log(S_DSD[n][0]))* \
+            np.exp(-np.log(x/D_DSD[n][0])**2/(2.0*np.log(S_DSD[n][0])**2))
+        f1=f1+N_DSD[n][1]/(x*np.sqrt(2.0*np.pi)*np.log(S_DSD[n][1]))* \
+            np.exp(-np.log(x/D_DSD[n][1])**2/(2.0*np.log(S_DSD[n][1])**2))
+
+    else:
+        f1=N_DSD[n]/(x*np.sqrt(2.0*np.pi)*np.log(S_DSD[n]))* \
+            np.exp(-np.log(x/D_DSD[n])**2/(2.0*np.log(S_DSD[n])**2))
+    
+    
+    f2=1.0 # f2 needs to be 1, because this is for one ice particle in the experiment
+    
+    E=ecoll_lm(x,dtarget)
+    P=C*f_hm(T)*gR*np.pi*(x+dtarget)**2*v_impact*f2*f1*E/4.0 # note, there was a mistake here
+                # I actually needed to divide by 4.
+    return P
+
 
 
 
 if __name__=="__main__":
     # check the integration works
-    I=integrate.quad(DropDist,0,1.e-2)
+    I=integrate.quad(DropDist,0,1.e-2,epsabs=1.49e-10,epsrel=1.49e-10)
     print('The integral of the PSD for n=' + str(n) + ' is ' + str(I[0]))
     
     
     # g13
-    G13=integrate.quad(g_func_hhc,0,13.e-6,epsabs=1.49e-20,epsrel=1.49e-20)
+    G13=integrate.quad(g_func_hhc,0,13.e-6,epsabs=1.49e-10,epsrel=1.49e-10)
     print('The G13 integrated over the PSD for n=' + str(n) + ' is ' + str(G13[0]))
     
     # gall
-    Gall=integrate.quad(g_func_hhc,0,1.e-3)
+    Gall=integrate.quad(g_func_hhc,0,1.e-3,epsabs=1.49e-10,epsrel=1.49e-10)
     print('The Gall integrated over the PSD for n=' + str(n) + ' is ' + str(Gall[0]))
     
     if allRime:
@@ -196,16 +277,22 @@ if __name__=="__main__":
         gR=G13[0]/Gall[0]
     print('Fraction of rime accreted of sizes less than 13 microns ' + str(gR))
     
+    # num-riming rate - 0 to 13 mm
+    Rime=integrate.quad(num_riming_rate,0,13.e-6,epsabs=1.49e-10,epsrel=1.49e-10)
+    print('The number riming rate integrated over the PSD for n=' + str(n) + ' is ' + str(Rime[0]*1e6))
+
     # riming rate - 0 to 1mm - an effective max
-    Rime=integrate.quad(riming_rate,0,1.e-3)
+    Rime=integrate.quad(riming_rate,0,1.e-3,epsabs=1.49e-20,epsrel=1.49e-20)
     print('The riming rate integrated over the PSD for n=' + str(n) + ' is ' + str(Rime[0]))
     
     # the integral for the production rate
     if allRime:
-        P=integrate.dblquad(P_hhc,1.e-6,1.e-3,1.e-6, 1.e-3,args=(gR,))
+        #P=integrate.dblquad(P_hhc,1.e-6,1.e-3,1.e-6, 1.e-3,args=(gR,))
+        P=integrate.quad(P_hhc_s,1.e-6,1.e-3,args=(gR,))
     else:
         # integrate everything larger than 24 microns, up to 1mm - an effective maximum
-        P=integrate.dblquad(P_hhc,24.e-6,1.e-3,1.e-6, 1.e-3,args=(gR,))
+        #P=integrate.dblquad(P_hhc,24.e-6,1.e-3,1.e-6, 1.e-3,args=(gR,))
+        P=integrate.quad(P_hhc_s,24.e-6,1.e-3,args=(gR,),epsabs=1.49e-20,epsrel=1.49e-20)
     print('Production rate per mg of rime ' + str(P[0]/Rime[0]/1.e6))
     
     
