@@ -15,4 +15,5 @@ matlab-dev
 mpi_old
 *.dSYM
 run_scripts/bli_data.nc
+.DS_Store
 
