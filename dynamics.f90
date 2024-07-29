@@ -923,8 +923,8 @@
             ! there should be no source to vertical wind at the surface
                     
             k=0
-            su(k,:,:)=-su(k+1,:,:)*rhoan(k+1)/rhoan(k)
-            sv(k,:,:)=-sv(k+1,:,:)*rhoan(k+1)/rhoan(k)
+            su(k,:,:)=-su(k+1,:,:)
+            sv(k,:,:)=-sv(k+1,:,:)
             sw(k,:,:)=0._wp
 !             do i=1,ip
 !                 do j=1,jp
@@ -967,7 +967,7 @@
 !             enddo		
         endif
         if(coords(3)==(dims(3)-1)) then 
-            sw(kp,:,:)=0._wp
+            sw(kp:kp+1,:,:)=0._wp
         endif
         if(coords(3)==(dims(3)-1)) su(kp:kp+1,:,:)=0._wp
         if(coords(3)==(dims(3)-1)) sv(kp:kp+1,:,:)=0._wp

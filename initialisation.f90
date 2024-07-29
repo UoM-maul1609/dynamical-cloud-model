@@ -59,7 +59,8 @@
     if (AllocateStatus /= 0) STOP "*** Not enough memory ***"
     allocate( v_read(1:n_levels), STAT = AllocateStatus)
     if (AllocateStatus /= 0) STOP "*** Not enough memory ***"
-    
+    u_read=0.0_wp
+    v_read=0.0_wp
     
     end subroutine allocate_nml_qs
 	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -416,7 +417,7 @@
 		if (AllocateStatus /= 0) STOP "*** Not enough memory ***"
 		allocate( dzn(1-l_h:kpp+r_h), STAT = AllocateStatus)
 		if (AllocateStatus /= 0) STOP "*** Not enough memory ***"	
-				
+		precip=0.0_wp
 		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 
@@ -813,16 +814,16 @@
                     do k=1-r_h,kpp+r_h
                         !th(k,j,i)=theta(k)
                 
-                        rad = (zn(k)-500._wp)**2._wp
+                        rad = (zn(k)-350._wp)**2._wp
                         
                         if (ip > 1) rad=rad+xn(i)**2._wp
                         if (jp > 1) rad=rad+yn(j)**2._wp
                     
                         rad=sqrt(rad)
                         if(rad<=300._wp) then
-                            th(k,j,i)=th(k,j,i)+2.5_wp
-                            q(k,j,i,1)=q(k,j,i,1)*3.5_wp
-                            !th(k,j,i)=th(k,j,i)+0.1_wp
+                            !th(k,j,i)=th(k,j,i)+2.5_wp
+                            !q(k,j,i,1)=q(k,j,i,1)*3.5_wp
+                            th(k,j,i)=th(k,j,i)+1.0_wp
                         else
                             !th(k,j,i)=0._wp
                         endif
@@ -1009,8 +1010,8 @@
         hmin=1.e-2_wp
         adiabatic_frac_glob=adiabatic_frac
         rv_glob=rv_sub
-        if(.not.theta_flag) then
-            adiabatic_frac_glob2=1._wp
+        if(theta_flag) then
+            adiabatic_frac_glob2=adiabatic_frac
         else
             adiabatic_frac_glob2=0._wp
             rv_glob=0._wp
@@ -1030,9 +1031,13 @@
             endif
             psolve(1)=pcb
             htry=dz(k)
+            !print *,1
+            ! psolve is pcb here
+            !print *,pcb,zcb,z(k),hmin,htry,k,t_cbase
             call vode_integrate(psolve,zcb,z(k),eps2,htry,hmin,hydrostatic2b)
             p_glob=psolve(1)
             t=zeroin(20._wp,t_cbase,calc_theta_q,1.e-5_wp)
+            !print *,psolve(1),t*(1.e5/psolve(1))**(ra/cp),calc_theta_q(t) ,t
             if(t.lt.t_ctop) exit
             
             !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -1040,18 +1045,17 @@
             !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
             pref(k)=psolve(1)
             tref(k)=t
-            theta(k)=t*(1.e5_wp/psolve(1))**(ra/cp)
+            theta(k)=t*(psurf/psolve(1))**(ra/cp)
             rhoa(k)=pref(k)/(ra*tref(k))
-            qv1d(k)=eps1*svp_liq(t)/(psolve(1)-svp_liq(t))
-            qc1d(k)=(rv_sub-qv1d(k))*adiabatic_frac
+            qv1d(k)=eps1*svp_liq(t)/(psolve(1)-svp_liq(t))*0.95_wp
+            qc1d(k)=max((rv_sub-qv1d(k))*adiabatic_frac,0._wp)
             !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-
+			!print *,2
         enddo
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         ! 3. done                                                                        !
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-     
-      
+      	!print *,3
       
 
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -1068,7 +1072,6 @@
         
         
         
-        
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         ! 5. calculate the cloud-top height                                              !
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -1081,7 +1084,6 @@
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         ! 5. done                                                                        !
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-        
         
         
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -1118,13 +1120,7 @@
         ! 6. done                                                                        !
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
                                              
-                                             
-                                             
-                                             
-                                             
-                       
-                       
-                       
+      
                        
                                              
                                              
@@ -1175,7 +1171,6 @@
         
         
         
-        
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         ! 2. calculate the cloud-base pressure                                           !
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -1192,7 +1187,6 @@
         
         
         
-        
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         ! 3. Solve hydrostatic equation up to cloud-top, conserving moist potential      !
         !    temperature                                                                 !
@@ -1202,7 +1196,7 @@
         adiabatic_frac_glob=adiabatic_frac
         rv_glob=rv_sub
         if(theta_flag) then
-            adiabatic_frac_glob2=1._wp
+            adiabatic_frac_glob2=adiabatic_frac
         else
             adiabatic_frac_glob2=0._wp
             rv_glob=0._wp
@@ -1231,18 +1225,16 @@
             !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
             prefn(k)=psolve(1)
             trefn(k)=t
-            thetan(k)=t*(1.e5_wp/psolve(1))**(ra/cp)
+            thetan(k)=t*(psurf/psolve(1))**(ra/cp)
             rhoan(k)=pref(k)/(ra*tref(k))
-            qv1d(k)=eps1*svp_liq(t)/(psolve(1)-svp_liq(t))
-            qc1d(k)=(rv_sub-qv1d(k))*adiabatic_frac
+            qv1d(k)=eps1*svp_liq(t)/(psolve(1)-svp_liq(t))*0.95_wp
+            qc1d(k)=0.0_wp !max((rv_sub-qv1d(k))*adiabatic_frac,0.0_wp)
             !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
         enddo
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         ! 3. done                                                                        !
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-     
-     
      
      
      
@@ -1404,7 +1396,7 @@
 
         t=tsurf_glob*(p_glob/1.e5_wp)**(ra/cp)
         ! find the temperature by iteration
-        t=zeroin(20._wp,t_glob,calc_theta_q,1.e-5_wp)
+        t=zeroin(20._wp,t_glob*1.1,calc_theta_q,1.e-5_wp)
 
         dzdp(1)=-(ra*t)/(grav*p)
 	
@@ -1432,9 +1424,9 @@
     
         p_glob=p(1)
 
-        t=tsurf_glob*(p_glob/1.e5_wp)**(ra/cp)
-        ! find the temperature by iteration
-        t=zeroin(20._wp,t_glob,calc_theta_q,1.e-5_wp)
+        !t=tsurf_glob*(p(1)/1.e5_wp)**(ra/cp)
+        ! find the temperature by iteration 
+        t=zeroin(20._wp,t_glob*1.1,calc_theta_q,1.e-5_wp)
 
         dpdz(1)=-(grav*p(1))/(ra*t)
 	

@@ -256,12 +256,13 @@
 
 
 		! locals:		
-		integer(i4b) :: n,n2, cur=1, i,j,k,nqc, error, rank2
-		real(wp) :: time, time_last_output, output_time, t1=0._wp,t2=0._wp
+		integer(i4b) :: n,n2, cur=1, i,j,k,nqc, error, rank2, jj,kk
+		real(wp) :: time, time_last_output, output_time, t1=0._wp,t2=0._wp, rad
 		real(wp), dimension(nq) :: q1,q2
 		real(wp), dimension(:,:,:), pointer :: u,zu,tu
 		real(wp), dimension(:,:,:), pointer :: v,zv,tv
 		real(wp), dimension(:,:,:), pointer :: w,zw,tw
+		real(wp), dimension(1-r_h:kpp+r_h,1-r_h:jpp+r_h,1-r_h:ipp+r_h) :: utmp, vtmp, wtmp
 ! 		real(wp), &
 ! 			dimension(1-r_h:kpp+r_h,1-r_h:jpp+r_h,1-r_h:ipp+r_h) :: th2
 		
@@ -301,7 +302,7 @@
 		! time-loop                                                                      !
 		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 		do n=1,ntim	
-		
+			
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 			! write netcdf variables                                                     !
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -452,7 +453,7 @@
 			! calculate sources of momentum, theta, q, pressure                          !
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 			call sources(ring_comm, id, rank2, dims,coords, &
-				dt,x,y,z,zn,dx,dy,dz,dxn,dyn,dzn,ipp,jpp,kpp,l_h,r_h,&
+				dt,xn,yn ,z,zn,dx,dy,dz,dxn,dyn,dzn,ipp,jpp,kpp,l_h,r_h,&
 				nq, &
 				ubar,vbar,wbar,thbar,qbar, dampfacn,dampfac, &
 				u_force,v_force,forcing_tau, &
@@ -477,8 +478,6 @@
                 nrad,ngs,lamgs,mugs, &
                 nprocv,mvrecv)
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-
-
 
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 			! set halos																	 !
@@ -587,14 +586,6 @@
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 
-			
-
-
-
-			
-
-
-
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 			! advance momentum 1 time-step                                               !
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -606,12 +597,10 @@
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 			! advance scalars 1 time-step                                                !
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-            if(viscous) then
-                    ! advance fields
-                    call advance_scalar_fields_3d(dt,&
-                        q,sq,&
-                        th,sth,rhoa,rhoan,ipp,jpp,kpp,nq,l_h,r_h,moisture)            
-            endif
+			! advance fields
+			call advance_scalar_fields_3d(dt,&
+				q,sq,&
+				th,sth,rhoa,rhoan,ipp,jpp,kpp,nq,l_h,r_h,moisture)            
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 
@@ -626,9 +615,15 @@
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 			! time-smoothing                                                             !
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-            u=0.99_wp*u+0.01_wp*zu
-            v=0.99_wp*v+0.01_wp*zv
-            w=0.99_wp*w+0.01_wp*zw
+            utmp=0.99_wp*u+0.01_wp*zu
+            vtmp=0.99_wp*v+0.01_wp*zv
+            wtmp=0.99_wp*w+0.01_wp*zw
+            zu=0.01_wp*u+0.99_wp*zu
+            zv=0.01_wp*v+0.99_wp*zv
+            zw=0.01_wp*w+0.99_wp*zw
+            u=utmp
+            v=vtmp
+            w=wtmp
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 
