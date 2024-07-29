@@ -2092,7 +2092,6 @@
 		! condensation of liquid water                                                   !
 		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 		! smr at 0c
-		!q0sat=eps1*svp_liq(ttr)/(p(k)-svp_liq(ttr))
 		q0sat=eps1*svp_liq(ttr)/(p(k)-svp_liq(ttr))
     	smr(k)=eps1*svp_liq(t(k))/(p(k)-svp_liq(t(k))) ! saturation mixing ratio
         
@@ -2110,7 +2109,6 @@
 		
 		tc=t(k)-ttr
     	smr(k)=eps1*svp_liq(t(k))/(p(k)-svp_liq(t(k))) ! saturation mixing ratio
-    	q0sat=smr(k)	
     	smr_i(k)=eps1*svp_ice(t(k))/(p(k)-svp_ice(t(k))) ! saturation mixing ratio - ice	
     	
     	cond=(q(k,iqc)-qold)
@@ -2197,6 +2195,7 @@
             !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
             act_frac1=max(act_frac1,0._wp)
+!             act_frac1=1000.0e6_wp/sum(n_aer1*act_frac1)*act_frac1
             temp1=sum(n_aer1*act_frac1)
             ! put in-cloud aerosol into aerosol - i.e. remove it first
             do i=1,n_mode-1
@@ -2555,6 +2554,9 @@
         ! 12. warm rain autoconversion based on Seifert and Beheng (2006)                !
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 		if (wr_flag) then
+!         if(q(k,iqc).gt.qsmall) then
+!         	q(k,inc)=1000.e6
+!         endif
             call seifert_beheng(sb_aut,sb_acr, sb_cwaut, sb_cwacr, sb_raut, &
                         sb_rsel, sb_cwsel, q(k,cst(cat_c)+1),q(k,cst(cat_c)),&
                         q(k,cst(cat_r)+1),q(k,cst(cat_r)),rho(k),dt)
@@ -2960,6 +2962,9 @@
             q(k,1)=q(k,1)+q(k,iqc)
             q(k,inc:iqc) = 0.0_wp
         endif
+!         if(q(k,iqc).gt.qsmall) then
+!         	q(k,inc)=1000.e6
+!         endif
         
 
 
