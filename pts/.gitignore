@@ -13,4 +13,4 @@ papers
 tests
 matlab-dev
 *.dSYM
-
+.DS_Store

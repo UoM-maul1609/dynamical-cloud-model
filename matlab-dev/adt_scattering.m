@@ -4,8 +4,10 @@ average=true;
 if average
     for i=1:length(lambdas)-1
         [blt(i),x_upper(i),x_lower(i),sum_upper(i),sum_lower(i)]=...
-            inline_planck(lambdas(i),lambdas(i+1),290);
+            inline_planck(lambdas(i),lambdas(i+1),5800);
     end
+    % convert to TOA
+    blt=blt.*(7e8./150e9).^2;
 end
 
 result=zeros(length(lambdas),1);
