@@ -618,8 +618,8 @@
                                         prefn,trefn,thetan,rhoan,zn,dzn, &
                                         coords,dims, id, comm3d)
             if(moisture) then
-                q(i,:,:,inc)=0._wp
                 do i=1-l_h,kpp+r_h
+	                q(i,:,:,inc)=0._wp
                     q(i,:,:,iqc)=qc1d(i)
                     q(i,:,:,iqv)=qv1d(i)
                     if(qc1d(i).gt.0._wp) q(i,:,:,inc)=num_drop
@@ -1226,7 +1226,7 @@
             prefn(k)=psolve(1)
             trefn(k)=t
             thetan(k)=t*(psurf/psolve(1))**(ra/cp)
-            rhoan(k)=pref(k)/(ra*tref(k))
+            rhoan(k)=prefn(k)/(ra*trefn(k))
             qv1d(k)=eps1*svp_liq(t)/(psolve(1)-svp_liq(t))*0.95_wp
             qc1d(k)=0.0_wp !max((rv_sub-qv1d(k))*adiabatic_frac,0.0_wp)
             !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
