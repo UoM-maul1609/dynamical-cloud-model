@@ -72,7 +72,7 @@
 		        ! Flux going through left cell boundary from adjacent cell-x
 				fx_l(k,j,i)=( (u(k,j,i-1)+abs(u(k,j,i-1)))*psi(k,j,i-1)+ &
 					(u(k,j,i-1)-abs(u(k,j,i-1)))*psi(k,j,i) )*dt/ &
-					(2._wp*dxn(i-1))
+					(2._wp*dxn(i))
 		
 				fy_r(k,j,i)=( (v(k,j,i)+abs(v(k,j,i)))*psi(k,j,i)+ &
 					(v(k,j,i)-abs(v(k,j,i)))*psi(k,j+1,i) )*dt/ &
@@ -80,15 +80,15 @@
 		
 				fy_l(k,j,i)=( (v(k,j-1,i)+abs(v(k,j-1,i)))*psi(k,j-1,i)+ &
 					(v(k,j-1,i)-abs(v(k,j-1,i)))*psi(k,j,i) )*dt/ &
-					(2._wp*dyn(j-1))
+					(2._wp*dyn(j))
 		
-				fz_r(k,j,i)=( (w(k,j,i)+abs(w(k,j,i)))*rhoan(k)*psi(k,j,i)+ &
-					(w(k,j,i)-abs(w(k,j,i)))*rhoan(k+1)*psi(k+1,j,i) )*dt/ &
-					(2._wp*dzn(k)*rhoa(k))
+				fz_r(k,j,i)=( (w(k,j,i)+abs(w(k,j,i)))*rhoa(k)*psi(k,j,i)+ &
+					(w(k,j,i)-abs(w(k,j,i)))*rhoa(k)*psi(k+1,j,i) )*dt/ &
+					(2._wp*dzn(k)*rhoan(k))
 		
-				fz_l(k,j,i)=( (w(k-1,j,i)+abs(w(k-1,j,i)))*rhoan(k-1)*psi(k-1,j,i)+ &
-					(w(k-1,j,i)-abs(w(k-1,j,i)))*rhoan(k)*psi(k,j,i) )*dt/ &
-					(2._wp*dzn(k-1)*rhoa(k))
+				fz_l(k,j,i)=( (w(k-1,j,i)+abs(w(k-1,j,i)))*rhoa(k-1)*psi(k-1,j,i)+ &
+					(w(k-1,j,i)-abs(w(k-1,j,i)))*rhoa(k-1)*psi(k,j,i) )*dt/ &
+					(2._wp*dzn(k)*rhoan(k))
 			enddo
 		enddo
 	enddo
@@ -271,7 +271,7 @@
 						beta_i_up, beta_i_down,&
 						beta_j_up, beta_j_down,&
 						beta_k_up, beta_k_down
-	
+	real(wp) :: g_bar1, g_bar2, g_bar3
 
 	! has to be positive definite
 	minlocal=min(minval(psi_in(:,:,:)),lbc,ubc)
@@ -326,6 +326,14 @@
 						!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 						! calculate the anti-diffusive velocities                        !
 						!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+						! Generalised G = rho factors
+						!
+						! u and v are at scalar vertical level k
+						g_bar1 = rhoan(k)
+						g_bar2 = rhoan(k)
+						
+						! w is between scalar levels k and k+1
+						g_bar3 = 0.5_wp*(rhoan(k)+rhoan(k+1))
 
 
 
@@ -334,22 +342,31 @@
 						!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 						! for divergent flow: eq 38 smolarkiewicz 1984 
 						! last part of u wind:
-						u_div1=(wt(k,j,i)+wt(k,j,i+1)-wt(k-1,j,i)-wt(k-1,j,i+1)) &
-								/ dz(k-1) + &
-								(vt(k,j,i)+vt(k,j,i+1)-vt(k,j-1,i)-vt(k,j-1,i+1)) &
-								/ dy(j-1)
+						u_div1 = &
+							( rhoa(k)   *(wt(k,j,i)+wt(k,j,i+1)) - &
+							  rhoa(k-1) *(wt(k-1,j,i)+wt(k-1,j,i+1)) ) / &
+							  (dz(k-1)*g_bar1) + &
+							( rhoan(k)*(vt(k,j,i)+vt(k,j,i+1) - &
+										vt(k,j-1,i)-vt(k,j-1,i+1)) ) / &
+							  (dy(j-1)*g_bar1)
 						! for divergent flow: eq 38 smolarkiewicz 1984 
 						! last part of v wind:
-						u_div2=(wt(k,j,i)+wt(k,j+1,i)-wt(k-1,j,i)-wt(k-1,j+1,i)) &
-								/ dz(k-1) + &
-								(ut(k,j,i)+ut(k,j+1,i)-ut(k,j,i-1)-ut(k,j+1,i-1)) &
-								/ dx(i-1)
+						u_div2 = &
+							( rhoa(k)   *(wt(k,j,i)+wt(k,j+1,i)) - &
+							  rhoa(k-1) *(wt(k-1,j,i)+wt(k-1,j+1,i)) ) / &
+							  (dz(k-1)*g_bar2) + &
+							( rhoan(k)*(ut(k,j,i)+ut(k,j+1,i) - &
+										ut(k,j,i-1)-ut(k,j+1,i-1)) ) / &
+							  (dx(i-1)*g_bar2)
 						! for divergent flow: eq 38 smolarkiewicz 1984 
 						! last part of w wind:
-						u_div3=(ut(k,j,i)+ut(k+1,j,i)-ut(k,j,i-1)-ut(k+1,j,i-1)) &
-								/ dx(i-1) + &
-								(vt(k,j,i)+vt(k+1,j,i)-vt(k,j-1,i)-vt(k+1,j-1,i)) &
-								/ dy(j-1)
+						u_div3 = &
+							( rhoan(k)  *(ut(k,j,i)-ut(k,j,i-1)) + &
+							  rhoan(k+1)*(ut(k+1,j,i)-ut(k+1,j,i-1)) ) / &
+							  (dx(i-1)*g_bar3) + &
+							( rhoan(k)  *(vt(k,j,i)-vt(k,j-1,i)) + &
+							  rhoan(k+1)*(vt(k+1,j,i)-vt(k+1,j-1,i)) ) / &
+							  (dy(j-1)*g_bar3)
 						!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 
@@ -360,68 +377,89 @@
 						! journal of computational physics
 						! second term of u wind:
 						u_j_bar1 = 0.5_wp*dt*ut(k,j,i) * ( &
-							! equation 14:
-							0.25_wp*(wt(k,j,i+1)+wt(k,j,i)+wt(k-1,j,i+1)+wt(k-1,j,i)) * &
-							! equation 13:
-						   ( psi_old(k+1,j,i+1)+psi_old(k+1,j,i)- &
-						     psi_old(k-1,j,i+1)-psi_old(k-1,j,i) ) / &
-						   ( psi_old(k+1,j,i+1)+psi_old(k+1,j,i)+ &
-						     psi_old(k-1,j,i+1)+psi_old(k-1,j,i)+small ) / &
-						     ( 0.5_wp*(dzn(k-1)+dzn(k)) ) + &
-						    ! repeat for y dimension:
-							! equation 14:
-							0.25_wp*(vt(k,j,i+1)+vt(k,j,i)+vt(k,j-1,i+1)+vt(k,j-1,i)) * &
-							! equation 13:
-						   ( psi_old(k,j+1,i+1)+psi_old(k,j+1,i)- &
-						     psi_old(k,j-1,i+1)-psi_old(k,j-1,i) ) / &
-						   ( psi_old(k,j+1,i+1)+psi_old(k,j+1,i)+ &
-						     psi_old(k,j-1,i+1)+psi_old(k,j-1,i)+small ) / &
-						     ( 0.5_wp*(dyn(j-1)+dyn(j)) ) )
-						     
+							! equation 14, z contribution: average G*w / G_u
+							0.25_wp*( &
+								rhoa(k)   *wt(k,j,i+1) + &
+								rhoa(k)   *wt(k,j,i) + &
+								rhoa(k-1) *wt(k-1,j,i+1) + &
+								rhoa(k-1) *wt(k-1,j,i) ) / g_bar1 * &
+							! equation 13
+							( psi_old(k+1,j,i+1)+psi_old(k+1,j,i)- &
+							  psi_old(k-1,j,i+1)-psi_old(k-1,j,i) ) / &
+							( psi_old(k+1,j,i+1)+psi_old(k+1,j,i)+ &
+							  psi_old(k-1,j,i+1)+psi_old(k-1,j,i)+small ) / &
+							(0.5_wp*(dzn(k-1)+dzn(k))) + &
+							! equation 14, y contribution: average G*v / G_u
+							0.25_wp*( &
+								rhoan(k)*vt(k,j,i+1) + &
+								rhoan(k)*vt(k,j,i) + &
+								rhoan(k)*vt(k,j-1,i+1) + &
+								rhoan(k)*vt(k,j-1,i) ) / g_bar1 * &
+							! equation 13
+							( psi_old(k,j+1,i+1)+psi_old(k,j+1,i)- &
+							  psi_old(k,j-1,i+1)-psi_old(k,j-1,i) ) / &
+							( psi_old(k,j+1,i+1)+psi_old(k,j+1,i)+ &
+							  psi_old(k,j-1,i+1)+psi_old(k,j-1,i)+small ) / &
+							(0.5_wp*(dyn(j-1)+dyn(j))) )
+    						     
 						     
 						! equation 13 page 330 of smolarkiewicz (1984) 
 						! journal of computational physics
 						! second term of v wind:
-						u_j_bar2 = 0.5_wp*dt*vt(k,j,i) * ( &
-							! equation 14:
-							0.25_wp*(wt(k,j+1,i)+wt(k,j,i)+wt(k-1,j+1,i)+wt(k-1,j,i)) * &
-							! equation 13:
-						   ( psi_old(k+1,j+1,i)+psi_old(k+1,j,i)- &
-						     psi_old(k-1,j+1,i)-psi_old(k-1,j,i) ) / &
-						   ( psi_old(k+1,j+1,i)+psi_old(k+1,j,i)+ &
-						     psi_old(k-1,j+1,i)+psi_old(k-1,j,i)+small ) / &
-						     ( 0.5_wp*(dzn(k-1)+dzn(k)) ) + &
-						    ! repeat for y dimension:
-							! equation 14:
-							0.25_wp*(ut(k,j+1,i)+ut(k,j,i)+ut(k,j+1,i-1)+ut(k,j,i-1)) * &
-							! equation 13:
-						   ( psi_old(k,j+1,i+1)+psi_old(k,j,i+1)- &
-						     psi_old(k,j+1,i-1)-psi_old(k,j,i-1) ) / &
-						   ( psi_old(k,j+1,i+1)+psi_old(k,j,i+1)+ &
-						     psi_old(k,j+1,i-1)+psi_old(k,j,i-1)+small ) / &
-						     ( 0.5_wp*(dxn(i-1)+dxn(i)) ) )
-						     
+						u_j_bar2 = 0.5_wp*dt*vt(k,j,i) * ( &						
+							! equation 14, z contribution
+							0.25_wp*( &
+								rhoa(k)   *wt(k,j+1,i) + &
+								rhoa(k)   *wt(k,j,i) + &
+								rhoa(k-1) *wt(k-1,j+1,i) + &
+								rhoa(k-1) *wt(k-1,j,i) ) / g_bar2 * &
+							! equation 13
+							( psi_old(k+1,j+1,i)+psi_old(k+1,j,i)- &
+							  psi_old(k-1,j+1,i)-psi_old(k-1,j,i) ) / &
+							( psi_old(k+1,j+1,i)+psi_old(k+1,j,i)+ &
+							  psi_old(k-1,j+1,i)+psi_old(k-1,j,i)+small ) / &
+							(0.5_wp*(dzn(k-1)+dzn(k))) + &
+							! equation 14, x contribution
+							0.25_wp*( &
+								rhoan(k)*ut(k,j+1,i) + &
+								rhoan(k)*ut(k,j,i) + &
+								rhoan(k)*ut(k,j+1,i-1) + &
+								rhoan(k)*ut(k,j,i-1) ) / g_bar2 * &
+							! equation 13
+							( psi_old(k,j+1,i+1)+psi_old(k,j,i+1)- &
+							  psi_old(k,j+1,i-1)-psi_old(k,j,i-1) ) / &
+							( psi_old(k,j+1,i+1)+psi_old(k,j,i+1)+ &
+							  psi_old(k,j+1,i-1)+psi_old(k,j,i-1)+small ) / &
+							(0.5_wp*(dxn(i-1)+dxn(i))) )
+    						     
 						! equation 13 page 330 of smolarkiewicz (1984) 
 						! journal of computational physics
 						! second term of w wind:
-						u_j_bar3 = 0.5_wp*dt*wt(k,j,i) * ( &
-							! equation 14:
-							0.25_wp*(vt(k+1,j,i)+vt(k,j,i)+vt(k+1,j-1,i)+vt(k,j-1,i)) * &
-							! equation 13:
-						   ( psi_old(k+1,j+1,i)+psi_old(k,j+1,i)- &
-						     psi_old(k+1,j-1,i)-psi_old(k,j-1,i) ) / &
-						   ( psi_old(k+1,j+1,i)+psi_old(k,j+1,i)+ &
-						     psi_old(k+1,j-1,i)+psi_old(k,j-1,i)+small ) / &
-						     ( 0.5_wp*(dyn(j-1)+dyn(j)) ) + &
-						    ! repeat for y dimension:
-							! equation 14:
-							0.25_wp*(ut(k+1,j,i)+ut(k,j,i)+ut(k+1,j,i-1)+ut(k,j,i-1)) * &
-							! equation 13:
-						   ( psi_old(k+1,j,i+1)+psi_old(k,j,i+1)- &
-						     psi_old(k+1,j,i-1)-psi_old(k,j,i-1) ) / &
-						   ( psi_old(k+1,j,i+1)+psi_old(k,j,i+1)+ &
-						     psi_old(k+1,j,i-1)+psi_old(k,j,i-1)+small ) / &
-						     ( 0.5_wp*(dxn(i-1)+dxn(i)) ) )
+						u_j_bar3 = 0.5_wp*dt*wt(k,j,i) * ( &						
+							! equation 14, y contribution
+							0.25_wp*( &
+								rhoan(k+1)*vt(k+1,j,i) + &
+								rhoan(k)  *vt(k,j,i) + &
+								rhoan(k+1)*vt(k+1,j-1,i) + &
+								rhoan(k)  *vt(k,j-1,i) ) / g_bar3 * &
+							! equation 13
+							( psi_old(k+1,j+1,i)+psi_old(k,j+1,i)- &
+							  psi_old(k+1,j-1,i)-psi_old(k,j-1,i) ) / &
+							( psi_old(k+1,j+1,i)+psi_old(k,j+1,i)+ &
+							  psi_old(k+1,j-1,i)+psi_old(k,j-1,i)+small ) / &
+							(0.5_wp*(dyn(j-1)+dyn(j))) + &
+							! equation 14, x contribution
+							0.25_wp*( &
+								rhoan(k+1)*ut(k+1,j,i) + &
+								rhoan(k)  *ut(k,j,i) + &
+								rhoan(k+1)*ut(k+1,j,i-1) + &
+								rhoan(k)  *ut(k,j,i-1) ) / g_bar3 * &
+							! equation 13
+							( psi_old(k+1,j,i+1)+psi_old(k,j,i+1)- &
+							  psi_old(k+1,j,i-1)-psi_old(k,j,i-1) ) / &
+							( psi_old(k+1,j,i+1)+psi_old(k,j,i+1)+ &
+							  psi_old(k+1,j,i-1)+psi_old(k,j,i-1)+small ) / &
+							(0.5_wp*(dxn(i-1)+dxn(i))) )
 						!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 
@@ -439,20 +477,28 @@
 							(psi_old(k,j+1,i)-psi_old(k,j,i) ) / &
 							(psi_old(k,j+1,i)+psi_old(k,j,i)+small) /dyn(j) - u_j_bar2														
 						! w wind:
-						wt_sav(k,j,i)=(abs(wt(k,j,i))*dz(k)-dt*wt(k,j,i)*wt(k,j,i) ) * &
-							(psi_old(k+1,j,i)-psi_old(k,j,i) ) / &
-							(psi_old(k+1,j,i)+psi_old(k,j,i)+small) /dzn(k) - u_j_bar3
+						wt_sav(k,j,i) = &
+							( abs(wt(k,j,i))*dz(k) - &
+							  dt*(rhoa(k)/g_bar3)*wt(k,j,i)*wt(k,j,i) ) * &
+							(psi_old(k+1,j,i)-psi_old(k,j,i)) / &
+							(psi_old(k+1,j,i)+psi_old(k,j,i)+small) / &
+							dzn(k) - u_j_bar3
 						!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 							
 						!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 						! last update of eq 38 smolarkiewicz 1984
 						!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-						ut_sav(k,j,i)=ut_sav(k,j,i) - 0.25_wp*dt*ut(k,j,i) * &
-						 ( (ut(k,j,i+1)-ut(k,j,i-1))/(dx(i-1))+u_div1 )
-						vt_sav(k,j,i)=vt_sav(k,j,i) - 0.25_wp*dt*vt(k,j,i) * &
-						 ( (vt(k,j+1,i)-vt(k,j-1,i))/(dy(j-1))+u_div2 )
-						wt_sav(k,j,i)=wt_sav(k,j,i) - 0.25_wp*dt*wt(k,j,i) * &
-						 ( (wt(k+1,j,i)-wt(k-1,j,i))/(dz(k-1))+u_div3 )
+						ut_sav(k,j,i) = ut_sav(k,j,i) - &
+							0.25_wp*dt*ut(k,j,i) * &
+							( (ut(k,j,i+1)-ut(k,j,i-1))/dx(i-1) + u_div1 )						
+						vt_sav(k,j,i) = vt_sav(k,j,i) - &
+							0.25_wp*dt*vt(k,j,i) * &
+							( (vt(k,j+1,i)-vt(k,j-1,i))/dy(j-1) + u_div2 )
+						wt_sav(k,j,i) = wt_sav(k,j,i) - &
+							0.25_wp*dt*wt(k,j,i) * &
+							( ( rhoa(k+1)*wt(k+1,j,i) - &
+								rhoa(k-1)*wt(k-1,j,i) ) / &
+							  (dz(k-1)*g_bar3) + u_div3 )
 						!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 
@@ -747,13 +793,13 @@
     			else
     			    wkm1ji=w(k-1,j,i)
     			endif
-				fz_r(k,j,i)=( (wkji+abs(wkji))*rhoan(k)*psi(k,j,i)+ &
-					(wkji-abs(wkji))*rhoan(k+1)*psi(k+1,j,i) )*dt/ &
-					(2._wp*dzn(k)*rhoa(k))
+				fz_r(k,j,i)=( (wkji+abs(wkji))*rhoa(k)*psi(k,j,i)+ &
+					(wkji-abs(wkji))*rhoa(k)*psi(k+1,j,i) )*dt/ &
+					(2._wp*dzn(k)*rhoan(k))
 		
-				fz_l(k,j,i)=( (wkm1ji+abs(wkm1ji))*rhoan(k-1)*psi(k-1,j,i)+ &
-					(wkm1ji-abs(wkm1ji))*rhoan(k)*psi(k,j,i) )*dt/ &
-					(2._wp*dzn(k-1)*rhoa(k))
+				fz_l(k,j,i)=( (wkm1ji+abs(wkm1ji))*rhoa(k-1)*psi(k-1,j,i)+ &
+					(wkm1ji-abs(wkm1ji))*rhoa(k-1)*psi(k,j,i) )*dt/ &
+					(2._wp*dzn(k)*rhoan(k))
 			enddo
 		enddo
 	enddo
@@ -838,7 +884,7 @@
 	real(wp), dimension(-r_h+1:kp+r_h,-r_h+1:jp+r_h,-r_h+1:ip+r_h) :: &
 						psi_k_max,psi_k_min, &
 						beta_k_up, beta_k_down
-	
+	real(wp) :: g_bar1, g_bar2, g_bar3
 
 	! has to be positive definite
 	minlocal=min(minval(psi_in(:,:,:)),lbc,ubc)
@@ -887,7 +933,14 @@
 						!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 						! calculate the anti-diffusive velocities                        !
 						!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-
+						! Generalised G = rho factors
+						!
+						! u and v are at scalar vertical level k
+						g_bar1 = rhoan(k)
+						g_bar2 = rhoan(k)
+						
+						! w is between scalar levels k and k+1
+						g_bar3 = 0.5_wp*(rhoan(k)+rhoan(k+1))
 
 
 
@@ -915,17 +968,24 @@
 						! last update of equation 13
 						!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 						! w wind:
-						wt_sav(k,j,i)=(abs(wt(k,j,i))*dz(k)-dt*wt(k,j,i)*wt(k,j,i) ) * &
-							(psi_old(k+1,j,i)-psi_old(k,j,i) ) / &
-							(psi_old(k+1,j,i)+psi_old(k,j,i)+small) /dzn(k) - u_j_bar3
+						wt_sav(k,j,i) = &
+							( abs(wt(k,j,i))*dz(k) - &
+							  dt*(rhoa(k)/g_bar3)*wt(k,j,i)*wt(k,j,i) ) * &
+							(psi_old(k+1,j,i)-psi_old(k,j,i)) / &
+							(psi_old(k+1,j,i)+psi_old(k,j,i)+small) / &
+							dzn(k) - u_j_bar3
 						!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 							
 						!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 						! last update of eq 38 smolarkiewicz 1984
 						!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-						wt_sav(k,j,i)=wt_sav(k,j,i) - 0.25_wp*dt*wt(k,j,i) * &
-						 ( (wt(k+1,j,i)-wt(k-1,j,i))/(dz(k-1))+u_div3 )
+						wt_sav(k,j,i) = wt_sav(k,j,i) - &
+							0.25_wp*dt*wt(k,j,i) * &
+							( ( rhoa(k+1)*wt(k+1,j,i) - &
+								rhoa(k-1)*wt(k-1,j,i) ) / &
+							  (dz(k-1)*g_bar3) + u_div3 )
 						!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
 
 
 					enddo
