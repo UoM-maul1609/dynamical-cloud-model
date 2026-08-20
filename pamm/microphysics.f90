@@ -379,6 +379,13 @@
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         ! if you would like to calculate ice microphysics                                !
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        ! Ice-only indices remain invalid in warm-only configurations.  Set them
+        ! explicitly so any accidental unguarded access fails predictably.
+        ini   = 0
+        iqi   = 0
+        iai   = 0
+        cat_i = 0
+
         if(ice_flag) then
             ncat=ncat+1             ! add the ice category
             nq=nq+(n_mode-1)*3 + &  ! aerosol in ice water
@@ -1926,7 +1933,7 @@
 	! coalescence efficiencies
 	real(wp), dimension(1-o_halo:kp+o_halo) :: egi_dry, egs_dry, esi, eii, ess
 	real(wp) :: qold,des_dt,dqs_dt,err,cond,temp1, dummy1,dummy2, dummy3,&
-	            dummy4, factor1, &
+	            dummy4, factor1, ni_for_limit, qi_for_limit, &
 	            n_mix,s_mix,m_mix, nin_c, din_c,nin_r,din_r, n_tot, s_tot, m_tot, rii_coll
 	
 	real(wp), dimension(1-o_halo:kp+o_halo) :: gamma_t,dep_density, qold1
@@ -2573,14 +2580,26 @@
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         ! Process-consistent limiter.  One factor is applied to every tendency belonging !
         ! to a physical process (mass, number and SIP), using gross donor sinks.          !
+        !                                                                                 !
+        ! In warm-only configurations ini/iqi are deliberately invalid (zero), so pass    !
+        ! zero ice reservoirs rather than indexing q(:,0).                                !
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        if(ice_flag) then
+            ni_for_limit = q(k,ini)
+            qi_for_limit = q(k,iqi)
+        else
+            ni_for_limit = 0._wp
+            qi_for_limit = 0._wp
+        endif
+
         call scale_microphysics(praci(k),rraci(k),piacr(k),riacr(k), &
             nfrag_m1c(k),nfrag_m2(k),nfrag_ii(k),rii_coll, &
             nin_c,nin_r,nfrag_nucc(k),nfrag_nucr(k), &
             massc_nucc(k),massr_nucr(k),piacw(k),riacw(k), &
             pidep(k),pisub(k),risub(k),riaci(k),prevp(k),rrevp(k), &
             praut(k),pracw(k),rcwacr(k),rraut(k),rrsel(k),rcwaut(k),rcwsel(k), &
-            q(k,1),q(k,inc),q(k,iqc),q(k,inr),q(k,iqr),q(k,ini),q(k,iqi),t(k),dt)
+            q(k,1),q(k,inc),q(k,iqc),q(k,inr),q(k,iqr), &
+            ni_for_limit,qi_for_limit,t(k),dt)
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
     
@@ -2998,7 +3017,8 @@
         ! Melt only the ice mass that can be supplied by sensible heat above 0 C.
         pimlt(k)=0._wp
         rimlt(k)=0._wp
-        if(ice_flag.and.(t(k).gt.ttr).and.(q(k,iqi).gt.qsmall)) then
+        if(ice_flag) then
+          if ((t(k).gt.ttr).and.(q(k,iqi).gt.qsmall)) then
             dummy1=min(q(k,iqi),max((t(k)-ttr)*cp/lf,0._wp)) ! mass melted
             if(dummy1.gt.0._wp) then
                 factor1=min(dummy1/(q(k,iqi)+qsmall),1._wp)
@@ -3022,6 +3042,7 @@
                 q(k,iqr)=q(k,iqr)+dummy1
                 t(k)=t(k)-lf/cp*dummy1
             endif
+          endif
         endif
 
         q(k,cst(cat_r)+1)=q(k,cst(cat_r)+1)-prevp(k)*dt
