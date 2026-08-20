@@ -251,7 +251,7 @@
                 ! sn1 = (s0.5+s1.5)/2
                 szn(i)=0.5_wp*(sz(i)+sz(i-1))
             enddo
-            szn(0)=0.5_wp*(sz(0)+(sz(0)-(szn(1)-szn(0))))
+            szn(0) = sz(0) - (szn(1)-sz(0))
             !---checked
             
             ! thickness
@@ -458,7 +458,7 @@
                         
                     ! now solve
                     call tridiagonal(a,b,c,r,u)
-                    wg(1:tdend,j,i)=min(u,wgs(1:tdend)) ! can't be more than the 
+                    wg(1:tdend,j,i)=max(0._wp,min(u,wgs(1:tdend))) ! can't be more than the 
                                                         ! saturated value
                     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
@@ -521,7 +521,7 @@
                 ! wind speed in first layer above surface 
                 vmag(j,i)=0.5_wp*sqrt((u(1,j,i)+u(1,j,i-1))**2 + &
                                       (v(1,j,i)+v(1,j-1,i))**2  )+small
-                vmag(j,i)=5._wp
+                !vmag(j,i)=5._wp
 
                 ! bulk richardson number
                 ! equation 8.39 (Jacobson pp 243) - theta(0) is the surface there is no pertubation here
@@ -547,8 +547,10 @@
                     (ustar(j,i)*prn*log(z(1)/z0)**2)*gh(j,i)
                 
                 if(w1(j,i)<wfc) then
-                    qv0=0.25_wp*(1._wp+cos(w1(j,i)/wfc*pi))**2
+                	! should really be called beta_soil
+                    qv0=0.25_wp*(1._wp-cos(w1(j,i)/wfc*pi))**2
                 else
+                	! should really be called beta_soil
                     qv0=1.0_wp
                 endif  
                 qv0=qv0*eps1*svp_liq(tsurf(j,i))/psurf + (1._wp-qv0)*q(1,j,i)          
