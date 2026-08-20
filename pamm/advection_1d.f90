@@ -238,7 +238,7 @@
 	subroutine coeff_bott_scheme_1d(q,a_coeff,j,ord,o_halo)
 		use numerics_type
 		implicit none
-		real(wp), intent(in), dimension(-o_halo+1:kp+1+o_halo) :: q
+		real(wp), intent(in), dimension(-o_halo+1:kp+o_halo) :: q
 		real(wp), intent(inout), dimension(1:ord+1) :: a_coeff
 		integer(i4b), intent(in) :: j,ord,o_halo
 
@@ -281,7 +281,7 @@
 
                 a_coeff(3) = 1._wp/16._wp*(-q(j+2)+12._wp*q(j+1) &
                             -22._wp*q(j)+12._wp*q(j-1)-q(j-2))
-                a_coeff(4) = 1._wp/288._wp*(-7*q(j+3)-52._wp*q(j+2) &
+                a_coeff(4) = 1._wp/288._wp*(-7*q(j+3)+52._wp*q(j+2) &
                             -83._wp*q(j+1)+83._wp*q(j-1)-52._wp*q(j-2)+7._wp*q(j-3))
 
                 a_coeff(5) = 1._wp/24._wp*(q(j+2)-4._wp*q(j+1) &
@@ -323,7 +323,7 @@
 
                 a_coeff(2) = 1._wp/645120._wp*(-3229._wp*q(j+4)+&
                             33878._wp*q(j+3)-170422._wp*q(j+2)+ &
-                            574686._wp*q(j+1)-574686._wp*q(j-1)+170433._wp*q(j-2)-&
+                            574686._wp*q(j+1)-574686._wp*q(j-1)+170422._wp*q(j-2)-&
                             33878._wp*q(j-3)+3229._wp*q(j-4))
 
                 a_coeff(3) = 1._wp/3840._wp*(37*q(j+3)-462._wp*q(j+2)+ &
@@ -359,7 +359,7 @@
                 a_coeff(2) = 1._wp/645120._wp*(-3229._wp*q(j+4)+ &
                             33878._wp*q(j+3)-170422._wp*q(j+2)+ &
                             574686._wp*q(j+1)-574686._wp*q(j-1)+ &
-                            170433._wp*q(j-2)-33878._wp*q(j-3)+3229._wp*q(j-4))
+                            170422._wp*q(j-2)-33878._wp*q(j-3)+3229._wp*q(j-4))
 
                 a_coeff(3) = 1._wp/1935360._wp*(-3229._wp*q(j+4)+ &
                             44480._wp*q(j+3)-323260._wp*q(j+2)+&
