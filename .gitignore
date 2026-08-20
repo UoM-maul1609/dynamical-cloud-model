@@ -13,3 +13,4 @@ papers
 tests
 *.dSYM
 __pycache__
+.DS_Store
