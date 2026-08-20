@@ -66,7 +66,7 @@
 	    integer(i4b) :: AllocateStatus,error,i
 	
 
-        call MPI_CART_RANK( comm3d, coords(3), pts1%id2,error)
+        call MPI_CART_RANK( comm3d, [coords(3)], pts1%id2,error)
 		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 		! allocate arrays                                                                !
 		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
