@@ -305,7 +305,7 @@
         ! forward elimination
         do i=2,kpp
             denom=b(i)-a(i)*xuh(i-1)
-            if(denom .eq. 0._wp) stop
+            if(denom .eq. 0._wp) call MPI_ABORT(comm3d,1,error)
             xuh(i)=c(i)/denom
             xlh(i)=(r(i)-a(i)*xlh(i-1))/denom
         enddo
@@ -318,9 +318,14 @@
         do i=kpp-1,1,-1
             xr(i)=xlh(i)-xuh(i)*xr(i+1)
             xlh(i)=-xuh(i)*xlh(i+1)
-            denom=b(i)-c(i)*xuh(i+1)
-            denom=sign(1._wp,denom+1.e-60_wp)*max(abs(denom),1.e-15)
-            if(denom .eq. 0._wp) stop
+			denom = b(i)-c(i)*xuh(i+1)
+			
+			if (abs(denom) < 100._wp*epsilon(1._wp)) then
+				print *, 'parallel_tridag: near-zero denominator'
+				print *, 'i=',i,' denom=',denom
+				call MPI_ABORT(comm3d,1,error)
+			endif
+            if(denom .eq. 0._wp) call MPI_ABORT(comm3d,1,error)
             xuh(i)=a(i)/denom
         enddo
         
