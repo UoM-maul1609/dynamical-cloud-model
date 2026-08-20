@@ -70,7 +70,7 @@
 						log_c_star1, &
 						w_test, t_test,p_test, a_eq_7, b_eq_7, &
 						act_frac1,smax1,dcrit2)
-			print *,w_test,act_frac1,  sum(act_frac1*n_aer1)
+			print *,w_test,act_frac1,  sum(act_frac1*n_aer1), sum(act_frac1*n_aer1)/sum(n_aer1)
 		else
 			! random number generator
 			call random_seed(size=l)
