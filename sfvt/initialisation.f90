@@ -22,12 +22,13 @@
 	!>allocate arrays on each PE, and initialise them
 	!>@param[inout] dt,runtime,ntim - time variables
 	!>@param[inout] x,y,z,xn,yn,zn,u,v,w,q - grid positions and prognostics
-	!>@param[inout] rhoa,rhoan - reference potential temperatures
+	!>@param[inout] rhoa  - reference density at vertical velocity (z) levels
+	!>@param[inout] rhoan - reference density at scalar (zn) levels
 	!>@param[inout] lamsq,lamsqn - mixing length
 	!>@param[inout] lbc, ubc
 	!>@param[in] cvis - smagorinsky parameter
 	!>@param[inout] dx,dy,dz - grid spacing on grid
-	!>@param[inout] dxn,dyn,dzn - grid spacing on grid - staggered
+	!>@param[inout] dxn,dyn,dzn - grid spacing on grid - 
 	!>@param[inout] ipp,jpp,kpp,ipstart,jpstart,kpstart - number of grid / starting position
 	!>@param[in] dx_nm,dy_nm,dz_nm - grid spacing from namelist
 	!>@param[in] ip,jp,kp - grid points from namelist
@@ -201,7 +202,7 @@
 		dx(:)=dx_nm
 		dy(:)=dy_nm
 		dz(:)=dz_nm
-		! grid spacing, staggered:
+		! grid spacing:
 		dxn(:)=dx_nm
 		dyn(:)=dy_nm
 		dzn(:)=dz_nm
@@ -517,7 +518,7 @@
         rad=0._wp
         do k=1-r_h,kpp+r_h
             
-            if(kp> 1) rad = (z(k)-3000._wp)**2._wp
+            if(kp> 1) rad = (zn(k)-3000._wp)**2._wp
                 
             
             rad=sqrt(rad)
@@ -685,10 +686,14 @@
 		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 		! set up grid spacing arrays                                                     !
 		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-		! grid spacing:
+		! velocity-face coordinates: x, y, z
+		! scalar-centre coordinates: xn, yn, zn
+		!
+		! rhoa  : reference density on vertical w faces (z)
+		! rhoan : reference density at scalar centres (zn)
 		dx(:)=dx_nm
 		dz(:)=dz_nm
-		! grid spacing, staggered:
+
 		dxn(:)=dx_nm
 		dzn(:)=dz_nm
 		! set up horizontal level array
@@ -719,8 +724,8 @@
 		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!		
 		do i=1,ipp
             do k=1,kpp
-                u(k,i)=-5.e-4_wp*(z(k)-5000._wp)  !/sqrt(xn(i)*xn(i)+y(j)*y(j))
-                w(k,i)=5.e-4_wp*(x(i))  !/sqrt(x(i)*x(i)+yn(j)*yn(j))
+                u(k,i)=-5.e-4_wp*(zn(k)-5000._wp)  !/sqrt(xn(i)*xn(i)+y(j)*y(j))
+                w(k,i)=5.e-4_wp*(xn(i))  !/sqrt(x(i)*x(i)+yn(j)*yn(j))
             enddo
 		enddo
 		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!		
@@ -734,9 +739,9 @@
 		do i=1-r_h,ipp+r_h
             do k=1-r_h,kpp+r_h
                 
-                if(kp> 1) rad = (z(k)-2000._wp)**2._wp
+                if(kp> 1) rad = (zn(k)-2000._wp)**2._wp
                     
-                if (ip > 1) rad=rad+x(i)**2._wp
+                if (ip > 1) rad=rad+xn(i)**2._wp
                 
                 rad=sqrt(rad)
                 if(rad<=1000._wp) then

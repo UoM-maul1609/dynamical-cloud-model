@@ -67,12 +67,12 @@
     
     
             fz_r(k,i)=( (w(k,i)+abs(w(k,i)))*rhoa(k)*psi(k,i)+ &
-                (w(k,i)-abs(w(k,i)))*rhoa(k+1)*psi(k+1,i) )*dt/ &
-                (2._wp*dzn(k)*rhoa(k))
+                (w(k,i)-abs(w(k,i)))*rhoa(k)*psi(k+1,i) )*dt/ &
+                (2._wp*dzn(k)*rhoan(k))
     
-            fz_l(k,i)=( (w(k-1,i)+abs(w(k-1,i)))*rhoan(k-1)*psi(k-1,i)+ &
-                (w(k-1,i)-abs(w(k-1,i)))*rhoan(k)*psi(k,i) )*dt/ &
-                (2._wp*dzn(k)*rhoa(k))
+            fz_l(k,i)=( (w(k-1,i)+abs(w(k-1,i)))*rhoa(k-1)*psi(k-1,i)+ &
+                (w(k-1,i)-abs(w(k-1,i)))*rhoa(k-1)*psi(k,i) )*dt/ &
+                (2._wp*dzn(k)*rhoan(k))
         enddo
 	enddo
 !$omp end simd
@@ -166,7 +166,7 @@
 						psi_i_max, psi_i_min, psi_k_max,psi_k_min, &
 						beta_i_up, beta_i_down,&
 						beta_k_up, beta_k_down
-	
+	real(wp) :: g_bar1, g_bar3
 
 	! has to be positive definite
 	minlocal=minval(psi_in(1:kp,1:ip))
@@ -221,6 +221,14 @@
                     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
                     ! calculate the anti-diffusive velocities                        !
                     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+					! Generalised G=rho factors
+					!
+					! u is at an x face.  Density varies only in z, therefore
+					! both scalar cells adjacent to this u face have rhoan(k)
+					g_bar1 = rhoan(k)
+					
+					! w is at the z face between scalar levels k and k+1
+					g_bar3 = 0.5_wp*(rhoan(k) + rhoan(k+1))
 
 
 
@@ -229,12 +237,20 @@
                     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
                     ! for divergent flow: eq 38 smolarkiewicz 1984 
                     ! last part of u wind:
-                    u_div1=(wt(k,i)+wt(k,i+1)-wt(k-1,i)-wt(k-1,i+1)) &
-                            / dz(k-1) 
+					u_div1 = ( &
+						rhoa(k  )*wt(k  ,i  ) + &
+						rhoa(k  )*wt(k  ,i+1) - &
+						rhoa(k-1)*wt(k-1,i  ) - &
+						rhoa(k-1)*wt(k-1,i+1) ) / &
+						(dz(k-1)*g_bar1)                            
                     ! for divergent flow: eq 38 smolarkiewicz 1984 
                     ! last part of w wind:
-                    u_div3=(ut(k,i)+ut(k+1,i)-ut(k,i-1)-ut(k+1,i-1)) &
-                            / dx(i-1) 
+					u_div3 = ( &
+						rhoan(k  )*ut(k  ,i  ) + &
+						rhoan(k+1)*ut(k+1,i  ) - &
+						rhoan(k  )*ut(k  ,i-1) - &
+						rhoan(k+1)*ut(k+1,i-1) ) / &
+						(dx(i-1)*g_bar3)
                     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 
@@ -244,30 +260,38 @@
                     ! equation 13 page 330 of smolarkiewicz (1984) 
                     ! journal of computational physics
                     ! second term of u wind:
-                    u_j_bar1 = 0.5_wp*dt*ut(k,i) * ( &
-                        ! equation 14:
-                        0.25_wp*(wt(k,i+1)+wt(k,i)+wt(k-1,i+1)+wt(k-1,i)) * &
-                        ! equation 13:
-                       ( psi_old(k+1,i+1)+psi_old(k+1,i)- &
-                         psi_old(k-1,i+1)-psi_old(k-1,i) ) / &
-                       ( psi_old(k+1,i+1)+psi_old(k+1,i)+ &
-                         psi_old(k-1,i+1)+psi_old(k-1,i)+small ) / &
-                         ( 0.5_wp*(dzn(k-1)+dzn(k)) ) )
-                         
+					u_j_bar1 = 0.5_wp*dt*ut(k,i) * ( &
+						! equation 14, generalised G=rho form:
+						0.25_wp*( &
+							rhoa(k  )*wt(k  ,i+1) + &
+							rhoa(k  )*wt(k  ,i  ) + &
+							rhoa(k-1)*wt(k-1,i+1) + &
+							rhoa(k-1)*wt(k-1,i  ) ) / g_bar1 * &
+						! equation 13:
+						( psi_old(k+1,i+1)+psi_old(k+1,i)- &
+						  psi_old(k-1,i+1)-psi_old(k-1,i) ) / &
+						( psi_old(k+1,i+1)+psi_old(k+1,i)+ &
+						  psi_old(k-1,i+1)+psi_old(k-1,i)+small ) / &
+						( 0.5_wp*(dzn(k-1)+dzn(k)) ) )
+												 
+
                                                   
                     ! equation 13 page 330 of smolarkiewicz (1984) 
                     ! journal of computational physics
                     ! second term of w wind:
-                    u_j_bar3 = 0.5_wp*dt*wt(k,i) * ( &
-                        ! repeat for y dimension:
-                        ! equation 14:
-                        0.25_wp*(ut(k+1,i)+ut(k,i)+ut(k+1,i-1)+ut(k,i-1)) * &
-                        ! equation 13:
-                       ( psi_old(k+1,i+1)+psi_old(k,i+1)- &
-                         psi_old(k+1,i-1)-psi_old(k,i-1) ) / &
-                       ( psi_old(k+1,i+1)+psi_old(k,i+1)+ &
-                         psi_old(k+1,i-1)+psi_old(k,i-1)+small ) / &
-                         ( 0.5_wp*(dxn(i-1)+dxn(i)) ) )
+					u_j_bar3 = 0.5_wp*dt*wt(k,i) * ( &					
+						! equation 14, generalised G=rho form:
+						0.25_wp*( &
+							rhoan(k+1)*ut(k+1,i  ) + &
+							rhoan(k  )*ut(k  ,i  ) + &
+							rhoan(k+1)*ut(k+1,i-1) + &
+							rhoan(k  )*ut(k  ,i-1) ) / g_bar3 * &
+						! equation 13:
+						( psi_old(k+1,i+1)+psi_old(k,i+1)- &
+						  psi_old(k+1,i-1)-psi_old(k,i-1) ) / &
+						( psi_old(k+1,i+1)+psi_old(k,i+1)+ &
+						  psi_old(k+1,i-1)+psi_old(k,i-1)+small ) / &
+						( 0.5_wp*(dxn(i-1)+dxn(i)) ) )
                     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 
@@ -277,13 +301,18 @@
                     ! last update of equation 13
                     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
                     ! u wind:
+					! For u: rho_u/g_bar1 = rhoan(k)/rhoan(k) = 1,
+					! since reference density varies only vertically.
                     ut_sav(k,i)=(abs(ut(k,i))*dx(i)-dt*ut(k,i)*ut(k,i) ) * &
                         (psi_old(k,i+1)-psi_old(k,i) ) / &
                         (psi_old(k,i+1)+psi_old(k,i)+small) /dxn(i) - u_j_bar1
                     ! w wind:
-                    wt_sav(k,i)=(abs(wt(k,i))*dz(k)-dt*wt(k,i)*wt(k,i) ) * &
-                        (psi_old(k+1,i)-psi_old(k,i) ) / &
-                        (psi_old(k+1,i)+psi_old(k,i)+small) /dzn(k) - u_j_bar3
+					wt_sav(k,i) = &
+						( abs(wt(k,i))*dz(k) - &
+						  dt*(rhoa(k)/g_bar3)*wt(k,i)*wt(k,i) ) * &
+						(psi_old(k+1,i)-psi_old(k,i)) / &
+						(psi_old(k+1,i)+psi_old(k,i)+small) / dzn(k) - &
+						u_j_bar3
                     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
                         
                     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -291,8 +320,10 @@
                     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
                     ut_sav(k,i)=ut_sav(k,i) - 0.25_wp*dt*ut(k,i) * &
                      ( (ut(k,i+1)-ut(k,i-1))/(dx(i-1))+u_div1 )
-                    wt_sav(k,i)=wt_sav(k,i) - 0.25_wp*dt*wt(k,i) * &
-                     ( (wt(k+1,i)-wt(k-1,i))/(dz(k-1))+u_div3 )
+					wt_sav(k,i) = wt_sav(k,i) - 0.25_wp*dt*wt(k,i) * &
+						( (rhoa(k+1)*wt(k+1,i) - &
+						   rhoa(k-1)*wt(k-1,i)) / &
+						  (dz(k-1)*g_bar3) + u_div3 )
                     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 
@@ -615,6 +646,7 @@
 						psi_i_max, psi_i_min, psi_k_max,psi_k_min, &
 						beta_i_up, beta_i_down,&
 						beta_k_up, beta_k_down
+	real(wp) :: g_bar1, g_bar3
 	
 
 	! has to be positive definite
@@ -673,6 +705,14 @@
                     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
                     ! calculate the anti-diffusive velocities                        !
                     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+					! Generalised G=rho factors
+					!
+					! u is at an x face.  Density varies only in z, therefore
+					! both scalar cells adjacent to this u face have rhoan(k)
+					g_bar1 = rhoan(k)
+					
+					! w is at the z face between scalar levels k and k+1
+					g_bar3 = 0.5_wp*(rhoan(k) + rhoan(k+1))
 
 
 
@@ -681,12 +721,20 @@
                     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
                     ! for divergent flow: eq 38 smolarkiewicz 1984 
                     ! last part of u wind:
-                    u_div1=(wt(k,i)+wt(k,i+1)-wt(k-1,i)-wt(k-1,i+1)) &
-                            / dz(k-1) 
+					u_div1 = ( &
+						rhoa(k  )*wt(k  ,i  ) + &
+						rhoa(k  )*wt(k  ,i+1) - &
+						rhoa(k-1)*wt(k-1,i  ) - &
+						rhoa(k-1)*wt(k-1,i+1) ) / &
+						(dz(k-1)*g_bar1)                            
                     ! for divergent flow: eq 38 smolarkiewicz 1984 
                     ! last part of w wind:
-                    u_div3=(ut(k,i)+ut(k+1,i)-ut(k,i-1)-ut(k+1,i-1)) &
-                            / dx(i-1) 
+					u_div3 = ( &
+						rhoan(k  )*ut(k  ,i  ) + &
+						rhoan(k+1)*ut(k+1,i  ) - &
+						rhoan(k  )*ut(k  ,i-1) - &
+						rhoan(k+1)*ut(k+1,i-1) ) / &
+						(dx(i-1)*g_bar3)
                     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 
@@ -696,30 +744,38 @@
                     ! equation 13 page 330 of smolarkiewicz (1984) 
                     ! journal of computational physics
                     ! second term of u wind:
-                    u_j_bar1 = 0.5_wp*dt*ut(k,i) * ( &
-                        ! equation 14:
-                        0.25_wp*(wt(k,i+1)+wt(k,i)+wt(k-1,i+1)+wt(k-1,i)) * &
-                        ! equation 13:
-                       ( psi_old(k+1,i+1)+psi_old(k+1,i)- &
-                         psi_old(k-1,i+1)-psi_old(k-1,i) ) / &
-                       ( psi_old(k+1,i+1)+psi_old(k+1,i)+ &
-                         psi_old(k-1,i+1)+psi_old(k-1,i)+small ) / &
-                         ( 0.5_wp*(dzn(k-1)+dzn(k)) ) )
-                         
+					u_j_bar1 = 0.5_wp*dt*ut(k,i) * ( &
+						! equation 14, generalised G=rho form:
+						0.25_wp*( &
+							rhoa(k  )*wt(k  ,i+1) + &
+							rhoa(k  )*wt(k  ,i  ) + &
+							rhoa(k-1)*wt(k-1,i+1) + &
+							rhoa(k-1)*wt(k-1,i  ) ) / g_bar1 * &
+						! equation 13:
+						( psi_old(k+1,i+1)+psi_old(k+1,i)- &
+						  psi_old(k-1,i+1)-psi_old(k-1,i) ) / &
+						( psi_old(k+1,i+1)+psi_old(k+1,i)+ &
+						  psi_old(k-1,i+1)+psi_old(k-1,i)+small ) / &
+						( 0.5_wp*(dzn(k-1)+dzn(k)) ) )
+												 
+
                                                   
                     ! equation 13 page 330 of smolarkiewicz (1984) 
                     ! journal of computational physics
                     ! second term of w wind:
-                    u_j_bar3 = 0.5_wp*dt*wt(k,i) * ( &
-                        ! repeat for y dimension:
-                        ! equation 14:
-                        0.25_wp*(ut(k+1,i)+ut(k,i)+ut(k+1,i-1)+ut(k,i-1)) * &
-                        ! equation 13:
-                       ( psi_old(k+1,i+1)+psi_old(k,i+1)- &
-                         psi_old(k+1,i-1)-psi_old(k,i-1) ) / &
-                       ( psi_old(k+1,i+1)+psi_old(k,i+1)+ &
-                         psi_old(k+1,i-1)+psi_old(k,i-1)+small ) / &
-                         ( 0.5_wp*(dxn(i-1)+dxn(i)) ) )
+					u_j_bar3 = 0.5_wp*dt*wt(k,i) * ( &					
+						! equation 14, generalised G=rho form:
+						0.25_wp*( &
+							rhoan(k+1)*ut(k+1,i  ) + &
+							rhoan(k  )*ut(k  ,i  ) + &
+							rhoan(k+1)*ut(k+1,i-1) + &
+							rhoan(k  )*ut(k  ,i-1) ) / g_bar3 * &
+						! equation 13:
+						( psi_old(k+1,i+1)+psi_old(k,i+1)- &
+						  psi_old(k+1,i-1)-psi_old(k,i-1) ) / &
+						( psi_old(k+1,i+1)+psi_old(k,i+1)+ &
+						  psi_old(k+1,i-1)+psi_old(k,i-1)+small ) / &
+						( 0.5_wp*(dxn(i-1)+dxn(i)) ) )
                     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 
@@ -729,13 +785,18 @@
                     ! last update of equation 13
                     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
                     ! u wind:
+					! For u: rho_u/g_bar1 = rhoan(k)/rhoan(k) = 1,
+					! since reference density varies only vertically.
                     ut_sav(k,i)=(abs(ut(k,i))*dx(i)-dt*ut(k,i)*ut(k,i) ) * &
                         (psi_old(k,i+1)-psi_old(k,i) ) / &
                         (psi_old(k,i+1)+psi_old(k,i)+small) /dxn(i) - u_j_bar1
                     ! w wind:
-                    wt_sav(k,i)=(abs(wt(k,i))*dz(k)-dt*wt(k,i)*wt(k,i) ) * &
-                        (psi_old(k+1,i)-psi_old(k,i) ) / &
-                        (psi_old(k+1,i)+psi_old(k,i)+small) /dzn(k) - u_j_bar3
+					wt_sav(k,i) = &
+						( abs(wt(k,i))*dz(k) - &
+						  dt*(rhoa(k)/g_bar3)*wt(k,i)*wt(k,i) ) * &
+						(psi_old(k+1,i)-psi_old(k,i)) / &
+						(psi_old(k+1,i)+psi_old(k,i)+small) / dzn(k) - &
+						u_j_bar3
                     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
                         
                     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -743,8 +804,10 @@
                     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
                     ut_sav(k,i)=ut_sav(k,i) - 0.25_wp*dt*ut(k,i) * &
                      ( (ut(k,i+1)-ut(k,i-1))/(dx(i-1))+u_div1 )
-                    wt_sav(k,i)=wt_sav(k,i) - 0.25_wp*dt*wt(k,i) * &
-                     ( (wt(k+1,i)-wt(k-1,i))/(dz(k-1))+u_div3 )
+					wt_sav(k,i) = wt_sav(k,i) - 0.25_wp*dt*wt(k,i) * &
+						( (rhoa(k+1)*wt(k+1,i) - &
+						   rhoa(k-1)*wt(k-1,i)) / &
+						  (dz(k-1)*g_bar3) + u_div3 )
                     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 
