@@ -12,7 +12,7 @@ DEcrit=0.2 # see page 3039 of Phillips et al.
 phi=0.5
 T=265.
 f=-cw*(T-TTR)/Lf # fraction frozen at the end of stage 1 of freezing
-alphar=2.5
+alphar=0.0
 alphai=2.5
 
 
@@ -160,8 +160,10 @@ for i in range(len(Ns)):
     for j in range(len(Ni1)):
         # rain water conc / m-3 
         Nr=1.0e3 
+        Nr=2.857142857142857e+03
         # rain water content kg / m-3 
         qr=3.e-4
+        qr=2.093522801226018e-04
         Nr=Ns[i]
         #qr=qs[j]
         
