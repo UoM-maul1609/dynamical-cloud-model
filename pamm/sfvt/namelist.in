@@ -15,10 +15,10 @@
 	                        !                                   2 - true and free
 	nm1%kord=3,    			! order for mpdata advection scheme
 	nm1%output_interval=10.,
-	nm1%ip=100,
+	nm1%ip=200,
 	nm1%jp=1,
-	nm1%kp=100,
-	nm1%dx=200.,
+	nm1%kp=200,
+	nm1%dx=100.,
 	nm1%dy=200.,
-	nm1%dz=200./
+	nm1%dz=100./
 	

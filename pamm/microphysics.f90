@@ -1914,7 +1914,9 @@
     			vimlt, &
     			mono1, &
     			phi11
-    				    
+    logical, dimension(1-o_halo:kp+o_halo) :: condense
+    real(wp), dimension(1-o_halo:kp+o_halo) :: updraft
+     
     real(wp) :: pgwet ! amount of liquid that graupel can freeze without shedding
     								
 
@@ -1937,7 +1939,7 @@
 	            n_mix,s_mix,m_mix, nin_c, din_c,nin_r,din_r, n_tot, s_tot, m_tot, rii_coll
 	
 	real(wp), dimension(1-o_halo:kp+o_halo) :: gamma_t,dep_density, qold1
-	real(wp) :: phi,vol, nfrag=0._wp
+	real(wp) :: phi,vol, nfrag=0._wp, dtdz
 	
     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     ! initialise some variables that do not depend on prognostics                        !
@@ -1952,6 +1954,8 @@
     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     ! zero arrays                                                                        !
     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    condense=.false.
+    updraft=0._wp
     vqr=0._wp
     vqc=0._wp
 	pgfr=0._wp
@@ -2102,12 +2106,12 @@
 		! smr at 0c
 		q0sat=eps1*svp_liq(ttr)/(p(k)-svp_liq(ttr))
     	smr(k)=eps1*svp_liq(t(k))/(p(k)-svp_liq(t(k))) ! saturation mixing ratio
+        dummy1=smr(k) 
         
         des_dt=dfsid1(svp_liq,t(k),1.e0_wp,1.e-8_wp,err)
         dqs_dt=eps1*p(k)*des_dt/(p(k)-svp_liq(t(k)))**2
         qold=q(k,iqc)
         qtot=q(k,1)+q(k,iqc)
-
 		
         q(k,iqc)=q(k,1)+q(k,iqc)-smr(k)
         if (theta_flag) q(k,iqc)=(q(k,iqc)+(lv/cp*qold)*dqs_dt) / (1._wp+lv/cp*dqs_dt)
@@ -2122,9 +2126,25 @@
     	cond=(q(k,iqc)-qold)
     	q(k,1)=q(k,1)-cond
     	qold1(k)=qold
-		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+   	
+		updraft(k) = -cond/(dqs_dt*dt)
     enddo
     
+     ! loop over relevant levels
+    do k=1,kp  
+    	if ((q(k,iqc)<=qc_min)) cycle
+	   	dtdz=-0.00065_wp
+		k1=k-1
+		! Interior, including MPI processor interfaces if halos are valid
+		dtdz = (t(k+1)-t(k-1)) / (z(k+1)-z(k-1))
+! 		if ((q(k,iqc)>qc_min).and.(qold1(k)<=qc_min)) then 
+! 			condense(k)=.true.
+! 		endif
+     	if ((q(k,iqc)>qc_min).and.(q(k1,iqc)<=qc_min)) then 
+    		condense(k)=.true.
+    	endif
+  		updraft(k) = max(updraft(k)/dtdz,u(k))
+	enddo
     
     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     ! calculate gamma_t and dep_density for ice growth model                             !
@@ -2147,17 +2167,42 @@
 		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         ! activation of cloud drops                                                      !
 		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-#if MPI_PAMM == 1
-        if(coords(3)==0) then
-            k1=max(k-1,1)
-        else
-            k1=k-1
-        endif
-#else
-        k1=max(k-1,1)
-#endif
-	    if((q(k1,iqc) .lt. qc_min) .and. (q(k,iqc) .ge. qc_min).and.(u(k)>0._wp)) then
-	    
+
+
+    	! if there has been condensation, if the total water is 
+    	! greater than smr, and if the previous water vapour is less than smr
+    	! and if previously no water
+!     	if ((q(k,iqc)>qc_min).and.(q(k1,iqc)<qc_min)) then 
+!     		condense(k)=.true.
+!     	endif
+		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+
+        ! Activate only when cloud water has formed locally in this
+        ! grid box during this microphysics call.
+		if (condense(k)) then
+            ! We have gone from cloud-free to cloudy.
+            ! First return any residual cloud-borne aerosol to the
+            ! unactivated aerosol population.  Activation is then
+            ! recalculated consistently from the complete aerosol PSD.
+            do i=1,n_mode-1
+
+                q(k,cst(i+1)) = q(k,cst(i+1)) + &
+                    q(k,cst(cat_c)+(i-1)*3+2)
+
+                q(k,cst(i+1)+1) = q(k,cst(i+1)+1) + &
+                    q(k,cst(cat_c)+(i-1)*3+3)
+
+                q(k,cst(i+1)+2) = q(k,cst(i+1)+2) + &
+                    q(k,cst(cat_c)+(i-1)*3+4)
+
+                q(k,cst(cat_c)+(i-1)*3+2) = 0._wp
+                q(k,cst(cat_c)+(i-1)*3+3) = 0._wp
+                q(k,cst(cat_c)+(i-1)*3+4) = 0._wp
+
+            enddo
+            
+            
             !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
             ! Calculate the lognormal parameters                                         !
             !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -2190,7 +2235,7 @@
             ! calculate aerosol PSD parameters
             p_test=p(k)
             t_test=t(k)
-            w_test=max(u(k),0.001_wp)
+            w_test=max(updraft(k),0.001_wp)
             call initialise_arrays(n_mode,n_sv,p_test,t_test,w_test, &
                         max(n_aer1,0.1e6),d_aer1,sig_aer1, molw_org1,density_core1)
 
@@ -2207,14 +2252,14 @@
 !             act_frac1=1000.0e6_wp/sum(n_aer1*act_frac1)*act_frac1
             temp1=sum(n_aer1*act_frac1)
             ! put in-cloud aerosol into aerosol - i.e. remove it first
-            do i=1,n_mode-1
-                q(k,cst(i+1))=  q(k,cst(i+1))+q(k,cst(cat_c)+(i-1)*3+2)
-                q(k,cst(i+1)+1)=q(k,cst(i+1)+1)+q(k,cst(cat_c)+(i-1)*3+3)
-                q(k,cst(i+1)+2)=q(k,cst(i+1)+2)+q(k,cst(cat_c)+(i-1)*3+4)
-                q(k,cst(cat_c)+(i-1)*3+2)=0._wp     ! aerosol num
-                q(k,cst(cat_c)+(i-1)*3+3)=0._wp     ! aerosol sa
-                q(k,cst(cat_c)+(i-1)*3+4)=0._wp     ! aerosol mass
-            enddo
+!             do i=1,n_mode-1
+!                 q(k,cst(i+1))=  q(k,cst(i+1))+q(k,cst(cat_c)+(i-1)*3+2)
+!                 q(k,cst(i+1)+1)=q(k,cst(i+1)+1)+q(k,cst(cat_c)+(i-1)*3+3)
+!                 q(k,cst(i+1)+2)=q(k,cst(i+1)+2)+q(k,cst(cat_c)+(i-1)*3+4)
+!                 q(k,cst(cat_c)+(i-1)*3+2)=0._wp     ! aerosol num
+!                 q(k,cst(cat_c)+(i-1)*3+3)=0._wp     ! aerosol sa
+!                 q(k,cst(cat_c)+(i-1)*3+4)=0._wp     ! aerosol mass
+!             enddo
             ! cloud droplet number
             q(k  ,inc)=temp1
             ! now we take activated aerosol away from aerosol field and add to in-cloud
@@ -3207,7 +3252,7 @@
             ! rain num self collection: equation a8 in Seifert and Beheng (2001, atmos res)
             rrsel=-kr*nr*lr
             ! cloud num self collection: equation a9 in Seifert and Beheng (2001, atmos res)
-            rcwsel=-kr*(alpha_c+2._wp)/(alpha_c+1._wp)*lc**2-rcwaut
+            rcwsel=-kc*(alpha_c+2._wp)/(alpha_c+1._wp)*lc**2-rcwaut
 
             praut=praut/rho
             pracw=pracw/rho

@@ -72,7 +72,7 @@
 		        ! Flux going through left cell boundary from adjacent cell-x
 				fx_l(k,j,i)=( (u(k,j,i-1)+abs(u(k,j,i-1)))*psi(k,j,i-1)+ &
 					(u(k,j,i-1)-abs(u(k,j,i-1)))*psi(k,j,i) )*dt/ &
-					(2._wp*dxn(i-1))
+					(2._wp*dxn(i))
 		
 				fy_r(k,j,i)=( (v(k,j,i)+abs(v(k,j,i)))*psi(k,j,i)+ &
 					(v(k,j,i)-abs(v(k,j,i)))*psi(k,j+1,i) )*dt/ &
@@ -80,15 +80,15 @@
 		
 				fy_l(k,j,i)=( (v(k,j-1,i)+abs(v(k,j-1,i)))*psi(k,j-1,i)+ &
 					(v(k,j-1,i)-abs(v(k,j-1,i)))*psi(k,j,i) )*dt/ &
-					(2._wp*dyn(j-1))
+					(2._wp*dyn(j))
 		
-				fz_r(k,j,i)=( (w(k,j,i)+abs(w(k,j,i)))*rhoan(k)*psi(k,j,i)+ &
-					(w(k,j,i)-abs(w(k,j,i)))*rhoan(k+1)*psi(k+1,j,i) )*dt/ &
-					(2._wp*dzn(k)*rhoa(k))
+				fz_r(k,j,i)=( (w(k,j,i)+abs(w(k,j,i)))*rhoa(k)*psi(k,j,i)+ &
+					(w(k,j,i)-abs(w(k,j,i)))*rhoa(k)*psi(k+1,j,i) )*dt/ &
+					(2._wp*dzn(k)*rhoan(k))
 		
-				fz_l(k,j,i)=( (w(k-1,j,i)+abs(w(k-1,j,i)))*rhoan(k-1)*psi(k-1,j,i)+ &
-					(w(k-1,j,i)-abs(w(k-1,j,i)))*rhoan(k)*psi(k,j,i) )*dt/ &
-					(2._wp*dzn(k-1)*rhoa(k))
+				fz_l(k,j,i)=( (w(k-1,j,i)+abs(w(k-1,j,i)))*rhoa(k-1)*psi(k-1,j,i)+ &
+					(w(k-1,j,i)-abs(w(k-1,j,i)))*rhoa(k-1)*psi(k,j,i) )*dt/ &
+					(2._wp*dzn(k)*rhoan(k))
 			enddo
 		enddo
 	enddo
@@ -267,11 +267,9 @@
 		w_store1, w_store2
 	real(wp), dimension(-r_h+1:kp+r_h,-r_h+1:jp+r_h,-r_h+1:ip+r_h), target :: psi_store
 	real(wp), dimension(-r_h+1:kp+r_h,-r_h+1:jp+r_h,-r_h+1:ip+r_h) :: &
-						psi_i_max, psi_i_min, psi_j_max,psi_j_min,psi_k_max,psi_k_min, &
-						beta_i_up, beta_i_down,&
-						beta_j_up, beta_j_down,&
-						beta_k_up, beta_k_down
-	
+						psi_max, psi_min, &
+						beta_up, beta_down
+	real(wp) :: g_bar1, g_bar2, g_bar3
 
 	! has to be positive definite
 	minlocal=min(minval(psi_in(:,:,:)),lbc,ubc)
@@ -326,6 +324,14 @@
 						!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 						! calculate the anti-diffusive velocities                        !
 						!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+						! Generalised G = rho factors
+						!
+						! u and v are at scalar vertical level k
+						g_bar1 = rhoan(k)
+						g_bar2 = rhoan(k)
+						
+						! w is between scalar levels k and k+1
+						g_bar3 = 0.5_wp*(rhoan(k)+rhoan(k+1))
 
 
 
@@ -334,22 +340,31 @@
 						!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 						! for divergent flow: eq 38 smolarkiewicz 1984 
 						! last part of u wind:
-						u_div1=(wt(k,j,i)+wt(k,j,i+1)-wt(k-1,j,i)-wt(k-1,j,i+1)) &
-								/ dz(k-1) + &
-								(vt(k,j,i)+vt(k,j,i+1)-vt(k,j-1,i)-vt(k,j-1,i+1)) &
-								/ dy(j-1)
+						u_div1 = &
+							( rhoa(k)   *(wt(k,j,i)+wt(k,j,i+1)) - &
+							  rhoa(k-1) *(wt(k-1,j,i)+wt(k-1,j,i+1)) ) / &
+							  (dz(k-1)*g_bar1) + &
+							( rhoan(k)*(vt(k,j,i)+vt(k,j,i+1) - &
+										vt(k,j-1,i)-vt(k,j-1,i+1)) ) / &
+							  (dy(j-1)*g_bar1)
 						! for divergent flow: eq 38 smolarkiewicz 1984 
 						! last part of v wind:
-						u_div2=(wt(k,j,i)+wt(k,j+1,i)-wt(k-1,j,i)-wt(k-1,j+1,i)) &
-								/ dz(k-1) + &
-								(ut(k,j,i)+ut(k,j+1,i)-ut(k,j,i-1)-ut(k,j+1,i-1)) &
-								/ dx(i-1)
+						u_div2 = &
+							( rhoa(k)   *(wt(k,j,i)+wt(k,j+1,i)) - &
+							  rhoa(k-1) *(wt(k-1,j,i)+wt(k-1,j+1,i)) ) / &
+							  (dz(k-1)*g_bar2) + &
+							( rhoan(k)*(ut(k,j,i)+ut(k,j+1,i) - &
+										ut(k,j,i-1)-ut(k,j+1,i-1)) ) / &
+							  (dx(i-1)*g_bar2)
 						! for divergent flow: eq 38 smolarkiewicz 1984 
 						! last part of w wind:
-						u_div3=(ut(k,j,i)+ut(k+1,j,i)-ut(k,j,i-1)-ut(k+1,j,i-1)) &
-								/ dx(i-1) + &
-								(vt(k,j,i)+vt(k+1,j,i)-vt(k,j-1,i)-vt(k+1,j-1,i)) &
-								/ dy(j-1)
+						u_div3 = &
+							( rhoan(k)  *(ut(k,j,i)-ut(k,j,i-1)) + &
+							  rhoan(k+1)*(ut(k+1,j,i)-ut(k+1,j,i-1)) ) / &
+							  (dx(i-1)*g_bar3) + &
+							( rhoan(k)  *(vt(k,j,i)-vt(k,j-1,i)) + &
+							  rhoan(k+1)*(vt(k+1,j,i)-vt(k+1,j-1,i)) ) / &
+							  (dy(j-1)*g_bar3)
 						!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 
@@ -360,68 +375,89 @@
 						! journal of computational physics
 						! second term of u wind:
 						u_j_bar1 = 0.5_wp*dt*ut(k,j,i) * ( &
-							! equation 14:
-							0.25_wp*(wt(k,j,i+1)+wt(k,j,i)+wt(k-1,j,i+1)+wt(k-1,j,i)) * &
-							! equation 13:
-						   ( psi_old(k+1,j,i+1)+psi_old(k+1,j,i)- &
-						     psi_old(k-1,j,i+1)-psi_old(k-1,j,i) ) / &
-						   ( psi_old(k+1,j,i+1)+psi_old(k+1,j,i)+ &
-						     psi_old(k-1,j,i+1)+psi_old(k-1,j,i)+small ) / &
-						     ( 0.5_wp*(dzn(k-1)+dzn(k)) ) + &
-						    ! repeat for y dimension:
-							! equation 14:
-							0.25_wp*(vt(k,j,i+1)+vt(k,j,i)+vt(k,j-1,i+1)+vt(k,j-1,i)) * &
-							! equation 13:
-						   ( psi_old(k,j+1,i+1)+psi_old(k,j+1,i)- &
-						     psi_old(k,j-1,i+1)-psi_old(k,j-1,i) ) / &
-						   ( psi_old(k,j+1,i+1)+psi_old(k,j+1,i)+ &
-						     psi_old(k,j-1,i+1)+psi_old(k,j-1,i)+small ) / &
-						     ( 0.5_wp*(dyn(j-1)+dyn(j)) ) )
-						     
+							! equation 14, z contribution: average G*w / G_u
+							0.25_wp*( &
+								rhoa(k)   *wt(k,j,i+1) + &
+								rhoa(k)   *wt(k,j,i) + &
+								rhoa(k-1) *wt(k-1,j,i+1) + &
+								rhoa(k-1) *wt(k-1,j,i) ) / g_bar1 * &
+							! equation 13
+							( psi_old(k+1,j,i+1)+psi_old(k+1,j,i)- &
+							  psi_old(k-1,j,i+1)-psi_old(k-1,j,i) ) / &
+							( psi_old(k+1,j,i+1)+psi_old(k+1,j,i)+ &
+							  psi_old(k-1,j,i+1)+psi_old(k-1,j,i)+small ) / &
+							(0.5_wp*(dzn(k-1)+dzn(k))) + &
+							! equation 14, y contribution: average G*v / G_u
+							0.25_wp*( &
+								rhoan(k)*vt(k,j,i+1) + &
+								rhoan(k)*vt(k,j,i) + &
+								rhoan(k)*vt(k,j-1,i+1) + &
+								rhoan(k)*vt(k,j-1,i) ) / g_bar1 * &
+							! equation 13
+							( psi_old(k,j+1,i+1)+psi_old(k,j+1,i)- &
+							  psi_old(k,j-1,i+1)-psi_old(k,j-1,i) ) / &
+							( psi_old(k,j+1,i+1)+psi_old(k,j+1,i)+ &
+							  psi_old(k,j-1,i+1)+psi_old(k,j-1,i)+small ) / &
+							(0.5_wp*(dyn(j-1)+dyn(j))) )
+    						     
 						     
 						! equation 13 page 330 of smolarkiewicz (1984) 
 						! journal of computational physics
 						! second term of v wind:
-						u_j_bar2 = 0.5_wp*dt*vt(k,j,i) * ( &
-							! equation 14:
-							0.25_wp*(wt(k,j+1,i)+wt(k,j,i)+wt(k-1,j+1,i)+wt(k-1,j,i)) * &
-							! equation 13:
-						   ( psi_old(k+1,j+1,i)+psi_old(k+1,j,i)- &
-						     psi_old(k-1,j+1,i)-psi_old(k-1,j,i) ) / &
-						   ( psi_old(k+1,j+1,i)+psi_old(k+1,j,i)+ &
-						     psi_old(k-1,j+1,i)+psi_old(k-1,j,i)+small ) / &
-						     ( 0.5_wp*(dzn(k-1)+dzn(k)) ) + &
-						    ! repeat for y dimension:
-							! equation 14:
-							0.25_wp*(ut(k,j+1,i)+ut(k,j,i)+ut(k,j+1,i-1)+ut(k,j,i-1)) * &
-							! equation 13:
-						   ( psi_old(k,j+1,i+1)+psi_old(k,j,i+1)- &
-						     psi_old(k,j+1,i-1)-psi_old(k,j,i-1) ) / &
-						   ( psi_old(k,j+1,i+1)+psi_old(k,j,i+1)+ &
-						     psi_old(k,j+1,i-1)+psi_old(k,j,i-1)+small ) / &
-						     ( 0.5_wp*(dxn(i-1)+dxn(i)) ) )
-						     
+						u_j_bar2 = 0.5_wp*dt*vt(k,j,i) * ( &						
+							! equation 14, z contribution
+							0.25_wp*( &
+								rhoa(k)   *wt(k,j+1,i) + &
+								rhoa(k)   *wt(k,j,i) + &
+								rhoa(k-1) *wt(k-1,j+1,i) + &
+								rhoa(k-1) *wt(k-1,j,i) ) / g_bar2 * &
+							! equation 13
+							( psi_old(k+1,j+1,i)+psi_old(k+1,j,i)- &
+							  psi_old(k-1,j+1,i)-psi_old(k-1,j,i) ) / &
+							( psi_old(k+1,j+1,i)+psi_old(k+1,j,i)+ &
+							  psi_old(k-1,j+1,i)+psi_old(k-1,j,i)+small ) / &
+							(0.5_wp*(dzn(k-1)+dzn(k))) + &
+							! equation 14, x contribution
+							0.25_wp*( &
+								rhoan(k)*ut(k,j+1,i) + &
+								rhoan(k)*ut(k,j,i) + &
+								rhoan(k)*ut(k,j+1,i-1) + &
+								rhoan(k)*ut(k,j,i-1) ) / g_bar2 * &
+							! equation 13
+							( psi_old(k,j+1,i+1)+psi_old(k,j,i+1)- &
+							  psi_old(k,j+1,i-1)-psi_old(k,j,i-1) ) / &
+							( psi_old(k,j+1,i+1)+psi_old(k,j,i+1)+ &
+							  psi_old(k,j+1,i-1)+psi_old(k,j,i-1)+small ) / &
+							(0.5_wp*(dxn(i-1)+dxn(i))) )
+    						     
 						! equation 13 page 330 of smolarkiewicz (1984) 
 						! journal of computational physics
 						! second term of w wind:
-						u_j_bar3 = 0.5_wp*dt*wt(k,j,i) * ( &
-							! equation 14:
-							0.25_wp*(vt(k+1,j,i)+vt(k,j,i)+vt(k+1,j-1,i)+vt(k,j-1,i)) * &
-							! equation 13:
-						   ( psi_old(k+1,j+1,i)+psi_old(k,j+1,i)- &
-						     psi_old(k+1,j-1,i)-psi_old(k,j-1,i) ) / &
-						   ( psi_old(k+1,j+1,i)+psi_old(k,j+1,i)+ &
-						     psi_old(k+1,j-1,i)+psi_old(k,j-1,i)+small ) / &
-						     ( 0.5_wp*(dyn(j-1)+dyn(j)) ) + &
-						    ! repeat for y dimension:
-							! equation 14:
-							0.25_wp*(ut(k+1,j,i)+ut(k,j,i)+ut(k+1,j,i-1)+ut(k,j,i-1)) * &
-							! equation 13:
-						   ( psi_old(k+1,j,i+1)+psi_old(k,j,i+1)- &
-						     psi_old(k+1,j,i-1)-psi_old(k,j,i-1) ) / &
-						   ( psi_old(k+1,j,i+1)+psi_old(k,j,i+1)+ &
-						     psi_old(k+1,j,i-1)+psi_old(k,j,i-1)+small ) / &
-						     ( 0.5_wp*(dxn(i-1)+dxn(i)) ) )
+						u_j_bar3 = 0.5_wp*dt*wt(k,j,i) * ( &						
+							! equation 14, y contribution
+							0.25_wp*( &
+								rhoan(k+1)*vt(k+1,j,i) + &
+								rhoan(k)  *vt(k,j,i) + &
+								rhoan(k+1)*vt(k+1,j-1,i) + &
+								rhoan(k)  *vt(k,j-1,i) ) / g_bar3 * &
+							! equation 13
+							( psi_old(k+1,j+1,i)+psi_old(k,j+1,i)- &
+							  psi_old(k+1,j-1,i)-psi_old(k,j-1,i) ) / &
+							( psi_old(k+1,j+1,i)+psi_old(k,j+1,i)+ &
+							  psi_old(k+1,j-1,i)+psi_old(k,j-1,i)+small ) / &
+							(0.5_wp*(dyn(j-1)+dyn(j))) + &
+							! equation 14, x contribution
+							0.25_wp*( &
+								rhoan(k+1)*ut(k+1,j,i) + &
+								rhoan(k)  *ut(k,j,i) + &
+								rhoan(k+1)*ut(k+1,j,i-1) + &
+								rhoan(k)  *ut(k,j,i-1) ) / g_bar3 * &
+							! equation 13
+							( psi_old(k+1,j,i+1)+psi_old(k,j,i+1)- &
+							  psi_old(k+1,j,i-1)-psi_old(k,j,i-1) ) / &
+							( psi_old(k+1,j,i+1)+psi_old(k,j,i+1)+ &
+							  psi_old(k+1,j,i-1)+psi_old(k,j,i-1)+small ) / &
+							(0.5_wp*(dxn(i-1)+dxn(i))) )
 						!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 
@@ -439,20 +475,28 @@
 							(psi_old(k,j+1,i)-psi_old(k,j,i) ) / &
 							(psi_old(k,j+1,i)+psi_old(k,j,i)+small) /dyn(j) - u_j_bar2														
 						! w wind:
-						wt_sav(k,j,i)=(abs(wt(k,j,i))*dz(k)-dt*wt(k,j,i)*wt(k,j,i) ) * &
-							(psi_old(k+1,j,i)-psi_old(k,j,i) ) / &
-							(psi_old(k+1,j,i)+psi_old(k,j,i)+small) /dzn(k) - u_j_bar3
+						wt_sav(k,j,i) = &
+							( abs(wt(k,j,i))*dz(k) - &
+							  dt*(rhoa(k)/g_bar3)*wt(k,j,i)*wt(k,j,i) ) * &
+							(psi_old(k+1,j,i)-psi_old(k,j,i)) / &
+							(psi_old(k+1,j,i)+psi_old(k,j,i)+small) / &
+							dzn(k) - u_j_bar3
 						!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 							
 						!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 						! last update of eq 38 smolarkiewicz 1984
 						!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-						ut_sav(k,j,i)=ut_sav(k,j,i) - 0.25_wp*dt*ut(k,j,i) * &
-						 ( (ut(k,j,i+1)-ut(k,j,i-1))/(dx(i-1))+u_div1 )
-						vt_sav(k,j,i)=vt_sav(k,j,i) - 0.25_wp*dt*vt(k,j,i) * &
-						 ( (vt(k,j+1,i)-vt(k,j-1,i))/(dy(j-1))+u_div2 )
-						wt_sav(k,j,i)=wt_sav(k,j,i) - 0.25_wp*dt*wt(k,j,i) * &
-						 ( (wt(k+1,j,i)-wt(k-1,j,i))/(dz(k-1))+u_div3 )
+						ut_sav(k,j,i) = ut_sav(k,j,i) - &
+							0.25_wp*dt*ut(k,j,i) * &
+							( (ut(k,j,i+1)-ut(k,j,i-1))/dx(i-1) + u_div1 )						
+						vt_sav(k,j,i) = vt_sav(k,j,i) - &
+							0.25_wp*dt*vt(k,j,i) * &
+							( (vt(k,j+1,i)-vt(k,j-1,i))/dy(j-1) + u_div2 )
+						wt_sav(k,j,i) = wt_sav(k,j,i) - &
+							0.25_wp*dt*wt(k,j,i) * &
+							( ( rhoa(k+1)*wt(k+1,j,i) - &
+								rhoa(k-1)*wt(k-1,j,i) ) / &
+							  (dz(k-1)*g_bar3) + u_div3 )
 						!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 
@@ -506,43 +550,26 @@
 			do i=1,ip
 				do j=1,jp
 					do k=1,kp			
-						! x direction - note: should the last q in the max/min be q+1?
-						psi_i_max(k,j,i)=max(psi(k,j,i-1),psi(k,j,i),psi(k,j,i+1), &
-									psi_old(k,j,i-1),psi_old(k,j,i),psi_old(k,j,i+1))
-					
-						psi_i_min(k,j,i)=min(psi(k,j,i-1),psi(k,j,i),psi(k,j,i+1), &
-									psi_old(k,j,i-1),psi_old(k,j,i),psi_old(k,j,i+1))
-					enddo
-				enddo
-			enddo
-!$omp end simd
-
-!$omp simd	
-			do i=1,ip
-				do j=1,jp
-					do k=1,kp			
-						! y direction - note: should the last q in the max/min be q+1?
-						psi_j_max(k,j,i)=max(psi(k,j-1,i),psi(k,j,i),psi(k,j+1,i), &
-									psi_old(k,j-1,i),psi_old(k,j,i),psi_old(k,j+1,i))
-					
-						psi_j_min(k,j,i)=min(psi(k,j-1,i),psi(k,j,i),psi(k,j+1,i), &
-									psi_old(k,j-1,i),psi_old(k,j,i),psi_old(k,j+1,i))
-					enddo
-				enddo
-			enddo
-!$omp end simd
-
-!$omp simd	
-			do i=1,ip
-				do j=1,jp
-					do k=1,kp			
-						! z direction - note: should the last q in the max/min be q+1?
-						psi_k_max(k,j,i)=max(psi(k-1,j,i),psi(k,j,i),psi(k+1,j,i), &
-									psi_old(k-1,j,i),psi_old(k,j,i),psi_old(k+1,j,i))
-					
-						psi_k_min(k,j,i)=min(psi(k-1,j,i),psi(k,j,i),psi(k+1,j,i), &
-									psi_old(k-1,j,i),psi_old(k,j,i),psi_old(k+1,j,i))
-					enddo
+						psi_max(k,j,i) = max( &
+							psi(k,j,i), &
+							psi(k,j,i-1), psi(k,j,i+1), &
+							psi(k,j-1,i), psi(k,j+1,i), &
+							psi(k-1,j,i), psi(k+1,j,i), &
+							psi_old(k,j,i), &
+							psi_old(k,j,i-1), psi_old(k,j,i+1), &
+							psi_old(k,j-1,i), psi_old(k,j+1,i), &
+							psi_old(k-1,j,i), psi_old(k+1,j,i) )
+						
+						psi_min(k,j,i) = min( &
+							psi(k,j,i), &
+							psi(k,j,i-1), psi(k,j,i+1), &
+							psi(k,j-1,i), psi(k,j+1,i), &
+							psi(k-1,j,i), psi(k+1,j,i), &
+							psi_old(k,j,i), &
+							psi_old(k,j,i-1), psi_old(k,j,i+1), &
+							psi_old(k,j-1,i), psi_old(k,j+1,i), &
+							psi_old(k-1,j,i), psi_old(k+1,j,i) )
+    					enddo
 				enddo
 			enddo
 !$omp end simd
@@ -559,35 +586,30 @@
 			do i=1,ip
 				do j=1,jp
 					do k=1,kp		
-						denom1=(dt*((max(ut(k,j,i-1),0._wp)*psi_old(k,j,i-1)- &
-								  min(ut(k,j,i),0._wp)*psi_old(k,j,i+1))/dx(i-1)+ &
-							    (max(vt(k,j-1,i),0._wp)*psi_old(k,j-1,i)-&
-								  min(vt(k,j,i),0._wp)*psi_old(k,j+1,i))/dy(j-1) + &
-							    (max(wt(k-1,j,i),0._wp)*psi_old(k-1,j,i)-&
-								  min(wt(k,j,i),0._wp)*psi_old(k+1,j,i))/dz(k-1) &
-								  +small))
-								  
-						denom2=(dt*((max(ut(k,j,i),0._wp)*psi_old(k,j,i)- &
-							      min(ut(k,j,i-1),0._wp)*psi_old(k,j,i))/dx(i-1) + &
-								(max(vt(k,j,i),0._wp)*psi_old(k,j,i)-&
-								  min(vt(k,j-1,i),0._wp)*psi_old(k,j,i))/dy(j-1) + &
-								(max(wt(k,j,i),0._wp)*psi_old(k,j,i)-&
-								  min(wt(k-1,j,i),0._wp)*psi_old(k,j,i))/dz(k-1) &
-								  +small))
-								  
-						beta_i_up(k,j,i)=(psi_i_max(k,j,i)-psi_old(k,j,i)) / denom1
-							
-								  
-						beta_i_down(k,j,i)=(psi_old(k,j,i)-psi_i_min(k,j,i)) / denom2
-											
-
-						beta_j_up(k,j,i)=(psi_j_max(k,j,i)-psi_old(k,j,i)) / denom1
-								  
-						beta_j_down(k,j,i)=(psi_old(k,j,i)-psi_j_min(k,j,i)) / denom2
-
-						beta_k_up(k,j,i)=(psi_k_max(k,j,i)-psi_old(k,j,i)) / denom1
-								  
-						beta_k_down(k,j,i)=(psi_old(k,j,i)-psi_k_min(k,j,i)) / denom2
+						denom1 = dt * ( &
+							( max(ut(k,j,i-1),0._wp) * rhoan(k) * psi_old(k,j,i-1) - &
+							  min(ut(k,j,i  ),0._wp) * rhoan(k) * psi_old(k,j,i+1) ) / dxn(i) + &
+							( max(vt(k,j-1,i),0._wp) * rhoan(k) * psi_old(k,j-1,i) - &
+							  min(vt(k,j  ,i),0._wp) * rhoan(k) * psi_old(k,j+1,i) ) / dyn(j) + &
+							( max(wt(k-1,j,i),0._wp) * rhoa(k-1) * psi_old(k-1,j,i) - &
+							  min(wt(k  ,j,i),0._wp) * rhoa(k  ) * psi_old(k+1,j,i) ) / dzn(k) &
+							) + small
+    								  							
+						denom2 = dt * ( &						
+							( max(ut(k,j,i  ),0._wp) * rhoan(k) * psi_old(k,j,i) - &
+							  min(ut(k,j,i-1),0._wp) * rhoan(k) * psi_old(k,j,i) ) / dxn(i) + &
+							( max(vt(k,j  ,i),0._wp) * rhoan(k) * psi_old(k,j,i) - &
+							  min(vt(k,j-1,i),0._wp) * rhoan(k) * psi_old(k,j,i) ) / dyn(j) + &
+							( max(wt(k  ,j,i),0._wp) * rhoa(k  ) * psi_old(k,j,i) - &
+							  min(wt(k-1,j,i),0._wp) * rhoa(k-1) * psi_old(k,j,i) ) / dzn(k) &
+							+ small )
+    
+						beta_up(k,j,i) = rhoan(k) * &
+							(psi_max(k,j,i)-psi_old(k,j,i)) / denom1
+						
+						beta_down(k,j,i) = rhoan(k) * &
+							(psi_old(k,j,i)-psi_min(k,j,i)) / denom2
+    						
 					enddo
 				enddo
 			enddo 
@@ -600,17 +622,9 @@
 			! exchange halos for beta_i_up, down
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 			call exchange_along_dim(comm3d, id, kp, jp, ip, r_h,r_h,r_h,r_h,r_h,r_h, &
-													beta_i_up,0._wp,0._wp,dims,coords)
+													beta_up,0._wp,0._wp,dims,coords)
 			call exchange_along_dim(comm3d, id, kp, jp, ip, r_h,r_h,r_h,r_h,r_h,r_h, &
-													beta_i_down,0._wp,0._wp,dims,coords)
-			call exchange_along_dim(comm3d, id, kp, jp, ip, r_h,r_h,r_h,r_h,r_h,r_h, &
-													beta_j_up,0._wp,0._wp,dims,coords)
-			call exchange_along_dim(comm3d, id, kp, jp, ip, r_h,r_h,r_h,r_h,r_h,r_h, &
-													beta_j_down,0._wp,0._wp,dims,coords)
-			call exchange_along_dim(comm3d, id, kp, jp, ip, r_h,r_h,r_h,r_h,r_h,r_h, &
-													beta_k_up,0._wp,0._wp,dims,coords)
-			call exchange_along_dim(comm3d, id, kp, jp, ip, r_h,r_h,r_h,r_h,r_h,r_h, &
-													beta_k_down,0._wp,0._wp,dims,coords)
+													beta_down,0._wp,0._wp,dims,coords)
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 								
@@ -621,19 +635,22 @@
 			do i=1,ip
 				do j=1,jp
 					do k=1,kp			
-						ut_sav(k,j,i)=min(1._wp,beta_i_down(k,j,i), &
-										 beta_i_up(k,j,i+1))*max(ut(k,j,i),0._wp) + &
-									  min(1._wp,beta_i_up(k,j,i), &
-									     beta_i_down(k,j,i+1))*min(ut(k,j,i),0._wp)
-						vt_sav(k,j,i)=min(1._wp,beta_j_down(k,j,i), &
-										 beta_j_up(k,j+1,i))*max(vt(k,j,i),0._wp) + &
-									  min(1._wp,beta_j_up(k,j,i), &
-									     beta_j_down(k,j+1,i))*min(vt(k,j,i),0._wp)
-						wt_sav(k,j,i)=min(1._wp,beta_k_down(k,j,i), &
-										 beta_k_up(k+1,j,i))*max(wt(k,j,i),0._wp) + &
-									  min(1._wp,beta_k_up(k,j,i), &
-									     beta_k_down(k+1,j,i))*min(wt(k,j,i),0._wp)
-					enddo
+						ut_sav(k,j,i) = &
+							min(1._wp,beta_down(k,j,i),beta_up(k,j,i+1)) * &
+								max(ut(k,j,i),0._wp) + &
+							min(1._wp,beta_up(k,j,i),beta_down(k,j,i+1)) * &
+								min(ut(k,j,i),0._wp)
+						vt_sav(k,j,i) = &
+							min(1._wp,beta_down(k,j,i),beta_up(k,j+1,i)) * &
+								max(vt(k,j,i),0._wp) + &
+							min(1._wp,beta_up(k,j,i),beta_down(k,j+1,i)) * &
+								min(vt(k,j,i),0._wp)
+						wt_sav(k,j,i) = &
+							min(1._wp,beta_down(k,j,i),beta_up(k+1,j,i)) * &
+								max(wt(k,j,i),0._wp) + &
+							min(1._wp,beta_up(k,j,i),beta_down(k+1,j,i)) * &
+								min(wt(k,j,i),0._wp)
+        				enddo
 				enddo
 			enddo 
 !$omp end simd
@@ -747,13 +764,13 @@
     			else
     			    wkm1ji=w(k-1,j,i)
     			endif
-				fz_r(k,j,i)=( (wkji+abs(wkji))*rhoan(k)*psi(k,j,i)+ &
-					(wkji-abs(wkji))*rhoan(k+1)*psi(k+1,j,i) )*dt/ &
-					(2._wp*dzn(k)*rhoa(k))
+				fz_r(k,j,i)=( (wkji+abs(wkji))*rhoa(k)*psi(k,j,i)+ &
+					(wkji-abs(wkji))*rhoa(k)*psi(k+1,j,i) )*dt/ &
+					(2._wp*dzn(k)*rhoan(k))
 		
-				fz_l(k,j,i)=( (wkm1ji+abs(wkm1ji))*rhoan(k-1)*psi(k-1,j,i)+ &
-					(wkm1ji-abs(wkm1ji))*rhoan(k)*psi(k,j,i) )*dt/ &
-					(2._wp*dzn(k-1)*rhoa(k))
+				fz_l(k,j,i)=( (wkm1ji+abs(wkm1ji))*rhoa(k-1)*psi(k-1,j,i)+ &
+					(wkm1ji-abs(wkm1ji))*rhoa(k-1)*psi(k,j,i) )*dt/ &
+					(2._wp*dzn(k)*rhoan(k))
 			enddo
 		enddo
 	enddo
@@ -836,9 +853,9 @@
 		w_store1, w_store2
 	real(wp), dimension(-r_h+1:kp+r_h,-r_h+1:jp+r_h,-r_h+1:ip+r_h), target :: psi_store
 	real(wp), dimension(-r_h+1:kp+r_h,-r_h+1:jp+r_h,-r_h+1:ip+r_h) :: &
-						psi_k_max,psi_k_min, &
-						beta_k_up, beta_k_down
-	
+						psi_max,psi_min, &
+						beta_up, beta_down
+	real(wp) :: g_bar3
 
 	! has to be positive definite
 	minlocal=min(minval(psi_in(:,:,:)),lbc,ubc)
@@ -887,7 +904,14 @@
 						!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 						! calculate the anti-diffusive velocities                        !
 						!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-
+						! Generalised G = rho factors
+						!
+						! u and v are at scalar vertical level k
+! 						g_bar1 = rhoan(k)
+! 						g_bar2 = rhoan(k)
+						
+						! w is between scalar levels k and k+1
+						g_bar3 = 0.5_wp*(rhoan(k)+rhoan(k+1))
 
 
 
@@ -915,17 +939,24 @@
 						! last update of equation 13
 						!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 						! w wind:
-						wt_sav(k,j,i)=(abs(wt(k,j,i))*dz(k)-dt*wt(k,j,i)*wt(k,j,i) ) * &
-							(psi_old(k+1,j,i)-psi_old(k,j,i) ) / &
-							(psi_old(k+1,j,i)+psi_old(k,j,i)+small) /dzn(k) - u_j_bar3
+						wt_sav(k,j,i) = &
+							( abs(wt(k,j,i))*dz(k) - &
+							  dt*(rhoa(k)/g_bar3)*wt(k,j,i)*wt(k,j,i) ) * &
+							(psi_old(k+1,j,i)-psi_old(k,j,i)) / &
+							(psi_old(k+1,j,i)+psi_old(k,j,i)+small) / &
+							dzn(k) - u_j_bar3
 						!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 							
 						!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 						! last update of eq 38 smolarkiewicz 1984
 						!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-						wt_sav(k,j,i)=wt_sav(k,j,i) - 0.25_wp*dt*wt(k,j,i) * &
-						 ( (wt(k+1,j,i)-wt(k-1,j,i))/(dz(k-1))+u_div3 )
+						wt_sav(k,j,i) = wt_sav(k,j,i) - &
+							0.25_wp*dt*wt(k,j,i) * &
+							( ( rhoa(k+1)*wt(k+1,j,i) - &
+								rhoa(k-1)*wt(k-1,j,i) ) / &
+							  (dz(k-1)*g_bar3) + u_div3 )
 						!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
 
 
 					enddo
@@ -965,13 +996,15 @@
 !$omp simd	
 			do i=1,ip
 				do j=1,jp
-					do k=1,kp			
-						! z direction - note: should the last q in the max/min be q+1?
-						psi_k_max(k,j,i)=max(psi(k-1,j,i),psi(k,j,i),psi(k+1,j,i), &
-									psi_old(k-1,j,i),psi_old(k,j,i),psi_old(k+1,j,i))
-					
-						psi_k_min(k,j,i)=min(psi(k-1,j,i),psi(k,j,i),psi(k+1,j,i), &
-									psi_old(k-1,j,i),psi_old(k,j,i),psi_old(k+1,j,i))
+					do k=1,kp
+						psi_max(k,j,i) = max( &
+							psi(k-1,j,i), psi(k,j,i), psi(k+1,j,i), &
+							psi_old(k-1,j,i), psi_old(k,j,i), psi_old(k+1,j,i) )
+			
+						psi_min(k,j,i) = min( &
+							psi(k-1,j,i), psi(k,j,i), psi(k+1,j,i), &
+							psi_old(k-1,j,i), psi_old(k,j,i), psi_old(k+1,j,i) )
+			
 					enddo
 				enddo
 			enddo
@@ -988,21 +1021,27 @@
 !$omp simd	
 			do i=1,ip
 				do j=1,jp
-					do k=1,kp		
-						denom1=(dt*((max(wt(k-1,j,i),0._wp)*psi_old(k-1,j,i)-&
-								  min(wt(k,j,i),0._wp)*psi_old(k+1,j,i))/dz(k-1) &
-								  +small))
-								  
-						denom2=(dt*((max(wt(k,j,i),0._wp)*psi_old(k,j,i)-&
-								  min(wt(k-1,j,i),0._wp)*psi_old(k,j,i))/dz(k-1) &
-								  +small))
-								  
-						beta_k_up(k,j,i)=(psi_k_max(k,j,i)-psi_old(k,j,i)) / denom1
-								  
-						beta_k_down(k,j,i)=(psi_old(k,j,i)-psi_k_min(k,j,i)) / denom2
+					do k=1,kp
+			
+						denom1 = dt * ( &
+							max(wt(k-1,j,i),0._wp) * rhoa(k-1) * psi_old(k-1,j,i) - &
+							min(wt(k  ,j,i),0._wp) * rhoa(k  ) * psi_old(k+1,j,i) &
+							) / dzn(k) + small
+			
+						denom2 = dt * ( &
+							max(wt(k  ,j,i),0._wp) * rhoa(k  ) * psi_old(k,j,i) - &
+							min(wt(k-1,j,i),0._wp) * rhoa(k-1) * psi_old(k,j,i) &
+							) / dzn(k) + small
+			
+						beta_up(k,j,i) = rhoan(k) * &
+							(psi_max(k,j,i)-psi_old(k,j,i)) / denom1
+			
+						beta_down(k,j,i) = rhoan(k) * &
+							(psi_old(k,j,i)-psi_min(k,j,i)) / denom2
+			
 					enddo
 				enddo
-			enddo 
+			enddo
 !$omp end simd
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
@@ -1011,11 +1050,14 @@
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 			! exchange halos for beta_i_up, down
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-			call exchange_along_z(comm3d, id, kp, jp, ip, r_h,r_h,r_h,r_h,r_h,r_h, &
-													beta_k_up,0._wp,0._wp,dims,coords)
-			call exchange_along_z(comm3d, id, kp, jp, ip, r_h,r_h,r_h,r_h,r_h,r_h, &
-													beta_k_down,0._wp,0._wp,dims,coords)
-			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+			call exchange_along_z(comm3d, id, kp, jp, ip, &
+				r_h,r_h,r_h,r_h,r_h,r_h, &
+				beta_up,0._wp,0._wp,dims,coords)
+			
+			call exchange_along_z(comm3d, id, kp, jp, ip, &
+				r_h,r_h,r_h,r_h,r_h,r_h, &
+				beta_down,0._wp,0._wp,dims,coords)
+    			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 								
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -1024,14 +1066,17 @@
 !$omp simd	
 			do i=1,ip
 				do j=1,jp
-					do k=1,kp			
-						wt_sav(k,j,i)=min(1._wp,beta_k_down(k,j,i), &
-										 beta_k_up(k+1,j,i))*max(wt(k,j,i),0._wp) + &
-									  min(1._wp,beta_k_up(k,j,i), &
-									     beta_k_down(k+1,j,i))*min(wt(k,j,i),0._wp)
+					do k=1,kp
+			
+						wt_sav(k,j,i) = &
+							min(1._wp, beta_down(k,j,i), beta_up(k+1,j,i)) * &
+								max(wt(k,j,i),0._wp) + &
+							min(1._wp, beta_up(k,j,i), beta_down(k+1,j,i)) * &
+								min(wt(k,j,i),0._wp)
+			
 					enddo
 				enddo
-			enddo 
+			enddo
 !$omp end simd
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
@@ -1253,11 +1298,9 @@
 		w_store1, w_store2
 	real(wp), dimension(-r_h+1:kp+r_h,-r_h+1:jp+r_h,-r_h+1:ip+r_h,1:nq), target :: psi_store
 	real(wp), dimension(-r_h+1:kp+r_h,-r_h+1:jp+r_h,-r_h+1:ip+r_h) :: &
-						psi_i_max, psi_i_min, psi_j_max,psi_j_min,psi_k_max,psi_k_min, &
-						beta_i_up, beta_i_down,&
-						beta_j_up, beta_j_down,&
-						beta_k_up, beta_k_down
-	
+						psi_max, psi_min, &
+						beta_up, beta_down
+	real(wp) :: g_bar1, g_bar2, g_bar3
 
 	! has to be positive definite
 	do n=1,nq
@@ -1315,6 +1358,14 @@
 						!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 						! calculate the anti-diffusive velocities                        !
 						!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+						! Generalised G = rho factors
+						!
+						! u and v are at scalar vertical level k
+						g_bar1 = rhoan(k)
+						g_bar2 = rhoan(k)
+						
+						! w is between scalar levels k and k+1
+						g_bar3 = 0.5_wp*(rhoan(k)+rhoan(k+1))
 
 
 
@@ -1323,22 +1374,31 @@
 						!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 						! for divergent flow: eq 38 smolarkiewicz 1984 
 						! last part of u wind:
-						u_div1=(wt(k,j,i)+wt(k,j,i+1)-wt(k-1,j,i)-wt(k-1,j,i+1)) &
-								/ dz(k-1) + &
-								(vt(k,j,i)+vt(k,j,i+1)-vt(k,j-1,i)-vt(k,j-1,i+1)) &
-								/ dy(j-1)
+						u_div1 = &
+							( rhoa(k)   *(wt(k,j,i)+wt(k,j,i+1)) - &
+							  rhoa(k-1) *(wt(k-1,j,i)+wt(k-1,j,i+1)) ) / &
+							  (dz(k-1)*g_bar1) + &
+							( rhoan(k)*(vt(k,j,i)+vt(k,j,i+1) - &
+										vt(k,j-1,i)-vt(k,j-1,i+1)) ) / &
+							  (dy(j-1)*g_bar1)
 						! for divergent flow: eq 38 smolarkiewicz 1984 
 						! last part of v wind:
-						u_div2=(wt(k,j,i)+wt(k,j+1,i)-wt(k-1,j,i)-wt(k-1,j+1,i)) &
-								/ dz(k-1) + &
-								(ut(k,j,i)+ut(k,j+1,i)-ut(k,j,i-1)-ut(k,j+1,i-1)) &
-								/ dx(i-1)
+						u_div2 = &
+							( rhoa(k)   *(wt(k,j,i)+wt(k,j+1,i)) - &
+							  rhoa(k-1) *(wt(k-1,j,i)+wt(k-1,j+1,i)) ) / &
+							  (dz(k-1)*g_bar2) + &
+							( rhoan(k)*(ut(k,j,i)+ut(k,j+1,i) - &
+										ut(k,j,i-1)-ut(k,j+1,i-1)) ) / &
+							  (dx(i-1)*g_bar2)
 						! for divergent flow: eq 38 smolarkiewicz 1984 
 						! last part of w wind:
-						u_div3=(ut(k,j,i)+ut(k+1,j,i)-ut(k,j,i-1)-ut(k+1,j,i-1)) &
-								/ dx(i-1) + &
-								(vt(k,j,i)+vt(k+1,j,i)-vt(k,j-1,i)-vt(k+1,j-1,i)) &
-								/ dy(j-1)
+						u_div3 = &
+							( rhoan(k)  *(ut(k,j,i)-ut(k,j,i-1)) + &
+							  rhoan(k+1)*(ut(k+1,j,i)-ut(k+1,j,i-1)) ) / &
+							  (dx(i-1)*g_bar3) + &
+							( rhoan(k)  *(vt(k,j,i)-vt(k,j-1,i)) + &
+							  rhoan(k+1)*(vt(k+1,j,i)-vt(k+1,j-1,i)) ) / &
+							  (dy(j-1)*g_bar3)
 						!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 
@@ -1349,68 +1409,89 @@
 						! journal of computational physics
 						! second term of u wind:
 						u_j_bar1 = 0.5_wp*dt*ut(k,j,i) * ( &
-							! equation 14:
-							0.25_wp*(wt(k,j,i+1)+wt(k,j,i)+wt(k-1,j,i+1)+wt(k-1,j,i)) * &
-							! equation 13:
-						   ( psi_old(k+1,j,i+1)+psi_old(k+1,j,i)- &
-						     psi_old(k-1,j,i+1)-psi_old(k-1,j,i) ) / &
-						   ( psi_old(k+1,j,i+1)+psi_old(k+1,j,i)+ &
-						     psi_old(k-1,j,i+1)+psi_old(k-1,j,i)+small ) / &
-						     ( 0.5_wp*(dzn(k-1)+dzn(k)) ) + &
-						    ! repeat for y dimension:
-							! equation 14:
-							0.25_wp*(vt(k,j,i+1)+vt(k,j,i)+vt(k,j-1,i+1)+vt(k,j-1,i)) * &
-							! equation 13:
-						   ( psi_old(k,j+1,i+1)+psi_old(k,j+1,i)- &
-						     psi_old(k,j-1,i+1)-psi_old(k,j-1,i) ) / &
-						   ( psi_old(k,j+1,i+1)+psi_old(k,j+1,i)+ &
-						     psi_old(k,j-1,i+1)+psi_old(k,j-1,i)+small ) / &
-						     ( 0.5_wp*(dyn(j-1)+dyn(j)) ) )
-						     
+							! equation 14, z contribution: average G*w / G_u
+							0.25_wp*( &
+								rhoa(k)   *wt(k,j,i+1) + &
+								rhoa(k)   *wt(k,j,i) + &
+								rhoa(k-1) *wt(k-1,j,i+1) + &
+								rhoa(k-1) *wt(k-1,j,i) ) / g_bar1 * &
+							! equation 13
+							( psi_old(k+1,j,i+1)+psi_old(k+1,j,i)- &
+							  psi_old(k-1,j,i+1)-psi_old(k-1,j,i) ) / &
+							( psi_old(k+1,j,i+1)+psi_old(k+1,j,i)+ &
+							  psi_old(k-1,j,i+1)+psi_old(k-1,j,i)+small ) / &
+							(0.5_wp*(dzn(k-1)+dzn(k))) + &
+							! equation 14, y contribution: average G*v / G_u
+							0.25_wp*( &
+								rhoan(k)*vt(k,j,i+1) + &
+								rhoan(k)*vt(k,j,i) + &
+								rhoan(k)*vt(k,j-1,i+1) + &
+								rhoan(k)*vt(k,j-1,i) ) / g_bar1 * &
+							! equation 13
+							( psi_old(k,j+1,i+1)+psi_old(k,j+1,i)- &
+							  psi_old(k,j-1,i+1)-psi_old(k,j-1,i) ) / &
+							( psi_old(k,j+1,i+1)+psi_old(k,j+1,i)+ &
+							  psi_old(k,j-1,i+1)+psi_old(k,j-1,i)+small ) / &
+							(0.5_wp*(dyn(j-1)+dyn(j))) )
+    						     
 						     
 						! equation 13 page 330 of smolarkiewicz (1984) 
 						! journal of computational physics
 						! second term of v wind:
-						u_j_bar2 = 0.5_wp*dt*vt(k,j,i) * ( &
-							! equation 14:
-							0.25_wp*(wt(k,j+1,i)+wt(k,j,i)+wt(k-1,j+1,i)+wt(k-1,j,i)) * &
-							! equation 13:
-						   ( psi_old(k+1,j+1,i)+psi_old(k+1,j,i)- &
-						     psi_old(k-1,j+1,i)-psi_old(k-1,j,i) ) / &
-						   ( psi_old(k+1,j+1,i)+psi_old(k+1,j,i)+ &
-						     psi_old(k-1,j+1,i)+psi_old(k-1,j,i)+small ) / &
-						     ( 0.5_wp*(dzn(k-1)+dzn(k)) ) + &
-						    ! repeat for y dimension:
-							! equation 14:
-							0.25_wp*(ut(k,j+1,i)+ut(k,j,i)+ut(k,j+1,i-1)+ut(k,j,i-1)) * &
-							! equation 13:
-						   ( psi_old(k,j+1,i+1)+psi_old(k,j,i+1)- &
-						     psi_old(k,j+1,i-1)-psi_old(k,j,i-1) ) / &
-						   ( psi_old(k,j+1,i+1)+psi_old(k,j,i+1)+ &
-						     psi_old(k,j+1,i-1)+psi_old(k,j,i-1)+small ) / &
-						     ( 0.5_wp*(dxn(i-1)+dxn(i)) ) )
-						     
+						u_j_bar2 = 0.5_wp*dt*vt(k,j,i) * ( &						
+							! equation 14, z contribution
+							0.25_wp*( &
+								rhoa(k)   *wt(k,j+1,i) + &
+								rhoa(k)   *wt(k,j,i) + &
+								rhoa(k-1) *wt(k-1,j+1,i) + &
+								rhoa(k-1) *wt(k-1,j,i) ) / g_bar2 * &
+							! equation 13
+							( psi_old(k+1,j+1,i)+psi_old(k+1,j,i)- &
+							  psi_old(k-1,j+1,i)-psi_old(k-1,j,i) ) / &
+							( psi_old(k+1,j+1,i)+psi_old(k+1,j,i)+ &
+							  psi_old(k-1,j+1,i)+psi_old(k-1,j,i)+small ) / &
+							(0.5_wp*(dzn(k-1)+dzn(k))) + &
+							! equation 14, x contribution
+							0.25_wp*( &
+								rhoan(k)*ut(k,j+1,i) + &
+								rhoan(k)*ut(k,j,i) + &
+								rhoan(k)*ut(k,j+1,i-1) + &
+								rhoan(k)*ut(k,j,i-1) ) / g_bar2 * &
+							! equation 13
+							( psi_old(k,j+1,i+1)+psi_old(k,j,i+1)- &
+							  psi_old(k,j+1,i-1)-psi_old(k,j,i-1) ) / &
+							( psi_old(k,j+1,i+1)+psi_old(k,j,i+1)+ &
+							  psi_old(k,j+1,i-1)+psi_old(k,j,i-1)+small ) / &
+							(0.5_wp*(dxn(i-1)+dxn(i))) )
+    						     
 						! equation 13 page 330 of smolarkiewicz (1984) 
 						! journal of computational physics
 						! second term of w wind:
-						u_j_bar3 = 0.5_wp*dt*wt(k,j,i) * ( &
-							! equation 14:
-							0.25_wp*(vt(k+1,j,i)+vt(k,j,i)+vt(k+1,j-1,i)+vt(k,j-1,i)) * &
-							! equation 13:
-						   ( psi_old(k+1,j+1,i)+psi_old(k,j+1,i)- &
-						     psi_old(k+1,j-1,i)-psi_old(k,j-1,i) ) / &
-						   ( psi_old(k+1,j+1,i)+psi_old(k,j+1,i)+ &
-						     psi_old(k+1,j-1,i)+psi_old(k,j-1,i)+small ) / &
-						     ( 0.5_wp*(dyn(j-1)+dyn(j)) ) + &
-						    ! repeat for y dimension:
-							! equation 14:
-							0.25_wp*(ut(k+1,j,i)+ut(k,j,i)+ut(k+1,j,i-1)+ut(k,j,i-1)) * &
-							! equation 13:
-						   ( psi_old(k+1,j,i+1)+psi_old(k,j,i+1)- &
-						     psi_old(k+1,j,i-1)-psi_old(k,j,i-1) ) / &
-						   ( psi_old(k+1,j,i+1)+psi_old(k,j,i+1)+ &
-						     psi_old(k+1,j,i-1)+psi_old(k,j,i-1)+small ) / &
-						     ( 0.5_wp*(dxn(i-1)+dxn(i)) ) )
+						u_j_bar3 = 0.5_wp*dt*wt(k,j,i) * ( &						
+							! equation 14, y contribution
+							0.25_wp*( &
+								rhoan(k+1)*vt(k+1,j,i) + &
+								rhoan(k)  *vt(k,j,i) + &
+								rhoan(k+1)*vt(k+1,j-1,i) + &
+								rhoan(k)  *vt(k,j-1,i) ) / g_bar3 * &
+							! equation 13
+							( psi_old(k+1,j+1,i)+psi_old(k,j+1,i)- &
+							  psi_old(k+1,j-1,i)-psi_old(k,j-1,i) ) / &
+							( psi_old(k+1,j+1,i)+psi_old(k,j+1,i)+ &
+							  psi_old(k+1,j-1,i)+psi_old(k,j-1,i)+small ) / &
+							(0.5_wp*(dyn(j-1)+dyn(j))) + &
+							! equation 14, x contribution
+							0.25_wp*( &
+								rhoan(k+1)*ut(k+1,j,i) + &
+								rhoan(k)  *ut(k,j,i) + &
+								rhoan(k+1)*ut(k+1,j,i-1) + &
+								rhoan(k)  *ut(k,j,i-1) ) / g_bar3 * &
+							! equation 13
+							( psi_old(k+1,j,i+1)+psi_old(k,j,i+1)- &
+							  psi_old(k+1,j,i-1)-psi_old(k,j,i-1) ) / &
+							( psi_old(k+1,j,i+1)+psi_old(k,j,i+1)+ &
+							  psi_old(k+1,j,i-1)+psi_old(k,j,i-1)+small ) / &
+							(0.5_wp*(dxn(i-1)+dxn(i))) )
 						!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 
@@ -1428,23 +1509,28 @@
 							(psi_old(k,j+1,i)-psi_old(k,j,i) ) / &
 							(psi_old(k,j+1,i)+psi_old(k,j,i)+small) /dyn(j) - u_j_bar2														
 						! w wind:
-						wt_sav(k,j,i)=(abs(wt(k,j,i))*dz(k)-dt*wt(k,j,i)*wt(k,j,i) ) * &
-							(psi_old(k+1,j,i)-psi_old(k,j,i) ) / &
-							(psi_old(k+1,j,i)+psi_old(k,j,i)+small) /dzn(k) - u_j_bar3
+						wt_sav(k,j,i) = &
+							( abs(wt(k,j,i))*dz(k) - &
+							  dt*(rhoa(k)/g_bar3)*wt(k,j,i)*wt(k,j,i) ) * &
+							(psi_old(k+1,j,i)-psi_old(k,j,i)) / &
+							(psi_old(k+1,j,i)+psi_old(k,j,i)+small) / &
+							dzn(k) - u_j_bar3
 						!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-							
-						! note, see Smolarkiewicz (1984, equations 35 and 36 for 
-						! 3rd order accurate in time option here - update to ut_sav)
 							
 						!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 						! last update of eq 38 smolarkiewicz 1984
 						!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-						ut_sav(k,j,i)=ut_sav(k,j,i) - 0.25_wp*dt*ut(k,j,i) * &
-						 ( (ut(k,j,i+1)-ut(k,j,i-1))/(dx(i-1))+u_div1 )
-						vt_sav(k,j,i)=vt_sav(k,j,i) - 0.25_wp*dt*vt(k,j,i) * &
-						 ( (vt(k,j+1,i)-vt(k,j-1,i))/(dy(j-1))+u_div2 )
-						wt_sav(k,j,i)=wt_sav(k,j,i) - 0.25_wp*dt*wt(k,j,i) * &
-						 ( (wt(k+1,j,i)-wt(k-1,j,i))/(dz(k-1))+u_div3 )
+						ut_sav(k,j,i) = ut_sav(k,j,i) - &
+							0.25_wp*dt*ut(k,j,i) * &
+							( (ut(k,j,i+1)-ut(k,j,i-1))/dx(i-1) + u_div1 )						
+						vt_sav(k,j,i) = vt_sav(k,j,i) - &
+							0.25_wp*dt*vt(k,j,i) * &
+							( (vt(k,j+1,i)-vt(k,j-1,i))/dy(j-1) + u_div2 )
+						wt_sav(k,j,i) = wt_sav(k,j,i) - &
+							0.25_wp*dt*wt(k,j,i) * &
+							( ( rhoa(k+1)*wt(k+1,j,i) - &
+								rhoa(k-1)*wt(k-1,j,i) ) / &
+							  (dz(k-1)*g_bar3) + u_div3 )
 						!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 
@@ -1498,43 +1584,26 @@
 			do i=1,ip
 				do j=1,jp
 					do k=1,kp			
-						! x direction - note: should the last q in the max/min be q+1?
-						psi_i_max(k,j,i)=max(psi(k,j,i-1),psi(k,j,i),psi(k,j,i+1), &
-									psi_old(k,j,i-1),psi_old(k,j,i),psi_old(k,j,i+1))
-					
-						psi_i_min(k,j,i)=min(psi(k,j,i-1),psi(k,j,i),psi(k,j,i+1), &
-									psi_old(k,j,i-1),psi_old(k,j,i),psi_old(k,j,i+1))
-					enddo
-				enddo
-			enddo
-!$omp end simd
-
-!$omp simd	
-			do i=1,ip
-				do j=1,jp
-					do k=1,kp			
-						! y direction - note: should the last q in the max/min be q+1?
-						psi_j_max(k,j,i)=max(psi(k,j-1,i),psi(k,j,i),psi(k,j+1,i), &
-									psi_old(k,j-1,i),psi_old(k,j,i),psi_old(k,j+1,i))
-					
-						psi_j_min(k,j,i)=min(psi(k,j-1,i),psi(k,j,i),psi(k,j+1,i), &
-									psi_old(k,j-1,i),psi_old(k,j,i),psi_old(k,j+1,i))
-					enddo
-				enddo
-			enddo
-!$omp end simd
-
-!$omp simd	
-			do i=1,ip
-				do j=1,jp
-					do k=1,kp			
-						! z direction - note: should the last q in the max/min be q+1?
-						psi_k_max(k,j,i)=max(psi(k-1,j,i),psi(k,j,i),psi(k+1,j,i), &
-									psi_old(k-1,j,i),psi_old(k,j,i),psi_old(k+1,j,i))
-					
-						psi_k_min(k,j,i)=min(psi(k-1,j,i),psi(k,j,i),psi(k+1,j,i), &
-									psi_old(k-1,j,i),psi_old(k,j,i),psi_old(k+1,j,i))
-					enddo
+						psi_max(k,j,i) = max( &
+							psi(k,j,i), &
+							psi(k,j,i-1), psi(k,j,i+1), &
+							psi(k,j-1,i), psi(k,j+1,i), &
+							psi(k-1,j,i), psi(k+1,j,i), &
+							psi_old(k,j,i), &
+							psi_old(k,j,i-1), psi_old(k,j,i+1), &
+							psi_old(k,j-1,i), psi_old(k,j+1,i), &
+							psi_old(k-1,j,i), psi_old(k+1,j,i) )
+						
+						psi_min(k,j,i) = min( &
+							psi(k,j,i), &
+							psi(k,j,i-1), psi(k,j,i+1), &
+							psi(k,j-1,i), psi(k,j+1,i), &
+							psi(k-1,j,i), psi(k+1,j,i), &
+							psi_old(k,j,i), &
+							psi_old(k,j,i-1), psi_old(k,j,i+1), &
+							psi_old(k,j-1,i), psi_old(k,j+1,i), &
+							psi_old(k-1,j,i), psi_old(k+1,j,i) )
+    					enddo
 				enddo
 			enddo
 !$omp end simd
@@ -1551,35 +1620,30 @@
 			do i=1,ip
 				do j=1,jp
 					do k=1,kp		
-						denom1=(dt*((max(ut(k,j,i-1),0._wp)*psi_old(k,j,i-1)- &
-								  min(ut(k,j,i),0._wp)*psi_old(k,j,i+1))/dx(i-1)+ &
-							    (max(vt(k,j-1,i),0._wp)*psi_old(k,j-1,i)-&
-								  min(vt(k,j,i),0._wp)*psi_old(k,j+1,i))/dy(j-1) + &
-							    (max(wt(k-1,j,i),0._wp)*psi_old(k-1,j,i)-&
-								  min(wt(k,j,i),0._wp)*psi_old(k+1,j,i))/dz(k-1) &
-								  +small))
-								  
-						denom2=(dt*((max(ut(k,j,i),0._wp)*psi_old(k,j,i)- &
-							      min(ut(k,j,i-1),0._wp)*psi_old(k,j,i))/dx(i-1) + &
-								(max(vt(k,j,i),0._wp)*psi_old(k,j,i)-&
-								  min(vt(k,j-1,i),0._wp)*psi_old(k,j,i))/dy(j-1) + &
-								(max(wt(k,j,i),0._wp)*psi_old(k,j,i)-&
-								  min(wt(k-1,j,i),0._wp)*psi_old(k,j,i))/dz(k-1) &
-								  +small))
-								  
-						beta_i_up(k,j,i)=(psi_i_max(k,j,i)-psi_old(k,j,i)) / denom1
-							
-								  
-						beta_i_down(k,j,i)=(psi_old(k,j,i)-psi_i_min(k,j,i)) / denom2
-											
-
-						beta_j_up(k,j,i)=(psi_j_max(k,j,i)-psi_old(k,j,i)) / denom1
-								  
-						beta_j_down(k,j,i)=(psi_old(k,j,i)-psi_j_min(k,j,i)) / denom2
-
-						beta_k_up(k,j,i)=(psi_k_max(k,j,i)-psi_old(k,j,i)) / denom1
-								  
-						beta_k_down(k,j,i)=(psi_old(k,j,i)-psi_k_min(k,j,i)) / denom2
+						denom1 = dt * ( &
+							( max(ut(k,j,i-1),0._wp) * rhoan(k) * psi_old(k,j,i-1) - &
+							  min(ut(k,j,i  ),0._wp) * rhoan(k) * psi_old(k,j,i+1) ) / dxn(i) + &
+							( max(vt(k,j-1,i),0._wp) * rhoan(k) * psi_old(k,j-1,i) - &
+							  min(vt(k,j  ,i),0._wp) * rhoan(k) * psi_old(k,j+1,i) ) / dyn(j) + &
+							( max(wt(k-1,j,i),0._wp) * rhoa(k-1) * psi_old(k-1,j,i) - &
+							  min(wt(k  ,j,i),0._wp) * rhoa(k  ) * psi_old(k+1,j,i) ) / dzn(k) &
+							) + small	
+    							  							
+						denom2 = dt * ( &						
+							( max(ut(k,j,i  ),0._wp) * rhoan(k) * psi_old(k,j,i) - &
+							  min(ut(k,j,i-1),0._wp) * rhoan(k) * psi_old(k,j,i) ) / dxn(i) + &
+							( max(vt(k,j  ,i),0._wp) * rhoan(k) * psi_old(k,j,i) - &
+							  min(vt(k,j-1,i),0._wp) * rhoan(k) * psi_old(k,j,i) ) / dyn(j) + &
+							( max(wt(k  ,j,i),0._wp) * rhoa(k  ) * psi_old(k,j,i) - &
+							  min(wt(k-1,j,i),0._wp) * rhoa(k-1) * psi_old(k,j,i) ) / dzn(k) &
+							+ small )
+    
+						beta_up(k,j,i) = rhoan(k) * &
+							(psi_max(k,j,i)-psi_old(k,j,i)) / denom1
+						
+						beta_down(k,j,i) = rhoan(k) * &
+							(psi_old(k,j,i)-psi_min(k,j,i)) / denom2
+    						
 					enddo
 				enddo
 			enddo 
@@ -1592,17 +1656,9 @@
 			! exchange halos for beta_i_up, down
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 			call exchange_along_dim(comm3d, id, kp, jp, ip, r_h,r_h,r_h,r_h,r_h,r_h, &
-													beta_i_up,0._wp,0._wp,dims,coords)
+													beta_up,0._wp,0._wp,dims,coords)
 			call exchange_along_dim(comm3d, id, kp, jp, ip, r_h,r_h,r_h,r_h,r_h,r_h, &
-													beta_i_down,0._wp,0._wp,dims,coords)
-			call exchange_along_dim(comm3d, id, kp, jp, ip, r_h,r_h,r_h,r_h,r_h,r_h, &
-													beta_j_up,0._wp,0._wp,dims,coords)
-			call exchange_along_dim(comm3d, id, kp, jp, ip, r_h,r_h,r_h,r_h,r_h,r_h, &
-													beta_j_down,0._wp,0._wp,dims,coords)
-			call exchange_along_dim(comm3d, id, kp, jp, ip, r_h,r_h,r_h,r_h,r_h,r_h, &
-													beta_k_up,0._wp,0._wp,dims,coords)
-			call exchange_along_dim(comm3d, id, kp, jp, ip, r_h,r_h,r_h,r_h,r_h,r_h, &
-													beta_k_down,0._wp,0._wp,dims,coords)
+													beta_down,0._wp,0._wp,dims,coords)
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 								
@@ -1613,19 +1669,22 @@
 			do i=1,ip
 				do j=1,jp
 					do k=1,kp			
-						ut_sav(k,j,i)=min(1._wp,beta_i_down(k,j,i), &
-										 beta_i_up(k,j,i+1))*max(ut(k,j,i),0._wp) + &
-									  min(1._wp,beta_i_up(k,j,i), &
-									     beta_i_down(k,j,i+1))*min(ut(k,j,i),0._wp)
-						vt_sav(k,j,i)=min(1._wp,beta_j_down(k,j,i), &
-										 beta_j_up(k,j+1,i))*max(vt(k,j,i),0._wp) + &
-									  min(1._wp,beta_j_up(k,j,i), &
-									     beta_j_down(k,j+1,i))*min(vt(k,j,i),0._wp)
-						wt_sav(k,j,i)=min(1._wp,beta_k_down(k,j,i), &
-										 beta_k_up(k+1,j,i))*max(wt(k,j,i),0._wp) + &
-									  min(1._wp,beta_k_up(k,j,i), &
-									     beta_k_down(k+1,j,i))*min(wt(k,j,i),0._wp)
-					enddo
+						ut_sav(k,j,i) = &
+							min(1._wp,beta_down(k,j,i),beta_up(k,j,i+1)) * &
+								max(ut(k,j,i),0._wp) + &
+							min(1._wp,beta_up(k,j,i),beta_down(k,j,i+1)) * &
+								min(ut(k,j,i),0._wp)
+						vt_sav(k,j,i) = &
+							min(1._wp,beta_down(k,j,i),beta_up(k,j+1,i)) * &
+								max(vt(k,j,i),0._wp) + &
+							min(1._wp,beta_up(k,j,i),beta_down(k,j+1,i)) * &
+								min(vt(k,j,i),0._wp)
+						wt_sav(k,j,i) = &
+							min(1._wp,beta_down(k,j,i),beta_up(k+1,j,i)) * &
+								max(wt(k,j,i),0._wp) + &
+							min(1._wp,beta_up(k,j,i),beta_down(k+1,j,i)) * &
+								min(wt(k,j,i),0._wp)
+        				enddo
 				enddo
 			enddo 
 !$omp end simd
@@ -1754,9 +1813,9 @@
 		w_store1, w_store2
 	real(wp), dimension(-r_h+1:kp+r_h,-r_h+1:jp+r_h,-r_h+1:ip+r_h,1:nq), target :: psi_store
 	real(wp), dimension(-r_h+1:kp+r_h,-r_h+1:jp+r_h,-r_h+1:ip+r_h) :: &
-						psi_k_max,psi_k_min, &
-						beta_k_up, beta_k_down
-	
+						psi_max,psi_min, &
+						beta_up, beta_down
+	real(wp) :: g_bar1,g_bar2,g_bar3
 
 	! has to be positive definite
 	do n=1,nq
@@ -1808,6 +1867,16 @@
 						!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 						! calculate the anti-diffusive velocities                        !
 						!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+						! Generalised G = rho factors
+						!
+						! u and v are at scalar vertical level k
+						g_bar1 = rhoan(k)
+						g_bar2 = rhoan(k)
+						
+						! w is between scalar levels k and k+1
+						g_bar3 = 0.5_wp*(rhoan(k)+rhoan(k+1))
+
+
 
 
 						!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -1832,21 +1901,23 @@
 						!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 						! last update of equation 13
 						!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-						! u wind:
 						! w wind:
-						wt_sav(k,j,i)=(abs(wt(k,j,i))*dz(k)-dt*wt(k,j,i)*wt(k,j,i) ) * &
-							(psi_old(k+1,j,i)-psi_old(k,j,i) ) / &
-							(psi_old(k+1,j,i)+psi_old(k,j,i)+small) /dzn(k) - u_j_bar3
+						wt_sav(k,j,i) = &
+							( abs(wt(k,j,i))*dz(k) - &
+							  dt*(rhoa(k)/g_bar3)*wt(k,j,i)*wt(k,j,i) ) * &
+							(psi_old(k+1,j,i)-psi_old(k,j,i)) / &
+							(psi_old(k+1,j,i)+psi_old(k,j,i)+small) / &
+							dzn(k) - u_j_bar3
 						!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-							
-						! note, see Smolarkiewicz (1984, equations 35 and 36 for 
-						! 3rd order accurate in time option here - update to ut_sav)
 							
 						!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 						! last update of eq 38 smolarkiewicz 1984
 						!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-						wt_sav(k,j,i)=wt_sav(k,j,i) - 0.25_wp*dt*wt(k,j,i) * &
-						 ( (wt(k+1,j,i)-wt(k-1,j,i))/(dz(k-1))+u_div3 )
+						wt_sav(k,j,i) = wt_sav(k,j,i) - &
+							0.25_wp*dt*wt(k,j,i) * &
+							( ( rhoa(k+1)*wt(k+1,j,i) - &
+								rhoa(k-1)*wt(k-1,j,i) ) / &
+							  (dz(k-1)*g_bar3) + u_div3 )
 						!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 
@@ -1890,11 +1961,13 @@
 				do j=1,jp
 					do k=1,kp			
 						! z direction - note: should the last q in the max/min be q+1?
-						psi_k_max(k,j,i)=max(psi(k-1,j,i),psi(k,j,i),psi(k+1,j,i), &
-									psi_old(k-1,j,i),psi_old(k,j,i),psi_old(k+1,j,i))
-					
-						psi_k_min(k,j,i)=min(psi(k-1,j,i),psi(k,j,i),psi(k+1,j,i), &
-									psi_old(k-1,j,i),psi_old(k,j,i),psi_old(k+1,j,i))
+						psi_max(k,j,i) = max( &
+							psi(k-1,j,i), psi(k,j,i), psi(k+1,j,i), &
+							psi_old(k-1,j,i), psi_old(k,j,i), psi_old(k+1,j,i) )
+						
+						psi_min(k,j,i) = min( &
+							psi(k-1,j,i), psi(k,j,i), psi(k+1,j,i), &
+							psi_old(k-1,j,i), psi_old(k,j,i), psi_old(k+1,j,i) )
 					enddo
 				enddo
 			enddo
@@ -1912,17 +1985,21 @@
 			do i=1,ip
 				do j=1,jp
 					do k=1,kp		
-						denom1=(dt*((max(wt(k-1,j,i),0._wp)*psi_old(k-1,j,i)-&
-								  min(wt(k,j,i),0._wp)*psi_old(k+1,j,i))/dz(k-1) &
-								  +small))
-								  
-						denom2=(dt*((max(wt(k,j,i),0._wp)*psi_old(k,j,i)-&
-								  min(wt(k-1,j,i),0._wp)*psi_old(k,j,i))/dz(k-1) &
-								  +small))
-								  
-						beta_k_up(k,j,i)=(psi_k_max(k,j,i)-psi_old(k,j,i)) / denom1
-								  
-						beta_k_down(k,j,i)=(psi_old(k,j,i)-psi_k_min(k,j,i)) / denom2
+						denom1 = dt * ( &
+							max(wt(k-1,j,i),0._wp) * rhoa(k-1) * psi_old(k-1,j,i) - &
+							min(wt(k  ,j,i),0._wp) * rhoa(k  ) * psi_old(k+1,j,i) &
+							) / dzn(k) + small
+    								  
+						denom2 = dt * ( &
+							max(wt(k  ,j,i),0._wp) * rhoa(k  ) * psi_old(k,j,i) - &
+							min(wt(k-1,j,i),0._wp) * rhoa(k-1) * psi_old(k,j,i) &
+							) / dzn(k) + small
+    								  
+						beta_up(k,j,i) = rhoan(k) * &
+							(psi_max(k,j,i)-psi_old(k,j,i)) / denom1
+						
+						beta_down(k,j,i) = rhoan(k) * &
+							(psi_old(k,j,i)-psi_min(k,j,i)) / denom2
 					enddo
 				enddo
 			enddo 
@@ -1935,9 +2012,9 @@
 			! exchange halos for beta_i_up, down
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 			call exchange_along_z(comm3d, id, kp, jp, ip, r_h,r_h,r_h,r_h,r_h,r_h, &
-													beta_k_up,0._wp,0._wp,dims,coords)
+													beta_up,0._wp,0._wp,dims,coords)
 			call exchange_along_z(comm3d, id, kp, jp, ip, r_h,r_h,r_h,r_h,r_h,r_h, &
-													beta_k_down,0._wp,0._wp,dims,coords)
+													beta_down,0._wp,0._wp,dims,coords)
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 								
@@ -1948,10 +2025,11 @@
 			do i=1,ip
 				do j=1,jp
 					do k=1,kp			
-						wt_sav(k,j,i)=min(1._wp,beta_k_down(k,j,i), &
-										 beta_k_up(k+1,j,i))*max(wt(k,j,i),0._wp) + &
-									  min(1._wp,beta_k_up(k,j,i), &
-									     beta_k_down(k+1,j,i))*min(wt(k,j,i),0._wp)
+						wt_sav(k,j,i) = &
+							min(1._wp, beta_down(k,j,i), beta_up(k+1,j,i)) * &
+								max(wt(k,j,i),0._wp) + &
+							min(1._wp, beta_up(k,j,i), beta_down(k+1,j,i)) * &
+								min(wt(k,j,i),0._wp)
 					enddo
 				enddo
 			enddo 
