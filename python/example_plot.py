@@ -7,7 +7,7 @@ from netCDF4 import Dataset
 import numpy as np
 
 # open file
-nc = Dataset('/tmp/output7.nc')
+nc = Dataset('/tmp/output.nc')
 
 # extract needed variables
 y = nc['y'][:]
