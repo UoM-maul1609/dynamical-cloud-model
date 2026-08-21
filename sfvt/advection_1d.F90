@@ -51,12 +51,12 @@
 !$omp simd	
     do k=1,kp
         fz_r(k)=( (w(k)+abs(w(k)))*rhoa(k)*psi(k)+ &
-            (w(k)-abs(w(k)))*rhoan(k+1)*psi(k+1) )*dt/ &
-            (2._wp*dzn(k)*rhoa(k))
+            (w(k)-abs(w(k)))*rhoa(k)*psi(k+1) )*dt/ &
+            (2._wp*dzn(k)*rhoan(k))
 
         fz_l(k)=( (w(k-1)+abs(w(k-1)))*rhoa(k-1)*psi(k-1)+ &
-            (w(k-1)-abs(w(k-1)))*rhoan(k)*psi(k) )*dt/ &
-            (2._wp*dzn(k)*rhoa(k))
+            (w(k-1)-abs(w(k-1)))*rhoa(k-1)*psi(k) )*dt/ &
+            (2._wp*dzn(k)*rhoan(k))
     enddo
 !$omp end simd
 	
@@ -143,9 +143,9 @@
 		w_store1, w_store2
 	real(wp), dimension(-r_h+1:kp+r_h), target :: psi_store
 	real(wp), dimension(-r_h+1:kp+r_h) :: &
-						psi_k_max,psi_k_min, &
-						beta_k_up, beta_k_down
-	
+						psi_max,psi_min, &
+						beta_up, beta_down
+	real(wp) :: g_bar3	
 
 	! has to be positive definite
 	minlocal=minval(psi_in(1:kp))
@@ -195,7 +195,13 @@
                 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
                 ! calculate the anti-diffusive velocities                        !
                 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-
+				! G at the u and v faces: density varies only vertically,
+				! so both adjacent scalar cells have rhoan(k)
+! 				g_bar1 = rhoan(k)
+! 				g_bar2 = rhoan(k)
+				
+				! G averaged to the w face between scalar levels k and k+1
+				g_bar3 = 0.5_wp*(rhoan(k)+rhoan(k+1))
 
 
 
@@ -223,16 +229,19 @@
                 ! last update of equation 13
                 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
                 ! w wind:
-                wt_sav(k)=(abs(wt(k))*dz(k)-dt*wt(k)*wt(k) ) * &
-                    (psi_old(k+1)-psi_old(k) ) / &
-                    (psi_old(k+1)+psi_old(k)+small) /dzn(k) - u_j_bar3
+				wt_sav(k) = &
+					( abs(wt(k))*dz(k) - &
+					  dt*(rhoa(k)/g_bar3)*wt(k)*wt(k) ) * &
+					(psi_old(k+1)-psi_old(k)) / &
+					(psi_old(k+1)+psi_old(k)+small) / dzn(k) - u_j_bar3
                 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
                     
                 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
                 ! last update of eq 38 smolarkiewicz 1984
                 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-                wt_sav(k)=wt_sav(k) - 0.25_wp*dt*wt(k) * &
-                 ( (wt(k+1)-wt(k-1))/(dz(k-1))+u_div3 )
+				wt_sav(k) = wt_sav(k) - 0.25_wp*dt*wt(k) * &
+					( ( rhoa(k+1)*wt(k+1) - &
+						rhoa(k-1)*wt(k-1) ) / dz(k-1) + u_div3 ) / g_bar3    
                 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 
@@ -279,12 +288,12 @@
 !$omp simd	
             do k=1,kp			
                 ! z direction - note: should the last q in the max/min be q+1?
-                psi_k_max(k)=max(psi(k-1),psi(k),psi(k+1), &
-                            psi_old(k-1),psi_old(k),psi_old(k+1))
-            
-                psi_k_min(k)=min(psi(k-1),psi(k),psi(k+1), &
-                            psi_old(k-1),psi_old(k),psi_old(k+1))
-            enddo
+				psi_max(k) = max(psi(k-1),psi(k),psi(k+1), &
+								 psi_old(k-1),psi_old(k),psi_old(k+1))
+			
+				psi_min(k) = min(psi(k-1),psi(k),psi(k+1), &
+								 psi_old(k-1),psi_old(k),psi_old(k+1))
+			enddo
 !$omp end simd
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
@@ -297,18 +306,19 @@
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !$omp simd	
             do k=1,kp		
-                denom1=(dt*((max(wt(k-1),0._wp)*psi_old(k-1)-&
-                          min(wt(k),0._wp)*psi_old(k+1))/dz(k-1) &
-                          +small))
-                          
-                denom2=(dt*((max(wt(k),0._wp)*psi_old(k)-&
-                          min(wt(k-1),0._wp)*psi_old(k))/dz(k-1) &
-                          +small))
-                          
-                beta_k_up(k)=(psi_k_max(k)-psi_old(k)) / denom1
-
-                          
-                beta_k_down(k)=(psi_old(k)-psi_k_min(k)) / denom2
+				denom1 = dt * ( &
+					max(wt(k-1),0._wp)*rhoa(k-1)*psi_old(k-1) - &
+					min(wt(k),0._wp)*rhoa(k)*psi_old(k+1) ) / dzn(k) + small
+				
+				denom2 = dt * ( &
+					max(wt(k),0._wp)*rhoa(k)*psi_old(k) - &
+					min(wt(k-1),0._wp)*rhoa(k-1)*psi_old(k) ) / dzn(k) + small
+				
+				beta_up(k) = rhoan(k) * &
+					(psi_max(k)-psi_old(k)) / denom1
+				
+				beta_down(k) = rhoan(k) * &
+					(psi_old(k)-psi_min(k)) / denom2
             enddo
 !$omp end simd
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -331,6 +341,10 @@
 !             beta_i_down(:,ip+1:ip+r_h)  =beta_i_down(:,1:r_h)
 !             beta_k_up(:,-l_h+1:0)       =beta_k_up(:,ip-l_h+1:ip)
 !             beta_k_down(:,ip+1:ip+r_h)  =beta_k_down(:,1:r_h)
+			beta_up(1-r_h:0)       = 0._wp
+			beta_up(kp+1:kp+r_h)   = 0._wp
+			beta_down(1-r_h:0)     = 0._wp
+			beta_down(kp+1:kp+r_h) = 0._wp
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 								
@@ -338,12 +352,13 @@
 			! equation 18 of Smolarkiewicz and Grabowski (1990, JCP, 86)                 !
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !$omp simd	
-            do k=1,kp			
-                wt_sav(k)=min(1._wp,beta_k_down(k), &
-                                 beta_k_up(k+1))*max(wt(k),0._wp) + &
-                              min(1._wp,beta_k_up(k), &
-                                 beta_k_down(k+1))*min(wt(k),0._wp)
-            enddo
+			do k=1,kp
+				wt_sav(k) = &
+					min(1._wp,beta_down(k),beta_up(k+1)) * &
+						max(wt(k),0._wp) + &
+					min(1._wp,beta_up(k),beta_down(k+1)) * &
+						min(wt(k),0._wp)
+			enddo
 !$omp end simd
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
@@ -481,8 +496,9 @@
 		w_store1, w_store2
 	real(wp), dimension(-r_h+1:kp+r_h,1:nq), target :: psi_store
 	real(wp), dimension(-r_h+1:kp+r_h) :: &
-						psi_k_max,psi_k_min, &
-						beta_k_up, beta_k_down
+						psi_max,psi_min, &
+						beta_up, beta_down
+	real(wp) :: g_bar3
 	
 
 	! has to be positive definite
@@ -536,7 +552,13 @@
                 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
                 ! calculate the anti-diffusive velocities                        !
                 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-
+				! G at the u and v faces: density varies only vertically,
+				! so both adjacent scalar cells have rhoan(k)
+! 				g_bar1 = rhoan(k)
+! 				g_bar2 = rhoan(k)
+				
+				! G averaged to the w face between scalar levels k and k+1
+				g_bar3 = 0.5_wp*(rhoan(k)+rhoan(k+1))
 
 
 
@@ -564,16 +586,19 @@
                 ! last update of equation 13
                 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
                 ! w wind:
-                wt_sav(k)=(abs(wt(k))*dz(k)-dt*wt(k)*wt(k) ) * &
-                    (psi_old(k+1)-psi_old(k) ) / &
-                    (psi_old(k+1)+psi_old(k)+small) /dzn(k) - u_j_bar3
+				wt_sav(k) = &
+					( abs(wt(k))*dz(k) - &
+					  dt*(rhoa(k)/g_bar3)*wt(k)*wt(k) ) * &
+					(psi_old(k+1)-psi_old(k)) / &
+					(psi_old(k+1)+psi_old(k)+small) / dzn(k) - u_j_bar3
                 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
                     
                 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
                 ! last update of eq 38 smolarkiewicz 1984
                 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-                wt_sav(k)=wt_sav(k) - 0.25_wp*dt*wt(k) * &
-                 ( (wt(k+1)-wt(k-1))/(dz(k-1))+u_div3 )
+				wt_sav(k) = wt_sav(k) - 0.25_wp*dt*wt(k) * &
+					( ( rhoa(k+1)*wt(k+1) - &
+						rhoa(k-1)*wt(k-1) ) / dz(k-1) + u_div3 ) / g_bar3    
                 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 
@@ -620,14 +645,13 @@
 
 
 !$omp simd	
-            do k=1,kp			
-                ! z direction - note: should the last q in the max/min be q+1?
-                psi_k_max(k)=max(psi(k-1),psi(k),psi(k+1), &
-                            psi_old(k-1),psi_old(k),psi_old(k+1))
-            
-                psi_k_min(k)=min(psi(k-1),psi(k),psi(k+1), &
-                            psi_old(k-1),psi_old(k),psi_old(k+1))
-            enddo
+			do k=1,kp
+				psi_max(k) = max(psi(k-1),psi(k),psi(k+1), &
+								 psi_old(k-1),psi_old(k),psi_old(k+1))
+			
+				psi_min(k) = min(psi(k-1),psi(k),psi(k+1), &
+								 psi_old(k-1),psi_old(k),psi_old(k+1))
+			enddo
 !$omp end simd
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
@@ -639,19 +663,19 @@
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !$omp simd	
             do k=1,kp	
-                	
-                denom1=dt*((max(wt(k-1),0._wp)*psi_old(k-1)-&
-                          min(wt(k),0._wp)*psi_old(k+1))/dz(k-1) &
-                          +small)
-                          
-                denom2=dt*((max(wt(k),0._wp)*psi_old(k)-&
-                          min(wt(k-1),0._wp)*psi_old(k))/dz(k-1) &
-                          +small)
-                          
-
-                beta_k_up(k)=(psi_k_max(k)-psi_old(k)) / denom1
-                          
-                beta_k_down(k)=(psi_old(k)-psi_k_min(k)) / denom2
+				denom1 = dt * ( &
+					max(wt(k-1),0._wp)*rhoa(k-1)*psi_old(k-1) - &
+					min(wt(k),0._wp)*rhoa(k)*psi_old(k+1) ) / dzn(k) + small
+				
+				denom2 = dt * ( &
+					max(wt(k),0._wp)*rhoa(k)*psi_old(k) - &
+					min(wt(k-1),0._wp)*rhoa(k-1)*psi_old(k) ) / dzn(k) + small
+				
+				beta_up(k) = rhoan(k) * &
+					(psi_max(k)-psi_old(k)) / denom1
+				
+				beta_down(k) = rhoan(k) * &
+					(psi_old(k)-psi_min(k)) / denom2
             enddo
 !$omp end simd
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -672,6 +696,10 @@
 !             beta_i_down(:,ip+1:ip+r_h)  =beta_i_down(:,1:r_h)
 !             beta_k_up(:,-l_h+1:0)       =beta_k_up(:,ip-l_h+1:ip)
 !             beta_k_down(:,ip+1:ip+r_h)  =beta_k_down(:,1:r_h)
+			beta_up(1-r_h:0)       = 0._wp
+			beta_up(kp+1:kp+r_h)   = 0._wp
+			beta_down(1-r_h:0)     = 0._wp
+			beta_down(kp+1:kp+r_h) = 0._wp
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 
@@ -680,12 +708,13 @@
 			! equation 18 of Smolarkiewicz and Grabowski (1990, JCP, 86)                 !
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !$omp simd	
-            do k=1,kp			
-                wt_sav(k)=min(1._wp,beta_k_down(k), &
-                                 beta_k_up(k+1))*max(wt(k),0._wp) + &
-                              min(1._wp,beta_k_up(k), &
-                                 beta_k_down(k+1))*min(wt(k),0._wp)
-            enddo
+			do k=1,kp
+				wt_sav(k) = &
+					min(1._wp,beta_down(k),beta_up(k+1)) * &
+						max(wt(k),0._wp) + &
+					min(1._wp,beta_up(k),beta_down(k+1)) * &
+						min(wt(k),0._wp)
+			enddo
 !$omp end simd
 			!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
